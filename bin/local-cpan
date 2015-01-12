@@ -1,0 +1,136 @@
+#!perl
+
+# DATE
+# VERSION
+
+use 5.010;
+use strict;
+use warnings;
+
+use Perinci::CmdLine::Any -prefer_lite=>1;
+
+#my $prefix = '/CPAN/Local/';
+
+Perinci::CmdLine::Any->new(
+    url => $prefix,
+    log => 1,
+    subcommands => {
+        update  => {url=>""},
+        'update-index' => {url=>""},
+        'update-files' => {url=>""},
+        'authors'  => {url=>""},
+        'modules'  => {url=>""},
+        'dists'    => {url=>""},
+        'deps'     => {url=>""},
+        'rev-deps' => {url=>""},
+        #'search' => {url=>""},
+    },
+)->run;
+
+# ABSTRACT: Manage your local CPAN mirror
+# PODNAME:
+
+=head1 SYNOPSIS
+
+=head2 Update (download and index) your local CPAN mirror
+
+ % local-cpan update
+
+A mini CPAN mirror will be downloaded in your C<~/cpan> directory. This will
+take a while (it downloads +- 4GB of files, as of this writing; subsequent
+update will of course take shorter time.)
+
+A SQLite database is also created/updated in C<~/cpan/index.db> which contains
+information about authors, modules/packages, distributions. This database is
+used for quickly answer various queries.
+
+You can run the above command e.g. daily to keep your mirror up-to-date.
+
+=head2 Using your local CPAN mirror to install modules
+
+ % cpanm --mirror ~/cpan --mirror-only -n Some::Module
+
+You can also set C<PERL_CPANM_OPT> in your C<~/.bashrc> or C<~/.bash_profile> to
+save typing the options all the time:
+
+ export PERL_CPANM_OPT="--mirror $HOME/cpan --mirror-only -n"
+
+Then you can install modules simply using:
+
+ % cpanm Some::Module
+
+and if you want to install from official CPAN mirror, you can do:
+
+ % PERL_CPANM_OPT= cpanm Some::Module
+
+=head2 Querying your local CPAN mirror
+
+Info about your local CPAN mirror:
+
+ % local-cpan stats
+ +------------------+----------------------+
+ | name             | value                |
+ +------------------+----------------------+
+ | authors          | 11967                |
+ | distributions    | 29907                |
+ | last-updated     | 2015-01-09T10:40:55Z |
+ | modules          | 13365                |
+ | packages         | 133650               |
+ +------------------+----------------------+
+
+Add C<--verbose> if you want more stats which normally are skipped because they
+can take a while to get (e.g. disk-space).
+
+B<List modules:>
+
+ % local-cpan modules
+
+List modules matching some query (name):
+
+ % local-cpan modules smtp
+
+List modules by certain author, show detail instead of just module names:
+
+ % local-cpan modules --author PERLANCAR --detail
+
+List modules from a certain dist:
+
+ % local-cpan modules --dist libwww-perl --detail
+
+B<List distributions:>
+
+ % local-cpan dists
+
+List distributions matching some query (name, filename, abstract), show detail
+instead of just distribution name:
+
+ % local-cpan dists critic --detail
+
+List distributions released by a certain author:
+
+ % local-cpan dists --author PERLANCAR
+
+B<List authors:>
+
+ % local-cpan authors
+
+List authors matching some query (PAUSE ID, name, email), show detail instead of
+just ID:
+
+ % local-cpan authors tatsuhiko --detail
+
+B<Show dependencies and reverse dependencies>:
+
+ # which modules does Text::ANSITable depend on?
+ % local-cpan deps Text::ANSITable
+
+ # do it recursively
+ % local-cpan deps Text::ANSITable -R
+
+ # which distributions depend on Text::ANSITable?
+ % local-cpan rev-deps Text::ANSITable
+
+
+=head2
+
+=head1 DESCRIPTION
