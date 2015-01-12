@@ -16,6 +16,7 @@ Perinci::CmdLine::Any->new(
     log => 1,
     subcommands => {
         update  => {url=>""},
+        stats   => {url=>""},
         'update-index' => {url=>""},
         'update-files' => {url=>""},
         'authors'  => {url=>""},

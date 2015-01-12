@@ -8,20 +8,21 @@ use strict;
 use warnings;
 use Log::Any '$log';
 
-use Archive::Zip qw(:ERROR_CODES :CONSTANTS);
-use Archive::Tar;
-use File::Slurp::Tiny qw(read_file);
-#use File::Temp qw(tempdir);
-use JSON;
-use YAML::Syck ();
-
 use Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = qw(
-                       index_cpan_meta
+                       update_local_cpan_index
                );
 
 our %SPEC;
+
+my %common_args = (
+    cpan => {
+        schema => 'str*',
+        req => 1,
+        summary => 'Location of your local CPAN mirror, e.g. /path/to/cpan',
+    },
+);
 
 $SPEC{':package'} = {
     v => 1.1,
@@ -31,22 +32,98 @@ $SPEC{':package'} = {
 sub _connect_db {
     require DBI;
 
-    my %args = @_;
+    my $cpan = shift;
 
-    my $cpan    = $args{cpan};
-    my $db_dir  = $args{db_dir} // $cpan;
-    my $db_name = $args{db_name} // 'cpandb.sql';
-
-    my $db_path = "$db_dir/$db_name";
+    my $db_path = "$cpan/index.db";
     $log->tracef("Connecting to SQLite database at %s ...", $db_path);
     DBI->connect("dbi:SQLite:dbname=$db_path", undef, undef,
                  {RaiseError=>1});
 }
 
+sub _create_schema {
+    require SQL::Schema::Versioned;
+
+    my $dbh = shift;
+
+    my $spec = {
+        latest_v => 1,
+
+        install => [
+            # some differences with CPAN::SQLite's version:
+            # - column sizes are expanded
+            # - some indexes are converted to unique index
+            # - remove chapter table/columns
+            # - dists: add index on dist_file
+            'CREATE TABLE mods (
+                 mod_id INTEGER NOT NULL PRIMARY KEY,
+                 mod_name VARCHAR(255) NOT NULL,
+                 dist_id INTEGER NOT NULL,
+                 mod_abs TEXT,
+                 mod_vers VARCHAR(20),
+                 dslip VARCHAR(5)
+                 -- chapterid INTEGER
+             )',
+            'CREATE INDEX ix_mods_dist_id ON mods(dist_id)',
+            'CREATE UNIQUE INDEX ix_mods_mod_name ON mods(dist_id)',
+
+            'CREATE TABLE dists (
+                 dist_id INTEGER NOT NULL PRIMARY KEY,
+                 dist_name VARCHAR(90) NOT NULL,
+                 auth_id INTEGER NOT NULL,
+                 dist_file VARCHAR(255) NOT NULL,
+                 dist_vers VARCHAR(20),
+                 dist_abs TEXT,
+                 dist_dslip VARCHAR(5)
+             )',
+            'CREATE INDEX ix_dists_auth_id ON dists(auth_id)',
+            'CREATE UNIQUE INDEX ix_dists_dist_name ON dists(dist_name)',
+            'CREATE UNIQUE INDEX ix_dists_dist_file ON dists(dist_file)',
+
+            'CREATE TABLE auths (
+                 auth_id INTEGER NOT NULL PRIMARY KEY,
+                 cpanid VARCHAR(20) NOT NULL,
+                 fullname VARCHAR(255) NOT NULL,
+                 email TEXT
+             )',
+            'CREATE UNIQUE INDEX ix_auths_cpanid ON auths(cpanid)',
+
+            'CREATE TABLE files (
+                 file_id INTEGER NOT NULL PRIMARY KEY,
+                 file_name TEXT NOT NULL,
+                 status TEXT -- ok, nometa, nofile, unsupported, metaerr, err
+             )',
+            'CREATE UNIQUE INDEX ix_files_file_name ON files(file_name)',
+
+            'CREATE TABLE IF NOT EXISTS deps (
+                 dep_id INTEGER NOT NULL PRIMARY KEY,
+                 file_id INTEGER,
+                 dist_id INTEGER,
+                 mod_id INTEGER, -- if module is known (listed in mods table), only its id will be recorded here
+                 mod_name TEXT,  -- if module is unknown (unlisted in mods), only the name will be recorded here
+                 rel TEXT, -- relationship: requires, ...
+                 phase TEXT, -- runtime, ...
+                 version TEXT,
+                 FOREIGN KEY (file_id) REFERENCES files(file_id),
+                 FOREIGN KEY (dist_id) REFERENCES dists(dist_id),
+                 FOREIGN KEY (mod_id) REFERENCES mods(mod_id)
+             )',
+            'CREATE INDEX IF NOT EXISTS ix_deps_mod_name ON deps(mod_name)',
+        ], # install
+    }; # spec
+
+    my $res = SQL::Schema::Versioned::create_or_update_db_schema(
+        dbh => $dbh, spec => $spec);
+    die "Can't create/update schema: $res->[0] - $res->[1]\n"
+        unless $res->[0] == 200;
+}
+
 sub _parse_json {
     my $content = shift;
 
-    state $json = JSON->new;
+    state $json = do {
+        require JSON;
+        JSON->new;
+    };
     my $data;
     eval {
         $data = $json->decode($content);
@@ -60,6 +137,8 @@ sub _parse_json {
 }
 
 sub _parse_yaml {
+    require YAML::Syck;
+
     my $content = shift;
 
     my $data;
@@ -91,67 +170,100 @@ sub _add_prereqs {
     }
 }
 
-my %common_args = (
-    cpan => {
-        schema => 'str*',
-        req => 1,
-        summary => 'Location of your local CPAN mirror, e.g. /path/to/cpan',
-    },
-    db_dir => {
-        summary => 'Database directory, defaults to your CPAN home',
-        schema  => 'str*',
-    },
-    db_name => {
-        summary => 'Database name',
-        schema  => 'str*',
-        default => 'cpandb.sql',
-    },
-);
-
-$SPEC{'index_cpan_meta'} = {
+$SPEC{'update_local_cpan_index'} = {
     v => 1.1,
-    summary => 'Index CPAN Meta information into CPAN::SQLite database',
     args => {
         %common_args,
     },
 };
-sub index_cpan_meta {
+sub update_local_cpan_index {
     require DBI;
+    require File::Slurp::Tiny;
+    require IO::Compress::Gzip;
 
     my %args = @_;
-
     my $cpan = $args{cpan} or return [400, "Please specify 'cpan'"];
 
-    my $dbh  = _connect_db(%args);
+    my $dbh  = _connect_db($cpan);
+    _create_schema($dbh);
 
-    $dbh->do("CREATE INDEX IF NOT EXISTS ix_dists_dist_file ON dists(dist_file)");
-    $dbh->do("CREATE TABLE IF NOT EXISTS files (
-  file_id INTEGER NOT NULL PRIMARY KEY,
-  file_name TEXT NOT NULL,
-  status TEXT -- ok (indexed successfully), nometa (does not contain META.yml/META.json), nofile (file does not exist in local CPAN), unsupported (unsupported file type), metaerr (meta has some errors), err (other error, detail logged to Log::Any)
-)");
-    $dbh->do("CREATE INDEX IF NOT EXISTS ix_files_file_name ON files(file_name)");
-    $dbh->do("CREATE TABLE IF NOT EXISTS deps (
-  dep_id INTEGER NOT NULL PRIMARY KEY,
-  file_id INTEGER,
-  dist_id INTEGER,
-  mod_id INTEGER, -- if release refers to a known module (listed in 'mods' table), only its id will be recorded here
-  mod_name TEXT,  -- if release refers to an unknown module (unlisted in 'mods'), only the name will be recorded here
-  rel TEXT, -- relationship: requires, ...
-  phase TEXT, -- runtime, ...
-  version TEXT,
-  FOREIGN KEY (file_id) REFERENCES files(file_id),
-  FOREIGN KEY (dist_id) REFERENCES dists(dist_id),
-  FOREIGN KEY (mod_id) REFERENCES mods(mod_id)
-)");
-    $dbh->do("CREATE INDEX IF NOT EXISTS ix_deps_mod_name ON deps(mod_name)");
+    {
+        my $path = "$cpan/authors/01mailrc.txt.gz";
+        $log->infof("Parsing %s ...", $path);
+        open my($fh), "<:gzip", $path or die "Can't open $path (<:gzip): $!";
 
-    my $sth;
+        my $sth = $dbh->prepare("INSERT OR IGNORE INTO auths (cpanid,fullname,email) VALUES (?,?,?)");
+        $dbh->begin_work;
+        my $line = 0;
+        while (<$fh>) {
+            $line++;
+            my ($cpanid, $fullname, $email) = /^alias (\S+)\s+"(.*) <(.+)>"/ or do {
+                $log->warnf("  line %d: syntax error, skipped: %s", $line, $_);
+                next;
+            };
+            $sth->execute($cpanid, $fullname, $email);
+            my $auth_id = $dbh->last_insert_id("","","","");
+            if ($auth_id) {
+                $log->debugf("  new author: %s", $cpanid);
+            }
+        }
+        $dbh->commit;
+    }
+
+    {
+        my $path = "$cpan/modules/02packages.details.txt.gz";
+        $log->infof("Parsing %s ...", $path);
+        open my($fh), "<:gzip", $path or die "Can't open $path (<:gzip): $!";
+
+        my $sth = $dbh->prepare("INSERT OR IGNORE INTO files (file_name) VALUES (?)");
+
+        my $line = 0;
+        my $newfiles = 0;
+        my $after_begin = 0;
+        while (<$fh>) {
+            # commit after every 500 new files
+            if ($newfiles % 500 == 499) {
+                $log->tracef("  COMMIT");
+                $dbh->commit;
+                $after_begin = 0;
+            }
+            if ($newfiles % 500 == 0 && !$after_begin) {
+                $log->tracef("  BEGIN");
+                $dbh->begin_work;
+                $after_begin = 1;
+            }
+            $line++;
+            next unless /\S/;
+            next if /^\S+:\s/;
+            chomp;
+            #say "D:$_";
+            my ($pkg, $ver, $path) = split /\s+/, $_;
+            $ver = undef if $ver eq 'undef';
+            my ($author, $file) = $path =~ m!^./../(.+?)/(.+)! or do {
+                $log->warnf("  line %d: Invalid path %s, skipped", $line, $path);
+                next;
+            };
+            $sth->execute($file);
+            my $file_id = $dbh->last_insert_id("","","","");
+            if ($file_id) {
+                $log->debugf("  New file: %s", $file);
+            }
+            # XXX parse dist, insert into dists
+            # XXX insert into mods
+            # XXX insert into deps
+        } # while <fh>
+        if ($after_begin) {
+            $log->tracef("  COMMIT");
+            $dbh->commit;
+        }
+    }
+
+    return [200];
 
     # delete files in 'files' table no longer in 'dists' table
   DEL_FILES:
     {
-        $sth = $dbh->prepare("SELECT file_name
+        my $sth = $dbh->prepare("SELECT file_name
 FROM files
 WHERE NOT EXISTS (SELECT 1 FROM dists WHERE file_name=dist_file)
 ");
@@ -174,7 +286,7 @@ WHERE NOT EXISTS (SELECT 1 FROM dists WHERE file_name=dist_file)
     }
 
     # list files in 'dists' but not already in 'files' table
-    $sth = $dbh->prepare("SELECT
+    my $sth = $dbh->prepare("SELECT
   d.dist_id dist_id,
   dist_name,
   dist_file,
@@ -191,7 +303,7 @@ ORDER BY dist_file
         push @files, $row;
     }
 
-    my $sth_insfile = $dbh->prepare("INSERT INTO files (file_name,status) VALUES (?,?)");
+    my $sth_insfile;
     my $sth_seldist = $dbh->prepare("SELECT * FROM dists WHERE dist_name=?");
     my $sth_insdist = $dbh->prepare("INSERT INTO dists (dist_file,dist_vers,dist_name,auth_id) VALUES (?,?,?,?)");
     my $sth_selmod  = $dbh->prepare("SELECT * FROM mods WHERE mod_name=?");
@@ -239,7 +351,7 @@ ORDER BY dist_file
             my ($name, $ext) = ($1, $2);
             if (-f "$name.meta") {
                 $log->tracef("Getting meta from .meta file: %s", "$name.meta");
-                eval { $meta = _parse_json(~~read_file("$name.meta")) };
+                eval { $meta = _parse_json(~~File::Slurp::Tiny::read_file("$name.meta")) };
                 unless ($meta) {
                     $log->errorf("Can't read %s: %s", "$name.meta", $@) if $@;
                     $sth_insfile->execute($file->{dist_file}, "err");
@@ -250,8 +362,10 @@ ORDER BY dist_file
 
             eval {
                 if ($path =~ /\.zip$/i) {
+                    require Archive::Zip;
                     my $zip = Archive::Zip->new;
-                    $zip->read($path) == AZ_OK or die "Can't read zip file";
+                    $zip->read($path) == Archive::Zip::AZ_OK()
+                        or die "Can't read zip file";
                     for my $member ($zip->members) {
                         if ($member->fileName =~ m!(?:/|\\)META.(yml|json)$!) {
                             #$log->tracef("  found %s", $member->fileName);
@@ -267,6 +381,7 @@ ORDER BY dist_file
                         }
                     }
                 } else {
+                    require Archive::Tar;
                     my $tar = Archive::Tar->new;
                     $tar->read($path);
                     for my $member ($tar->list_files) {
@@ -368,5 +483,20 @@ ORDER BY dist_file
 =head1 SYNOPSIS
 
 See L<local-cpan> script.
+
+
+=head1 HISTORY
+
+This application began as L<CPAN::SQLite::CPANMeta>, an extension of
+L<CPAN::SQLite>. C<CPAN::SQLite> parses C<02packages.details.txt.gz> and
+C<01mailrc.txt.gz> and puts the parse result into a SQLite database.
+C<CPAN::SQLite::CPANMeta> parses the C<META.json>/C<META.yml> files in
+individual release files and adds it to the SQLite database.
+
+In order to simplify things for the users (one-step indexing) and get more
+freedom in database schema, C<CPAN::Local> skips using C<CPAN::SQLite> and
+creates the SQLite database itself. It also parses C<02packages.details.txt.gz>
+but does not parse distribution names from it but instead uses C<META.json> and
+C<META.yml> files extracted from the release files.
 
 =cut
