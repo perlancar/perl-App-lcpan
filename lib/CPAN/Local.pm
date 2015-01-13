@@ -238,7 +238,12 @@ sub update_local_cpan_index {
         $log->infof("Parsing %s ...", $path);
         open my($fh), "<:gzip", $path or die "Can't open $path (<:gzip): $!";
 
-        my $sth = $dbh->prepare("INSERT OR IGNORE INTO author (cpanid,fullname,email) VALUES (?,?,?)");
+        # i would like to use INSERT OR IGNORE, but rows affected returned by
+        # execute() is always 1?
+
+        my $sth_ins_auth = $dbh->prepare("INSERT INTO author (cpanid,fullname,email) VALUES (?,?,?)");
+        my $sth_sel_auth = $dbh->prepare("SELECT cpanid FROM author WHERE cpanid=?");
+
         $dbh->begin_work;
         my $line = 0;
         while (<$fh>) {
@@ -247,11 +252,11 @@ sub update_local_cpan_index {
                 $log->warnf("  line %d: syntax error, skipped: %s", $line, $_);
                 next;
             };
-            $sth->execute($cpanid, $fullname, $email);
-            my $id = $dbh->last_insert_id("","","","");
-            if ($id) {
-                $log->tracef("  new author: %s", $cpanid);
-            }
+
+            $sth_sel_auth->execute($cpanid);
+            next if $sth_sel_auth->fetchrow_arrayref;
+            $sth_ins_auth->execute($cpanid, $fullname, $email);
+            $log->tracef("  new author: %s", $cpanid);
         }
         $dbh->commit;
     }
@@ -264,7 +269,8 @@ sub update_local_cpan_index {
         $log->infof("Parsing %s ...", $path);
         open my($fh), "<:gzip", $path or die "Can't open $path (<:gzip): $!";
 
-        my $sth_ins_file = $dbh->prepare("INSERT OR IGNORE INTO file (name,cpanid) VALUES (?,?)");
+        my $sth_sel_file = $dbh->prepare("SELECT id FROM file WHERE name=?");
+        my $sth_ins_file = $dbh->prepare("INSERT INTO file (name,cpanid) VALUES (?,?)");
         my $sth_ins_mod  = $dbh->prepare("INSERT OR REPLACE INTO module (name,file_id,version) VALUES (?,?,?)");
 
         $dbh->begin_work;
@@ -293,9 +299,12 @@ sub update_local_cpan_index {
             if (exists $files_in_02packages{$file}) {
                 $file_id = $files_in_02packages{$file};
             } else {
-                $sth_ins_file->execute($file, $author);
-                $file_id = $dbh->last_insert_id("","","","");
-                $log->tracef("  New file: %s", $file) if $file_id;
+                $sth_sel_file->execute($file);
+                unless ($sth_sel_file->fetchrow_arrayref) {
+                    $sth_ins_file->execute($file, $author);
+                    $file_id = $dbh->last_insert_id("","","","");
+                    $log->tracef("  New file: %s", $file);
+                }
                 $files_in_02packages{$file} = $file_id;
             }
             next unless $file_id;
