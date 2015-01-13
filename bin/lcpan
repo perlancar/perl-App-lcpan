@@ -139,6 +139,17 @@ command-line (as well as programmatically).
 
 =head1 FAQ
 
+=head2 How to customize location of local CPAN mirror?
+
+By default CPAN mirror is put in C<~/cpan>. To customize this, use the C<--cpan>
+option, e.g.:
+
+ % lcpan update --cpan /path/to/my/cpan
+
+You can also create a configuration C<~/lcpan.conf> so you don't have to specify
+the C<--cpan> option everytime:
+
+ cpan=/path/to/my/cpan
 
 =head1 SEE ALSO
 
