@@ -9,7 +9,7 @@ use warnings;
 
 use Perinci::CmdLine::Any -prefer_lite=>1;
 
-my $prefix = '/CPAN/Local/';
+my $prefix = '/App/lcpan/';
 
 Perinci::CmdLine::Any->new(
     url => $prefix,

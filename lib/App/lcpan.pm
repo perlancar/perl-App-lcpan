@@ -1,4 +1,4 @@
-package CPAN::Local;
+package App::lcpan;
 
 # DATE
 # VERSION
@@ -1144,9 +1144,10 @@ C<CPAN::SQLite::CPANMeta> parses the C<META.json>/C<META.yml> files in
 individual release files and adds it to the SQLite database.
 
 In order to simplify things for the users (one-step indexing) and get more
-freedom in database schema, C<CPAN::Local> skips using C<CPAN::SQLite> and
-creates the SQLite database itself. It also parses C<02packages.details.txt.gz>
-but does not parse distribution names from it but instead uses C<META.json> and
-C<META.yml> files extracted from the release files.
+freedom in database schema, C<lcpan> skips using C<CPAN::SQLite> and creates its
+own SQLite database. It also parses C<02packages.details.txt.gz> but does not
+parse distribution names from it but instead uses C<META.json> and C<META.yml>
+files extracted from the release files. If no C<META.*> files exist, then it
+will use the module name.
 
 =cut
