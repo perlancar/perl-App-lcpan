@@ -9,22 +9,24 @@ use warnings;
 
 use Perinci::CmdLine::Any -prefer_lite=>1;
 
-#my $prefix = '/CPAN/Local/';
+my $prefix = '/CPAN/Local/';
 
 Perinci::CmdLine::Any->new(
     url => $prefix,
     log => 1,
     subcommands => {
-        update  => {url=>""},
-        stats   => {url=>""},
-        'update-index' => {url=>""},
-        'update-files' => {url=>""},
-        'authors'  => {url=>""},
-        'modules'  => {url=>""},
-        'dists'    => {url=>""},
-        'deps'     => {url=>""},
-        'rev-deps' => {url=>""},
-        #'search' => {url=>""},
+        update          => {url=>"${prefix}update_local_cpan"},
+        'update-index'  => {url=>"${prefix}update_local_cpan_index"},
+        'update-files'  => {url=>"${prefix}update_local_cpan_files"},
+
+        stats      => {url=>"${prefix}stat_local_cpan"},
+
+        authors    => {url=>"${prefix}list_local_cpan_authors"},
+        modules    => {url=>"${prefix}list_local_cpan_modules"},
+        dists      => {url=>"${prefix}list_local_cpan_dists"},
+        deps       => {url=>"${prefix}list_local_cpan_deps"},
+        'rev-deps' => {url=>"${prefix}list_local_cpan_rev_deps"},
+        #search => {url=>""},
     },
 )->run;
 
