@@ -1,5 +1,11 @@
 Revision history for App-lcpan
 
+0.02    2015-01-13 (PERLANCAR)
+
+	- Rename module/dist from CPAN::Local to App::lcpan (PAUSE
+	  conflict, CPAN::Local already exists on CPAN).
+
+
 0.01    2015-01-13 (PERLANCAR)
 
         - First version.
