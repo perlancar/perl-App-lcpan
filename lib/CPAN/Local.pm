@@ -1112,7 +1112,7 @@ sub list_local_cpan_rev_deps {
 
 =head1 SYNOPSIS
 
-See L<local-cpan> script.
+See L<lcpan> script.
 
 
 =head1 HISTORY

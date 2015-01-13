@@ -37,7 +37,7 @@ Perinci::CmdLine::Any->new(
 
 =head2 Update (download and index) your local CPAN mirror
 
- % local-cpan update
+ % lcpan update
 
 A mini CPAN mirror will be downloaded in your C<~/cpan> directory. This will
 take a while (it downloads +- 4GB of files, as of this writing; subsequent
@@ -65,7 +65,7 @@ Then you can install modules simply using:
 
 Info about your local CPAN mirror:
 
- % local-cpan stats
+ % lcpan stats
  +------------------+----------------------+
  | name             | value                |
  +------------------+----------------------+
@@ -81,52 +81,52 @@ can take a while to get (e.g. disk-space).
 
 B<List modules:>
 
- % local-cpan modules
+ % lcpan modules
 
 List modules matching some query (name):
 
- % local-cpan modules smtp
+ % lcpan modules smtp
 
 List modules by certain author, show detail instead of just module names:
 
- % local-cpan modules --author PERLANCAR --detail
+ % lcpan modules --author PERLANCAR --detail
 
 List modules from a certain dist:
 
- % local-cpan modules --dist libwww-perl --detail
+ % lcpan modules --dist libwww-perl --detail
 
 B<List distributions:>
 
- % local-cpan dists
+ % lcpan dists
 
 List distributions matching some query (name, filename, abstract), show detail
 instead of just distribution name:
 
- % local-cpan dists critic --detail
+ % lcpan dists critic --detail
 
 List distributions released by a certain author:
 
- % local-cpan dists --author PERLANCAR
+ % lcpan dists --author PERLANCAR
 
 B<List authors:>
 
- % local-cpan authors
+ % lcpan authors
 
 List authors matching some query (PAUSE ID, name, email), show detail instead of
 just ID:
 
- % local-cpan authors tatsuhiko --detail
+ % lcpan authors tatsuhiko --detail
 
 B<Show dependencies and reverse dependencies>:
 
  # which modules does Text::ANSITable depend on?
- % local-cpan deps Text::ANSITable
+ % lcpan deps Text::ANSITable
 
  # do it recursively
- % local-cpan deps Text::ANSITable -R
+ % lcpan deps Text::ANSITable -R
 
  # which distributions depend on Text::ANSITable?
- % local-cpan rev-deps Text::ANSITable
+ % lcpan rev-deps Text::ANSITable
 
 
 =head1 DESCRIPTION
