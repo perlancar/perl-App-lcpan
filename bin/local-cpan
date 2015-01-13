@@ -51,18 +51,13 @@ You can run the above command e.g. daily to keep your mirror up-to-date.
 
  % cpanm --mirror ~/cpan --mirror-only -n Some::Module
 
-You can also set C<PERL_CPANM_OPT> in your C<~/.bashrc> or C<~/.bash_profile> to
-save typing the options all the time:
+You can also set up a shell alias to save typing the options all the time, e.g.:
 
- export PERL_CPANM_OPT="--mirror $HOME/cpan --mirror-only -n"
+ alias lcpanm="cpanm --mirror ~/cpan --mirror-only -n"
 
 Then you can install modules simply using:
 
- % cpanm Some::Module
-
-and if you want to install from official CPAN mirror, you can do:
-
- % PERL_CPANM_OPT= cpanm Some::Module
+ % lcpanm Some::Module
 
 =head2 Querying your local CPAN mirror
 
