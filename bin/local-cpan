@@ -129,6 +129,16 @@ B<Show dependencies and reverse dependencies>:
  % local-cpan rev-deps Text::ANSITable
 
 
-=head2
-
 =head1 DESCRIPTION
+
+This application is a convenient bundling of C<CPAN::Mini> and an indexer so in
+addition to creating your local CPAN mirror and installing modules from it, you
+can also query various things about your local CPAN mirror quickly from the
+command-line (as well as programmatically).
+
+
+=head1 FAQ
+
+
+=head1 SEE ALSO
+

@@ -185,6 +185,12 @@ $SPEC{'update_local_cpan_files'} = {
     v => 1.1,
     args => {
         %common_args,
+        max_file_size => {
+            schema => 'int',
+        },
+        remote_url => {
+            schema => 'str*',
+        },
     },
 };
 sub update_local_cpan_files {
@@ -193,11 +199,19 @@ sub update_local_cpan_files {
     my %args = @_;
     _set_args_default(\%args);
     my $cpan = $args{cpan};
+    my $remote_url = $args{remote_url} // "http://mirrors.kernel.org/cpan";
+    my $max_file_size = $args{max_file_size};
+
+    local $ENV{PERL5OPT} = "-MLWP::UserAgent::Patch::FilterMirrorMaxSize=-size,".($max_file_size+0).",-verbose,1"
+        if defined $max_file_size;
+
+    my @cmd = ("minicpan", "-l", $cpan, "-r", $remote_url);
 
     IPC::System::Options::system(
         {die=>1, log=>1},
-        "minicpan", "-l", $cpan, "-r", "http://mirrors.kernel.org/cpan",
+        @cmd,
     );
+    [200];
 }
 
 $SPEC{'update_local_cpan_index'} = {
@@ -781,8 +795,8 @@ sub list_local_cpan_packages {
     my @where;
     if (length($q)) {
         #push @where, "(name LIKE ? OR dist LIKE ?)"; # rather slow
-        push @where, "(name LIKE ?)";
-        push @bind, $q;#, $q;
+        push @where, "(name LIKE ? OR abstract LIKE ?)";
+        push @bind, $q, $q;
     }
     if ($args{author}) {
         #push @where, "(dist_id IN (SELECT dist_id FROM dist WHERE auth_id IN (SELECT auth_id FROM auths WHERE cpanid=?)))";
@@ -798,6 +812,7 @@ sub list_local_cpan_packages {
   name,
   version,
   (SELECT name FROM dist WHERE dist.file_id=module.file_id) dist,
+  (SELECT abstract FROM dist WHERE dist.file_id=module.file_id) abstract,
   (SELECT cpanid FROM file WHERE id=module.file_id) author
 FROM module".
         (@where ? " WHERE ".join(" AND ", @where) : "").
@@ -807,6 +822,7 @@ FROM module".
     my $sth = $dbh->prepare($sql);
     $sth->execute(@bind);
     while (my $row = $sth->fetchrow_hashref) {
+        delete $row->{abstract};
         push @res, $detail ? $row : $row->{name};
     }
     \@res;
@@ -872,8 +888,8 @@ sub list_local_cpan_dists {
     my @bind;
     my @where;
     if (length($q)) {
-        push @where, "(name LIKE ?)";
-        push @bind, $q;
+        push @where, "(name LIKE ? OR abstract LIKE ?)";
+        push @bind, $q, $q;
     }
     if ($args{author}) {
         #push @where, "(dist_id IN (SELECT dist_id FROM dists WHERE auth_id IN (SELECT auth_id FROM auths WHERE cpanid=?)))";
@@ -882,6 +898,7 @@ sub list_local_cpan_dists {
     }
     my $sql = "SELECT
   name,
+  abstract,
   version,
   (SELECT name FROM file WHERE id=dist.file_id) file,
   (SELECT cpanid FROM file WHERE id=dist.file_id) author
