@@ -544,8 +544,19 @@ sub stat_local_cpan {
     my %args = @_;
     _set_args_default(\%args);
     my $cpan = $args{cpan};
+    my $dbh = _connect_db($cpan);
 
-    [501, "Not yet implemented"];
+    my $stat = {};
+
+    ($stat->{authors}) = $dbh->selectrow_array("SELECT COUNT(*) FROM author");
+    ($stat->{modules}) = $dbh->selectrow_array("SELECT COUNT(*) FROM module");
+    ($stat->{releases}) = $dbh->selectrow_array("SELECT COUNT(*) FROM file");
+    ($stat->{releases_with_cpan_meta}) = $dbh->selectrow_array("SELECT COUNT(*) FROM file WHERE status='ok'");
+    ($stat->{distributions}) = $dbh->selectrow_array("SELECT COUNT(*) FROM dist");
+
+    # XXX last_update_time
+
+    [200, "OK", $stat];
 }
 
 sub _complete_mod {
