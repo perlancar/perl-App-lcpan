@@ -27,8 +27,6 @@ Perinci::CmdLine::Any->new(
         dists      => {url=>"${prefix}list_local_cpan_dists"},
         deps       => {url=>"${prefix}list_local_cpan_deps"},
         rdeps      => {url=>"${prefix}list_local_cpan_rev_deps"},
-
-        'dump-config' => {url=>"${prefix}dump_config"},
         #search => {url=>""},
     },
 )->run;

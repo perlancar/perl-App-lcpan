@@ -8,9 +8,29 @@
 use strict;
 use warnings;
 
-my %opts = map {chomp;$_} `lcpan dump-config`;
+use App::lcpan;
+use Perinci::CmdLine::Util::Config;
+
+my $res = Perinci::CmdLine::Util::Config::read_config(
+    program_name => "lcpan",
+);
+die "Can't read lcpan config files: $res->[0] - $res->[1]\n"
+    unless $res->[0] == 200;
+my $config = $res->[2];
+
+my %args;
+$res = Perinci::CmdLine::Util::Config::get_args_from_config(
+    config => $config,
+    args   => \%args,
+    subcommand_name => 'update-index',
+    meta   => $App::lcpan::SPEC{update_local_cpan_index},
+);
+die "Can't set lcpan function argument from config: $res->[0] - $res->[1]\n"
+    unless $res->[0] == 200;
+App::lcpan::_set_args_default(\%args);
+
 my @cmd = ("cpanm");
-push @cmd, "--mirror", $opts{cpan}, "--mirror-only" if $opts{cpan};
+push @cmd, "--mirror", $args{cpan}, "--mirror-only" if $args{cpan}; # should be defined
 push @cmd, @ARGV;
 
 print "lcpanm: exec: ".join(" ", @cmd), "\n" if $ENV{DEBUG};
