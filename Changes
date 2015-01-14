@@ -9,7 +9,7 @@ Revision history for App-lcpan
           files. But this also means actually executing the Makefile.PL &
           Build.PL scripts, which might have some side effects.
 
-        - Add script: lcpam.
+        - Add script: lcpanm.
 
         - Rename 'rev-deps' subcommand to 'rdeps'.
 
