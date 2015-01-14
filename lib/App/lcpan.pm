@@ -53,7 +53,7 @@ sub _create_schema {
     my $dbh = shift;
 
     my $spec = {
-        latest_v => 1,
+        latest_v => 2,
 
         install => [
             'CREATE TABLE author (
@@ -68,10 +68,11 @@ sub _create_schema {
                  cpanid VARCHAR(20) NOT NULL REFERENCES author(cpanid),
 
                  -- processing status: ok (meta has been extracted and parsed),
-                 -- nometa (file does contain cpan meta), nofile (file does not
-                 -- exist in mirror), unsupported (file type is not supported,
-                 -- e.g. rar, non archive), metaerr (meta has some error), err
-                 -- (other error).
+                 -- nofile (file does not exist in mirror), unsupported (file
+                 -- type is not supported, e.g. rar, non archive), infoerr
+                 -- (META.json/META.yml/Makefile.PL/Build.PL has some error)
+                 -- noinfo (no META.json, META.yml, Makefile.PL, or Build.PL
+                 -- found), err (other error).
                  status TEXT
              )',
             'CREATE UNIQUE INDEX ix_file__name ON file(name)',
@@ -85,7 +86,6 @@ sub _create_schema {
             'CREATE UNIQUE INDEX ix_module__name ON module(name)',
             'CREATE INDEX ix_module__file_id ON module(file_id)',
 
-            # this is inserted
             'CREATE TABLE dist (
                  id INTEGER NOT NULL PRIMARY KEY,
                  name VARCHAR(90) NOT NULL,
@@ -109,6 +109,16 @@ sub _create_schema {
             'CREATE INDEX ix_dep__module_name ON dep(module_name)',
             'CREATE UNIQUE INDEX ix_dep__dist_id__module_id ON dep(dist_id,module_id)',
         ], # install
+
+        upgrade_to_v2 => [
+            # actually we don't have any schema changes in v2, but we want to
+            # reindex release files that haven't been successfully indexed
+            # because aside from META.{json,yml}, we now can get information
+            # from Makefile.PL or Build.PL.
+            qq|DELETE FROM dep  WHERE dist_id IN (SELECT id FROM dist WHERE file_id IN (SELECT id FROM file WHERE status<>'ok'))|, # shouldn't exist though
+            qq|DELETE FROM dist WHERE file_id IN (SELECT id FROM file WHERE status<>'ok')|,
+            qq|DELETE FROM file WHERE status<>'ok'|,
+        ],
     }; # spec
 
     my $res = SQL::Schema::Versioned::create_or_update_db_schema(
@@ -185,12 +195,23 @@ sub _add_prereqs {
 
 $SPEC{'update_local_cpan_files'} = {
     v => 1.1,
+    summary => 'Update local CPAN mirror files using minicpan command',
+    description => <<'_',
+
+This subcommand runs the `minicpan` command to download/update your local CPAN
+mirror files.
+
+Note: you can also run `minicpan` yourself.
+
+_
     args => {
         %common_args,
         max_file_size => {
+            summary => 'If set, skip downloading files larger than this',
             schema => 'int',
         },
         remote_url => {
+            summary => 'Select CPAN mirror to download from',
             schema => 'str*',
         },
     },
@@ -216,8 +237,105 @@ sub update_local_cpan_files {
     [200];
 }
 
+sub _check_meta {
+    my $meta = shift;
+
+    unless (ref($meta) eq 'HASH') {
+        $log->infof("  meta is not a hash");
+        return 0;
+    }
+    unless (defined $meta->{name}) {
+        $log->errorf("  meta does not contain name");
+        return 0;
+    }
+    1;
+}
+
+sub _dump_makefile_pl {
+    require ExtUtils::MakeMaker::Dump;
+    require File::Temp;
+
+    my $content = shift;
+    state $tempname;
+    my $fh;
+    # we reuse the tempfile to avoid creating thousands
+    if (!$tempname) {
+        ($fh, $tempname) = File::Temp::tempfile();
+        close $fh;
+    }
+    open $fh, ">", $tempname or do {
+        $log->errorf("  can't write to tempfile %s: %s", $tempname, $!);
+        return undef;
+    };
+    print $fh $content;
+    close $fh;
+    my $res = ExtUtils::MakeMaker::Dump::dump_makefile_pl_script(
+        filename => $tempname);
+    unless ($res->[0] == 200) {
+        $log->errorf("  can't dump Makefile.PL: $res->[0] - $res->[1]");
+        return undef;
+    }
+    unless ($res->[2]{NAME}) {
+        $log->errorf("  no dist name in Makefile.PL");
+        return undef;
+    }
+    $res->[2];
+}
+
+sub _dump_build_pl {
+    require Module::Build::Dump;
+    require File::Temp;
+
+    my $content = shift;
+    state $tempname;
+    my $fh;
+    # we reuse the tempfile to avoid creating thousands
+    if (!$tempname) {
+        ($fh, $tempname) = File::Temp::tempfile();
+        close $fh;
+    }
+    open $fh, ">", $tempname or do {
+        $log->errorf("  can't write to tempfile %s: %s", $tempname, $!);
+        return undef;
+    };
+    print $fh $content;
+    close $fh;
+    my $res = Module::Build::Dump::dump_build_pl_script(
+        filename => $tempname);
+    unless ($res->[0] == 200) {
+        $log->errorf("  can't dump Build.PL: $res->[0] - $res->[1]");
+        return undef;
+    }
+    unless ($res->[2]{dist_name}) {
+        $log->errorf("  no dist name in Build.PL");
+        return undef;
+    }
+    $res->[2];
+}
+
 $SPEC{'update_local_cpan_index'} = {
     v => 1.1,
+    summary => 'Create/update index.db in local CPAN mirror',
+    description => <<'_',
+
+This subcommand is called by the `update` subcommand after `update-files` but
+can be performed separately via `update-index`. Its task is to create/update
+`index.db` SQLite database containing list of authors, modules, dists, and
+dependencies.
+
+It gets list of authors from parsing `authors/01mailrc.txt.gz` file.
+
+It gets list of packages from parsing `modules/02packages.details.txt.gz`.
+Afterwards, it tries to extract each release file for `META.yml` or `META.json`
+file to get distribution name, abstract, and dependencies information. If a
+release file does not contain any CPAN META file, it turns to `Makefile.PL` or
+`Build.PLq (which contains roughly the same information but in an executable
+form), trying to run the script but monkey-patching `ExtUtils::MakeMaker`'s
+`WriteMakefile()` or `Module::Build::Base`'s `create_build_script()` to dump the
+information and exit immediately before creating any actual Makefile/Build
+script.
+
+_
     args => {
         %common_args,
     },
@@ -332,7 +450,7 @@ sub update_local_cpan_index {
         $dbh->commit;
     }
 
-    # for each new file, try to extract its CPAN META
+    # for each new file, try to extract its CPAN META or Makefile.PL/Build.PL
     {
         my $sth = $dbh->prepare("SELECT * FROM file WHERE status IS NULL");
         $sth->execute;
@@ -375,9 +493,8 @@ sub update_local_cpan_index {
                 next FILE;
             }
 
-            # extract META.yml or META.json
-            my $meta;
-          GET_META:
+            my ($info, $type);
+          GET_INFO:
             {
                 unless ($path =~ /(.+)\.(tar|tar\.gz|tar\.bz2|tar\.Z|tgz|tbz2?|zip)$/i) {
                     $log->errorf("Doesn't support file type: %s, skipped", $file->{name});
@@ -388,15 +505,18 @@ sub update_local_cpan_index {
                 my ($name, $ext) = ($1, $2);
                 if (-f "$name.meta") {
                     $log->tracef("Getting meta from .meta file: %s", "$name.meta");
-                    eval { $meta = _parse_json(~~File::Slurp::Tiny::read_file("$name.meta")) };
-                    unless ($meta) {
+                    eval { $info = _parse_json(~~File::Slurp::Tiny::read_file("$name.meta")) };
+                    unless ($info) {
                         $log->errorf("Can't read %s: %s", "$name.meta", $@) if $@;
                         $sth_set_file_status->execute("err", $file->{id});
-                        next FILE;
+                        goto L1;
                     }
+                    $type = 'META.json';
+                    do { undef $info; goto L1 } unless _check_meta($info);
                     last GET_META;
                 }
 
+              L1:
                 eval {
                     if ($path =~ /\.zip$/i) {
                         require Archive::Zip;
@@ -404,17 +524,24 @@ sub update_local_cpan_index {
                         $zip->read($path) == Archive::Zip::AZ_OK()
                             or die "Can't read zip file";
                         for my $member ($zip->members) {
-                            if ($member->fileName =~ m!(?:/|\\)META.(yml|json)$!) {
-                                #$log->tracef("  found %s", $member->fileName);
-                                my $type = $1;
+                            if ($member->fileName =~ m!(?:/|\\)(META\.yml|META\.json|Makefile\.PL|Build\.PL)$!) {
+                                $log->tracef("  found %s", $member->fileName);
+                                $type = $1;
                                 my $content = $zip->contents($member);
                                 #$log->trace("[[$content]]");
-                                if ($type eq 'yml') {
-                                    $meta = _parse_yaml($content);
-                                } else {
-                                    $meta = _parse_json($content);
+                                if ($type eq 'META.yml') {
+                                    $info = _parse_yaml($content);
+                                    if (_check_meta($info)) { return } else { undef $info } # from eval
+                                } elsif ($type eq 'META.json') {
+                                    $info = _parse_json($content);
+                                    if (_check_meta($info)) { return } else { undef $info } # from eval
+                                } elsif ($type eq 'Makefile.PL') {
+                                    $info = _dump_makefile_pl($content);
+                                    if ($info) { return } else { undef $info } # from eval
+                                } elsif ($type eq 'Build.PL') {
+                                    $info = _dump_build_pl($content);
+                                    if ($info) { return } else { undef $info } # from eval
                                 }
-                                return; # from eval
                             }
                         }
                     } else {
@@ -422,66 +549,79 @@ sub update_local_cpan_index {
                         my $tar = Archive::Tar->new;
                         $tar->read($path);
                         for my $member ($tar->list_files) {
-                            if ($member =~ m!/META\.(yml|json)$!) {
-                                #$log->tracef("  found %s", $member);
+                            if ($member =~ m!/(META\.yml|META\.json|Makefile\.PL|Build\.PL)$!) {
+                                $log->tracef("  found %s", $member);
                                 my $type = $1;
                                 my ($obj) = $tar->get_files($member);
                                 my $content = $obj->get_content;
                                 #$log->trace("[[$content]]");
-                                if ($type eq 'yml') {
-                                    $meta = _parse_yaml($content);
-                                } else {
-                                    $meta = _parse_json($content);
+                                if ($type eq 'META.yml') {
+                                    $info = _parse_yaml($content);
+                                    if (_check_meta($info)) { return } else { undef $info } # from eval
+                                } elsif ($type eq 'META.json') {
+                                    $info = _parse_json($content);
+                                    if (_check_meta($info)) { return } else { undef $info } # from eval
+                                } elsif ($type eq 'Makefile.PL') {
+                                    $info = _dump_makefile_pl($content);
+                                    if ($info) { return } else { undef $info } # from eval
+                                } elsif ($type eq 'Build.PL') {
+                                    $info = _dump_build_pl($content);
+                                    if ($info) { return } else { undef $info } # from eval
                                 }
-                                return; # from eval
                             }
                         }
                     }
                 }; # eval
 
                 if ($@) {
-                    $log->errorf("Can't extract meta from file %s: %s", $path, $@);
+                    $log->errorf("Can't extract info from file %s: %s", $path, $@);
                     $sth_set_file_status->execute("err", $file->{id});
                     next FILE;
                 }
-            } # GET_META
+            } # GET_INFO
 
-            unless ($meta) {
-                $log->infof("File %s doesn't contain META.json/META.yml, skipped", $path);
-                $sth_set_file_status->execute("nometa", $file->{id});
+            unless ($info) {
+                $log->infof("File %s doesn't contain META.json/META.yml/Makefile.PL/Build.PL, skipped", $path);
+                $sth_set_file_status->execute("noinfo", $file->{id});
                 next FILE;
             }
 
-            unless (ref($meta) eq 'HASH') {
-                $log->infof("meta is not a hash, skipped");
-                $sth_set_file_status->execute("metaerr", $file->{id});
-                next FILE;
-            }
-
-            my $dist_name = $meta->{name};
-            if (!defined($dist_name)) {
-                $log->errorf("meta does not contain name, skipped");
-                $sth_set_file_status->execute("metaerr", $file->{id});
-                next FILE;
-            }
+            my $dist_name = $info->{name} // $info->{NAME} // $info->{dist_name};
+            my $dist_abstract = $info->{abstract} // $info->{ABSTRACT} // $info->{dist_abstract};
+            my $dist_version =
             $dist_name =~ s/::/-/g; # sometimes author miswrites module name
             # insert dist record
-            $sth_ins_dist->execute($dist_name, $meta->{abstract}, $file->{id}, $meta->{version});
+            $sth_ins_dist->execute($dist_name, $dist_abstract, $file->{id}, $info->{version});
             my $dist_id = $dbh->last_insert_id("","","","");
 
             # insert dependency information
-            if (ref($meta->{build_requires}) eq 'HASH') {
-                _add_prereqs($dist_id, $meta->{build_requires}, 'build', 'requires', $sth_ins_dep, $sth_sel_mod);
+            if (ref($info->{configure_requires}) eq 'HASH') {
+                _add_prereqs($dist_id, $info->{configure_requires}, 'configure', 'requires', $sth_ins_dep, $sth_sel_mod);
             }
-            if (ref($meta->{configure_requires}) eq 'HASH') {
-                _add_prereqs($dist_id, $meta->{configure_requires}, 'configure', 'requires', $sth_ins_dep, $sth_sel_mod);
+            if (ref($info->{CONFIGURE_REQUIRES}) eq 'HASH') {
+                _add_prereqs($dist_id, $info->{CONFIGURE_REQUIRES}, 'configure', 'requires', $sth_ins_dep, $sth_sel_mod);
             }
-            if (ref($meta->{requires}) eq 'HASH') {
-                _add_prereqs($dist_id, $meta->{requires}, 'runtime', 'requires', $sth_ins_dep, $sth_sel_mod);
+            if (ref($info->{build_requires}) eq 'HASH') {
+                _add_prereqs($dist_id, $info->{build_requires}, 'build', 'requires', $sth_ins_dep, $sth_sel_mod);
             }
-            if (ref($meta->{prereqs}) eq 'HASH') {
-                for my $phase (keys %{ $meta->{prereqs} }) {
-                    my $phprereqs = $meta->{prereqs}{$phase};
+            if (ref($info->{BUILD_REQUIRES}) eq 'HASH') {
+                _add_prereqs($dist_id, $info->{BUILD_REQUIRES}, 'build', 'requires', $sth_ins_dep, $sth_sel_mod);
+            }
+            if (ref($info->{test_requires}) eq 'HASH') {
+                _add_prereqs($dist_id, $info->{test_requires}, 'test', 'requires', $sth_ins_dep, $sth_sel_mod);
+            }
+            if (ref($info->{TEST_REQUIRES}) eq 'HASH') {
+                _add_prereqs($dist_id, $info->{TEST_REQUIRES}, 'test', 'requires', $sth_ins_dep, $sth_sel_mod);
+            }
+            if (ref($info->{requires}) eq 'HASH') {
+                _add_prereqs($dist_id, $info->{requires}, 'runtime', 'requires', $sth_ins_dep, $sth_sel_mod);
+            }
+            if (ref($info->{PREREQS_PM}) eq 'HASH') {
+                _add_prereqs($dist_id, $info->{PREREQS_PM}, 'runtime', 'requires', $sth_ins_dep, $sth_sel_mod);
+            }
+            if (ref($info->{prereqs}) eq 'HASH') {
+                for my $phase (keys %{ $info->{prereqs} }) {
+                    my $phprereqs = $info->{prereqs}{$phase};
                     for my $rel (keys %$phprereqs) {
                         _add_prereqs($dist_id, $phprereqs->{$rel}, $phase, $rel, $sth_ins_dep, $sth_sel_mod);
                     }
@@ -497,8 +637,8 @@ sub update_local_cpan_index {
     }
 
     # there remains some files for which we haven't determine the dist name of
-    # (e.g. non-existing file, no meta, can't parse meta). we determine the dist
-    # from the module name.
+    # (e.g. non-existing file, no info, other error). we determine the dist from
+    # the module name.
     {
         my $sth = $dbh->prepare("SELECT id FROM file WHERE NOT EXISTS (SELECT id FROM dist WHERE file_id=file.id)");
         my @file_ids;
@@ -531,6 +671,12 @@ sub update_local_cpan_index {
 
 $SPEC{'update_local_cpan'} = {
     v => 1.1,
+    summary => 'Update local CPAN mirror files, followed by create/update the index.db',
+    description => <<'_',
+
+This subcommand calls the `update-files` followed by `update-index`.
+
+_
     args => {
         %common_args,
     },
@@ -561,7 +707,6 @@ sub stat_local_cpan {
     ($stat->{authors}) = $dbh->selectrow_array("SELECT COUNT(*) FROM author");
     ($stat->{modules}) = $dbh->selectrow_array("SELECT COUNT(*) FROM module");
     ($stat->{releases}) = $dbh->selectrow_array("SELECT COUNT(*) FROM file");
-    ($stat->{releases_with_cpan_meta}) = $dbh->selectrow_array("SELECT COUNT(*) FROM file WHERE status='ok'");
     ($stat->{distributions}) = $dbh->selectrow_array("SELECT COUNT(*) FROM dist");
 
     # XXX last_update_time
