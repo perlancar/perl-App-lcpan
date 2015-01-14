@@ -8,6 +8,8 @@ use strict;
 use warnings;
 use Log::Any '$log';
 
+use File::chdir;
+
 use Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = qw(
@@ -343,6 +345,7 @@ _
 sub update_local_cpan_index {
     require DBI;
     require File::Slurp::Tiny;
+    require File::Temp;
     require IO::Compress::Gzip;
 
     my %args = @_;
@@ -449,6 +452,10 @@ sub update_local_cpan_index {
 
         $dbh->commit;
     }
+
+    # because we run Makefile.PL / Build.PL there might be some file extracted
+    # by the script, for cleaner things we move to a tempdir
+    local $CWD = File::Temp::tempdir(CLEANUP => 1);
 
     # for each new file, try to extract its CPAN META or Makefile.PL/Build.PL
     {
