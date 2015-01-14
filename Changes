@@ -1,5 +1,13 @@
 Revision history for App-lcpan
 
+0.04    2015-01-14 (PERLANCAR)
+
+        - Use Perinci::CmdLine::Util::Config to get lcpan configuration without
+          running the binary.
+
+        - Rebuild to update TODO.md.
+
+
 0.03    2015-01-14 (PERLANCAR)
 
 	- The indexer now tries to extract dist information from Makefile.PL or

@@ -1,5 +1,6 @@
 #!perl
 
+# NO_PERINCI_CMDLINE_SCRIPT
 # FRAGMENT id=shcompgen-hint command=_cpanm
 
 # DATE
