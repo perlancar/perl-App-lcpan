@@ -1,0 +1,17 @@
+#!perl
+
+# FRAGMENT id=shcompgen-hint command=_cpanm
+
+use strict;
+use warnings;
+
+my %opts = map {chomp;$_} `lcpan dump-config`;
+my @cmd = ("cpanm");
+push @cmd, "--mirror", $opts{cpan}, "--mirror-only" if $opts{cpan};
+push @cmd, @ARGV;
+
+print "lcpanm: exec: ".join(" ", @cmd), "\n" if $ENV{DEBUG};
+exec @cmd;
+
+# ABSTRACT: cpanm wrapper (set mirror to local CPAN by default)
+# PODNAME:
