@@ -47,17 +47,6 @@ sub _set_args_default {
     }
 }
 
-sub _connect_db {
-    require DBI;
-
-    my $cpan = shift;
-
-    my $db_path = "$cpan/index.db";
-    $log->tracef("Connecting to SQLite database at %s ...", $db_path);
-    DBI->connect("dbi:SQLite:dbname=$db_path", undef, undef,
-                 {RaiseError=>1});
-}
-
 sub _create_schema {
     require SQL::Schema::Versioned;
 
@@ -126,6 +115,19 @@ sub _create_schema {
         dbh => $dbh, spec => $spec);
     die "Can't create/update schema: $res->[0] - $res->[1]\n"
         unless $res->[0] == 200;
+}
+
+sub _connect_db {
+    require DBI;
+
+    my $cpan = shift;
+
+    my $db_path = "$cpan/index.db";
+    $log->tracef("Connecting to SQLite database at %s ...", $db_path);
+    my $dbh = DBI->connect("dbi:SQLite:dbname=$db_path", undef, undef,
+                           {RaiseError=>1});
+    _create_schema($dbh);
+    $dbh;
 }
 
 sub _parse_json {
@@ -230,7 +232,6 @@ sub update_local_cpan_index {
     my $cpan = $args{cpan};
 
     my $dbh  = _connect_db($cpan);
-    _create_schema($dbh);
 
     # parse 01mailrc.txt.gz and insert the parse result to 'author' table
     {
