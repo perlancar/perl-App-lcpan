@@ -1,5 +1,12 @@
 Revision history for App-lcpan
 
+0.05    2015-01-14 (PERLANCAR)
+
+        - No functional changes.
+
+        - Rebuild to update TODO.md (d'oh).
+
+
 0.04    2015-01-14 (PERLANCAR)
 
         - Use Perinci::CmdLine::Util::Config to get lcpan configuration without
