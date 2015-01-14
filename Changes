@@ -1,5 +1,23 @@
 Revision history for App-lcpan
 
+0.03    2015-01-14 (PERLANCAR)
+
+	- The indexer now tries to extract dist information from Makefile.PL or
+          Build.PL in addition to from META.{json,yml}. This allows for more
+          thorough indexing of dependencies information (as well as distribution
+          name & abstract), as a lot of older releases do not include CPAN META
+          files. But this also means actually executing the Makefile.PL &
+          Build.PL scripts, which might have some side effects.
+
+        - Add script: lcpam.
+
+        - Rename 'rev-deps' subcommand to 'rdeps'.
+
+        - rdeps: Add options --author and --author-isnt to be able to filter by
+          author. This allows you to, for example, see if a module is used by
+          other authors instead of just herself.
+
+
 0.02    2015-01-13 (PERLANCAR)
 
 	- Rename module/dist from CPAN::Local to App::lcpan (PAUSE

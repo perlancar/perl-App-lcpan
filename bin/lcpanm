@@ -2,6 +2,9 @@
 
 # FRAGMENT id=shcompgen-hint command=_cpanm
 
+# DATE
+# VERSION
+
 use strict;
 use warnings;
 
