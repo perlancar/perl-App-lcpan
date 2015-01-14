@@ -1093,11 +1093,13 @@ sub _get_prereqs {
 
     $log->tracef("Finding dependencies for module %s (level=%i) ...", $mod, $level);
 
+    return [404, "No such module: $mod"] unless $dbh->selectrow_arrayref("SELECT id FROM module WHERE name=?", {}, $mod);
+
     # first find out which distribution that module belongs to
     my $sth = $dbh->prepare("SELECT id FROM dist WHERE file_id=(SELECT file_id FROM module WHERE name=?)");
     $sth->execute($mod);
     my ($dist_id) = $sth->fetchrow_array;
-    return [404, "No such module: $mod"] unless $dist_id;
+    return [404, "Module '$mod' is not in any dist, index problem?"] unless $dist_id;
 
     # fetch the dependency information
     $sth = $dbh->prepare("SELECT
