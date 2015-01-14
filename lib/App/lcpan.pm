@@ -500,7 +500,7 @@ sub update_local_cpan_index {
                 next FILE;
             }
 
-            my ($info, $type);
+            my ($distmeta, $distmetatype);
           GET_INFO:
             {
                 unless ($path =~ /(.+)\.(tar|tar\.gz|tar\.bz2|tar\.Z|tgz|tbz2?|zip)$/i) {
@@ -512,14 +512,14 @@ sub update_local_cpan_index {
                 my ($name, $ext) = ($1, $2);
                 if (-f "$name.meta") {
                     $log->tracef("Getting meta from .meta file: %s", "$name.meta");
-                    eval { $info = _parse_json(~~File::Slurp::Tiny::read_file("$name.meta")) };
-                    unless ($info) {
+                    eval { $distmeta = _parse_json(~~File::Slurp::Tiny::read_file("$name.meta")) };
+                    unless ($distmeta) {
                         $log->errorf("Can't read %s: %s", "$name.meta", $@) if $@;
                         $sth_set_file_status->execute("err", $file->{id});
                         goto L1;
                     }
-                    $type = 'META.json';
-                    do { undef $info; goto L1 } unless _check_meta($info);
+                    $distmetatype = 'META.json';
+                    do { undef $distmeta; goto L1 } unless _check_meta($distmeta);
                     last GET_META;
                 }
 
@@ -534,30 +534,30 @@ sub update_local_cpan_index {
                         for my $member (@members) {
                             if ($member->fileName =~ m!(?:/|\\)(META\.yml|META\.json)$!) {
                                 $log->tracef("  found %s", $member->fileName);
-                                $type = $1;
+                                $distmetatype = $1;
                                 my $content = $zip->contents($member);
                                 #$log->trace("[[$content]]");
-                                if ($type eq 'META.yml') {
-                                    $info = _parse_yaml($content);
-                                    if (_check_meta($info)) { return } else { undef $info } # from eval
-                                } elsif ($type eq 'META.json') {
-                                    $info = _parse_json($content);
-                                    if (_check_meta($info)) { return } else { undef $info } # from eval
+                                if ($distmetatype eq 'META.yml') {
+                                    $distmeta = _parse_yaml($content);
+                                    if (_check_meta($distmeta)) { return } else { undef $distmeta } # from eval
+                                } elsif ($distmetatype eq 'META.json') {
+                                    $distmeta = _parse_json($content);
+                                    if (_check_meta($distmeta)) { return } else { undef $distmeta } # from eval
                                 }
                             }
                         }
                         for my $member (@members) {
                             if ($member->fileName =~ m!(?:/|\\)(Makefile\.PL|Build\.PL)$!) {
                                 $log->tracef("  found %s", $member->fileName);
-                                $type = $1;
+                                $distmetatype = $1;
                                 my $content = $zip->contents($member);
                                 #$log->trace("[[$content]]");
-                                if ($type eq 'Makefile.PL') {
-                                    $info = _dump_makefile_pl($content);
-                                    if ($info) { return } else { undef $info } # from eval
-                                } elsif ($type eq 'Build.PL') {
-                                    $info = _dump_build_pl($content);
-                                    if ($info) { return } else { undef $info } # from eval
+                                if ($distmetatype eq 'Makefile.PL') {
+                                    $distmeta = _dump_makefile_pl($content);
+                                    if ($distmeta) { return } else { undef $distmeta } # from eval
+                                } elsif ($distmetatype eq 'Build.PL') {
+                                    $distmeta = _dump_build_pl($content);
+                                    if ($distmeta) { return } else { undef $distmeta } # from eval
                                 }
                             }
                         }
@@ -570,32 +570,32 @@ sub update_local_cpan_index {
                         for my $member (@members) {
                             if ($member =~ m!/(META\.yml|META\.json)$!) {
                                 $log->tracef("  found %s", $member);
-                                my $type = $1;
+                                $distmetatype = $1;
                                 my ($obj) = $tar->get_files($member);
                                 my $content = $obj->get_content;
                                 #$log->trace("[[$content]]");
-                                if ($type eq 'META.yml') {
-                                    $info = _parse_yaml($content);
-                                    if (_check_meta($info)) { return } else { undef $info } # from eval
-                                } elsif ($type eq 'META.json') {
-                                    $info = _parse_json($content);
-                                    if (_check_meta($info)) { return } else { undef $info } # from eval
+                                if ($distmetatype eq 'META.yml') {
+                                    $distmeta = _parse_yaml($content);
+                                    if (_check_meta($distmeta)) { return } else { undef $distmeta } # from eval
+                                } elsif ($distmetatype eq 'META.json') {
+                                    $distmeta = _parse_json($content);
+                                    if (_check_meta($distmeta)) { return } else { undef $distmeta } # from eval
                                 }
                             }
                         }
                         for my $member (@members) {
                             if ($member =~ m!/(Makefile\.PL|Build\.PL)$!) {
                                 $log->tracef("  found %s", $member);
-                                my $type = $1;
+                                $distmetatype = $1;
                                 my ($obj) = $tar->get_files($member);
                                 my $content = $obj->get_content;
                                 #$log->trace("[[$content]]");
-                                if ($type eq 'Makefile.PL') {
-                                    $info = _dump_makefile_pl($content);
-                                    if ($info) { return } else { undef $info } # from eval
-                                } elsif ($type eq 'Build.PL') {
-                                    $info = _dump_build_pl($content);
-                                    if ($info) { return } else { undef $info } # from eval
+                                if ($distmetatype eq 'Makefile.PL') {
+                                    $distmeta = _dump_makefile_pl($content);
+                                    if ($distmeta) { return } else { undef $distmeta } # from eval
+                                } elsif ($distmetatype eq 'Build.PL') {
+                                    $distmeta = _dump_build_pl($content);
+                                    if ($distmeta) { return } else { undef $distmeta } # from eval
                                 }
                             }
                         }
@@ -609,48 +609,48 @@ sub update_local_cpan_index {
                 }
             } # GET_INFO
 
-            unless ($info) {
+            unless ($distmeta) {
                 $log->infof("File %s doesn't contain META.json/META.yml/Makefile.PL/Build.PL, skipped", $path);
                 $sth_set_file_status->execute("noinfo", $file->{id});
                 next FILE;
             }
 
-            my $dist_name = $info->{name} // $info->{NAME} // $info->{dist_name};
-            my $dist_abstract = $info->{abstract} // $info->{ABSTRACT} // $info->{dist_abstract};
+            my $dist_name = $distmeta->{name} // $distmeta->{NAME} // $distmeta->{dist_name};
+            my $dist_abstract = $distmeta->{abstract} // $distmeta->{ABSTRACT} // $distmeta->{dist_abstract};
             my $dist_version =
             $dist_name =~ s/::/-/g; # sometimes author miswrites module name
             # insert dist record
-            $sth_ins_dist->execute($dist_name, $dist_abstract, $file->{id}, $info->{version});
+            $sth_ins_dist->execute($dist_name, $dist_abstract, $file->{id}, $distmeta->{version});
             my $dist_id = $dbh->last_insert_id("","","","");
 
             # insert dependency information
-            if (ref($info->{configure_requires}) eq 'HASH') {
-                _add_prereqs($dist_id, $info->{configure_requires}, 'configure', 'requires', $sth_ins_dep, $sth_sel_mod);
+            if (ref($distmeta->{configure_requires}) eq 'HASH') {
+                _add_prereqs($dist_id, $distmeta->{configure_requires}, 'configure', 'requires', $sth_ins_dep, $sth_sel_mod);
             }
-            if (ref($info->{CONFIGURE_REQUIRES}) eq 'HASH') {
-                _add_prereqs($dist_id, $info->{CONFIGURE_REQUIRES}, 'configure', 'requires', $sth_ins_dep, $sth_sel_mod);
+            if (ref($distmeta->{CONFIGURE_REQUIRES}) eq 'HASH') {
+                _add_prereqs($dist_id, $distmeta->{CONFIGURE_REQUIRES}, 'configure', 'requires', $sth_ins_dep, $sth_sel_mod);
             }
-            if (ref($info->{build_requires}) eq 'HASH') {
-                _add_prereqs($dist_id, $info->{build_requires}, 'build', 'requires', $sth_ins_dep, $sth_sel_mod);
+            if (ref($distmeta->{build_requires}) eq 'HASH') {
+                _add_prereqs($dist_id, $distmeta->{build_requires}, 'build', 'requires', $sth_ins_dep, $sth_sel_mod);
             }
-            if (ref($info->{BUILD_REQUIRES}) eq 'HASH') {
-                _add_prereqs($dist_id, $info->{BUILD_REQUIRES}, 'build', 'requires', $sth_ins_dep, $sth_sel_mod);
+            if (ref($distmeta->{BUILD_REQUIRES}) eq 'HASH') {
+                _add_prereqs($dist_id, $distmeta->{BUILD_REQUIRES}, 'build', 'requires', $sth_ins_dep, $sth_sel_mod);
             }
-            if (ref($info->{test_requires}) eq 'HASH') {
-                _add_prereqs($dist_id, $info->{test_requires}, 'test', 'requires', $sth_ins_dep, $sth_sel_mod);
+            if (ref($distmeta->{test_requires}) eq 'HASH') {
+                _add_prereqs($dist_id, $distmeta->{test_requires}, 'test', 'requires', $sth_ins_dep, $sth_sel_mod);
             }
-            if (ref($info->{TEST_REQUIRES}) eq 'HASH') {
-                _add_prereqs($dist_id, $info->{TEST_REQUIRES}, 'test', 'requires', $sth_ins_dep, $sth_sel_mod);
+            if (ref($distmeta->{TEST_REQUIRES}) eq 'HASH') {
+                _add_prereqs($dist_id, $distmeta->{TEST_REQUIRES}, 'test', 'requires', $sth_ins_dep, $sth_sel_mod);
             }
-            if (ref($info->{requires}) eq 'HASH') {
-                _add_prereqs($dist_id, $info->{requires}, 'runtime', 'requires', $sth_ins_dep, $sth_sel_mod);
+            if (ref($distmeta->{requires}) eq 'HASH') {
+                _add_prereqs($dist_id, $distmeta->{requires}, 'runtime', 'requires', $sth_ins_dep, $sth_sel_mod);
             }
-            if (ref($info->{PREREQS_PM}) eq 'HASH') {
-                _add_prereqs($dist_id, $info->{PREREQS_PM}, 'runtime', 'requires', $sth_ins_dep, $sth_sel_mod);
+            if (ref($distmeta->{PREREQS_PM}) eq 'HASH') {
+                _add_prereqs($dist_id, $distmeta->{PREREQS_PM}, 'runtime', 'requires', $sth_ins_dep, $sth_sel_mod);
             }
-            if (ref($info->{prereqs}) eq 'HASH') {
-                for my $phase (keys %{ $info->{prereqs} }) {
-                    my $phprereqs = $info->{prereqs}{$phase};
+            if (ref($distmeta->{prereqs}) eq 'HASH') {
+                for my $phase (keys %{ $distmeta->{prereqs} }) {
+                    my $phprereqs = $distmeta->{prereqs}{$phase};
                     for my $rel (keys %$phprereqs) {
                         _add_prereqs($dist_id, $phprereqs->{$rel}, $phase, $rel, $sth_ins_dep, $sth_sel_mod);
                     }
