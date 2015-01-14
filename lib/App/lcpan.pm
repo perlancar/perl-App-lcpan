@@ -530,8 +530,9 @@ sub update_local_cpan_index {
                         my $zip = Archive::Zip->new;
                         $zip->read($path) == Archive::Zip::AZ_OK()
                             or die "Can't read zip file";
-                        for my $member ($zip->members) {
-                            if ($member->fileName =~ m!(?:/|\\)(META\.yml|META\.json|Makefile\.PL|Build\.PL)$!) {
+                        my @members = $zip->members;
+                        for my $member (@members) {
+                            if ($member->fileName =~ m!(?:/|\\)(META\.yml|META\.json)$!) {
                                 $log->tracef("  found %s", $member->fileName);
                                 $type = $1;
                                 my $content = $zip->contents($member);
@@ -542,7 +543,16 @@ sub update_local_cpan_index {
                                 } elsif ($type eq 'META.json') {
                                     $info = _parse_json($content);
                                     if (_check_meta($info)) { return } else { undef $info } # from eval
-                                } elsif ($type eq 'Makefile.PL') {
+                                }
+                            }
+                        }
+                        for my $member (@members) {
+                            if ($member->fileName =~ m!(?:/|\\)(Makefile\.PL|Build\.PL)$!) {
+                                $log->tracef("  found %s", $member->fileName);
+                                $type = $1;
+                                my $content = $zip->contents($member);
+                                #$log->trace("[[$content]]");
+                                if ($type eq 'Makefile.PL') {
                                     $info = _dump_makefile_pl($content);
                                     if ($info) { return } else { undef $info } # from eval
                                 } elsif ($type eq 'Build.PL') {
@@ -551,12 +561,14 @@ sub update_local_cpan_index {
                                 }
                             }
                         }
-                    } else {
+                    } # if zip
+                    else {
                         require Archive::Tar;
                         my $tar = Archive::Tar->new;
                         $tar->read($path);
-                        for my $member ($tar->list_files) {
-                            if ($member =~ m!/(META\.yml|META\.json|Makefile\.PL|Build\.PL)$!) {
+                        my @members = $tar->list_files;
+                        for my $member (@members) {
+                            if ($member =~ m!/(META\.yml|META\.json)$!) {
                                 $log->tracef("  found %s", $member);
                                 my $type = $1;
                                 my ($obj) = $tar->get_files($member);
@@ -568,7 +580,17 @@ sub update_local_cpan_index {
                                 } elsif ($type eq 'META.json') {
                                     $info = _parse_json($content);
                                     if (_check_meta($info)) { return } else { undef $info } # from eval
-                                } elsif ($type eq 'Makefile.PL') {
+                                }
+                            }
+                        }
+                        for my $member (@members) {
+                            if ($member =~ m!/(Makefile\.PL|Build\.PL)$!) {
+                                $log->tracef("  found %s", $member);
+                                my $type = $1;
+                                my ($obj) = $tar->get_files($member);
+                                my $content = $obj->get_content;
+                                #$log->trace("[[$content]]");
+                                if ($type eq 'Makefile.PL') {
                                     $info = _dump_makefile_pl($content);
                                     if ($info) { return } else { undef $info } # from eval
                                 } elsif ($type eq 'Build.PL') {
@@ -577,7 +599,7 @@ sub update_local_cpan_index {
                                 }
                             }
                         }
-                    }
+                    } # if tar
                 }; # eval
 
                 if ($@) {
