@@ -736,7 +736,7 @@ sub stat_local_cpan {
     ($stat->{authors}) = $dbh->selectrow_array("SELECT COUNT(*) FROM author");
     ($stat->{modules}) = $dbh->selectrow_array("SELECT COUNT(*) FROM module");
     ($stat->{releases}) = $dbh->selectrow_array("SELECT COUNT(*) FROM file");
-    ($stat->{distributions}) = $dbh->selectrow_array("SELECT COUNT(*) FROM dist");
+    ($stat->{distributions}) = $dbh->selectrow_array("SELECT COUNT(DISTINCT name) FROM dist");
 
     # XXX last_update_time
 
