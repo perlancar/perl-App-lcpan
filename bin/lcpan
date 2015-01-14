@@ -7,6 +7,7 @@ use 5.010;
 use strict;
 use warnings;
 
+use App::lcpan;
 use Perinci::CmdLine::Any -prefer_lite=>1;
 
 my $prefix = '/App/lcpan/';
@@ -26,6 +27,8 @@ Perinci::CmdLine::Any->new(
         dists      => {url=>"${prefix}list_local_cpan_dists"},
         deps       => {url=>"${prefix}list_local_cpan_deps"},
         rdeps      => {url=>"${prefix}list_local_cpan_rev_deps"},
+
+        'dump-config' => {url=>"${prefix}dump_config"},
         #search => {url=>""},
     },
 )->run;
@@ -51,15 +54,11 @@ You can run the above command e.g. daily to keep your mirror up-to-date.
 
 =head2 Using your local CPAN mirror to install modules
 
+ % lcpanm -n Some::Module
+
+C<lcpanm> is a thin wrapper for C<cpanm>, the above command is equivalent to:
+
  % cpanm --mirror ~/cpan --mirror-only -n Some::Module
-
-You can also set up a shell alias to save typing the options all the time, e.g.:
-
- alias lcpanm="cpanm --mirror ~/cpan --mirror-only -n"
-
-Then you can install modules simply using:
-
- % lcpanm Some::Module
 
 =head2 Querying your local CPAN mirror
 

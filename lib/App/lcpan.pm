@@ -1338,6 +1338,22 @@ sub list_local_cpan_rev_deps {
     _get_revdeps($mod, $dbh, $filters);
 }
 
+# XXX instead of this, read config files directly in the future to save some
+# overhead.
+$SPEC{dump_config} = {
+    v => 1.1,
+    summary => 'For internal use only',
+    args => {
+        cpan => {schema=>'str*'},
+    },
+};
+sub dump_config {
+    my %args = @_;
+    App::lcpan::_set_args_default(\%args);
+    my @res = ("cpan", $args{cpan});
+    [200, "OK", \@res];
+}
+
 1;
 # ABSTRACT: Manage your local CPAN mirror
 
