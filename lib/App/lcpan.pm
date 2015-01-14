@@ -854,18 +854,22 @@ sub list_local_cpan_modules {
     goto &list_local_cpan_packages;
 }
 
+my %author_args = (
+    author => {
+        summary => 'Filter by author',
+        schema => 'str*',
+        cmdline_aliases => {a=>{}},
+        completion => \&_complete_cpanid,
+    },
+);
+
 $SPEC{list_local_cpan_dists} = {
     v => 1.1,
     summary => 'List distributions in local CPAN',
     args => {
         %common_args,
         %query_args,
-        author => {
-            summary => 'Filter by author',
-            schema => 'str*',
-            cmdline_aliases => {a=>{}},
-            completion => \&_complete_cpanid,
-        },
+        %author_args,
     },
     result_naked => 1,
     result => {
@@ -994,7 +998,7 @@ ORDER BY module");
 }
 
 sub _get_revdeps {
-    my ($mod, $dbh) = @_;
+    my ($mod, $dbh, $filters) = @_;
 
     $log->tracef("Finding reverse dependencies for module %s ...", $mod);
 
@@ -1002,17 +1006,30 @@ sub _get_revdeps {
     my ($mod_id) = $dbh->selectrow_array("SELECT id FROM module WHERE name=?", {}, $mod)
         or return [404, "No such module: $mod"];
 
+    my @wheres = ('module_id=?');
+    my @binds  = ($mod_id);
+
+    if ($filters->{author}) {
+        push @wheres, 'cpanid=?';
+        push @binds, $filters->{author};
+    }
+    if ($filters->{author_isnt}) {
+        push @wheres, 'cpanid <> ?';
+        push @binds, $filters->{author_isnt};
+    }
+
     # get all dists that depend on that module
     my $sth = $dbh->prepare("SELECT
   (SELECT name    FROM dist WHERE dp.dist_id=dist.id) AS dist,
   (SELECT version FROM dist WHERE dp.dist_id=dist.id) AS dist_version,
+  (SELECT cpanid  FROM file WHERE dp.dist_id=(SELECT id FROM dist WHERE file.id=dist.file_id)) AS cpanid,
   -- phase,
   -- rel,
   version req_version
 FROM dep dp
-WHERE module_id=?
+WHERE ".join(" AND ", @wheres)."
 ORDER BY dist");
-    $sth->execute($mod_id);
+    $sth->execute(@binds);
     my @res;
     while (my $row = $sth->fetchrow_hashref) {
         #next unless $phase eq 'ALL' || $row->{phase} eq $phase;
@@ -1114,6 +1131,18 @@ $SPEC{'list_local_cpan_rev_deps'} = {
     args => {
         %common_args,
         %mod_args,
+        %author_args,
+        author_isnt => {
+            summary => 'Filter out certain author',
+            schema => 'str*',
+            description => <<'_',
+
+This can be used to filter out certain author. For example if you want to know
+whether a module is being used by another CPAN author instead of just herself.
+
+_
+            completion => \&_complete_cpanid,
+        },
     },
 };
 sub list_local_cpan_rev_deps {
@@ -1125,7 +1154,12 @@ sub list_local_cpan_rev_deps {
 
     my $dbh     = _connect_db($cpan);
 
-    _get_revdeps($mod, $dbh);
+    my $filters = {
+        author => $args{author},
+        author_isnt => $args{author_isnt},
+    };
+
+    _get_revdeps($mod, $dbh, $filters);
 }
 
 1;
