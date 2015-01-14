@@ -25,7 +25,7 @@ Perinci::CmdLine::Any->new(
         modules    => {url=>"${prefix}list_local_cpan_modules"},
         dists      => {url=>"${prefix}list_local_cpan_dists"},
         deps       => {url=>"${prefix}list_local_cpan_deps"},
-        'rev-deps' => {url=>"${prefix}list_local_cpan_rev_deps"},
+        rdeps      => {url=>"${prefix}list_local_cpan_rev_deps"},
         #search => {url=>""},
     },
 )->run;
@@ -126,7 +126,7 @@ B<Show dependencies and reverse dependencies>:
  % lcpan deps Text::ANSITable -R
 
  # which distributions depend on Text::ANSITable?
- % lcpan rev-deps Text::ANSITable
+ % lcpan rdeps Text::ANSITable
 
 
 =head1 DESCRIPTION
