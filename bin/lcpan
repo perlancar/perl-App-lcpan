@@ -73,15 +73,20 @@ C<lcpanm> is a thin wrapper for C<cpanm>, the above command is equivalent to:
 Info about your local CPAN mirror:
 
  % lcpan stats
- +------------------+----------------------+
- | name             | value                |
- +------------------+----------------------+
- | authors          | 11967                |
- | distributions    | 29907                |
- | last-updated     | 2015-01-09T10:40:55Z |
- | modules          | 13365                |
- | packages         | 133650               |
- +------------------+----------------------+
+ +------------------------------+----------------------+
+ | key                          | value                |
+ | last_index_time              | 2015-01-15T13:09:25Z |
+ | mirror_mtime                 | 2015-01-15T13:09:22Z |
+ | num_authors                  | 11981                |
+ | num_dists                    | 30376                |
+ | num_modules                  | 151927               |
+ | num_releases                 | 31877                |
+ | num_releases_with_buildpl    | 6521                 |
+ | num_releases_with_makefilepl | 28948                |
+ | num_releases_with_metajson   | 10625                |
+ | num_releases_with_metayml    | 10689                |
+ | schema_version               | 3                    |
+ +------------------------------+----------------------+
 
 Add C<--verbose> if you want more stats which normally are skipped because they
 can take a while to get (e.g. disk-space).
@@ -146,8 +151,8 @@ B<Some other utilities>:
 This application is a convenient bundling of C<CPAN::Mini> and an indexer so in
 addition to creating your local CPAN mirror and installing modules from it, you
 can also query various things about your local CPAN mirror quickly from the
-command-line (as well as programmatically). Powerful and quicker querying is the
-main reason C<lcpan> is created.
+command-line (as well as programmatically). Powerful and more convenient
+querying is the main reason C<lcpan> is created.
 
 
 =head1 MORE EXAMPLE QUERIES
