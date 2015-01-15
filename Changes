@@ -1,6 +1,6 @@
 Revision history for App-lcpan
 
-0.06    2015-01-14 (PERLANCAR) (unreleased)
+0.06    2015-01-14 (PERLANCAR)
 
         [REMOVED FEATURES]
 
@@ -19,6 +19,11 @@ Revision history for App-lcpan
         - Also remove the feature that detects *.meta files, because these files
           are not present in a mini CPAN mirror.
 
+        [ENHANCEMENTS]
+
+        - New subcommands: releases, mod2dist, mod2rel, dist2rel, distmods,
+          authormods, authordists, authorrels.
+
         [DATABASE CHANGES]
 
         - Upgrade schema to v3: add columns
@@ -26,11 +31,6 @@ Revision history for App-lcpan
           'version_numified' to 'dist' and 'module' tables.
 
         - Clear data for reindexing.
-
-        [ENHANCEMENTS]
-
-        - New subcommands: releases, mod2dist, mod2rel, dist2rel, distmods,
-          authormods, authordists, authorrels.
 
 
 0.05    2015-01-14 (PERLANCAR)
