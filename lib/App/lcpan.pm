@@ -9,6 +9,7 @@ use warnings;
 use Log::Any '$log';
 
 use version;
+use POSIX ();
 
 use Exporter;
 our @ISA = qw(Exporter);
@@ -58,6 +59,12 @@ sub _set_args_default {
         require File::HomeDir;
         $args->{cpan} = File::HomeDir->my_home . '/cpan';
     }
+}
+
+sub _fmt_time {
+    my $epoch = shift;
+    return '' unless defined($epoch);
+    POSIX::strftime("%Y-%m-%dT%H:%M:%SZ", gmtime($epoch));
 }
 
 sub _numify_ver {
@@ -274,6 +281,8 @@ sub update_local_cpan_files {
     my $remote_url = $args{remote_url} // "http://mirrors.kernel.org/cpan";
     my $max_file_size = $args{max_file_size};
 
+    my $dbh = _connect_db($cpan);
+
     local $ENV{PERL5OPT} = "-MLWP::UserAgent::Patch::FilterMirrorMaxSize=-size,".($max_file_size+0).",-verbose,1"
         if defined $max_file_size;
 
@@ -283,6 +292,10 @@ sub update_local_cpan_files {
         {die=>1, log=>1},
         @cmd,
     );
+
+    $dbh->do("INSERT OR REPLACE INTO meta (name,value) VALUES (?,?)",
+             {}, 'last_mirror_time', time());
+
     [200];
 }
 
@@ -605,6 +618,10 @@ sub update_local_cpan_index {
                 $has_metajson, $has_metajson, $has_makefilepl, $has_buildpl,
                 $file->{id});
         } # for file
+
+        $dbh->do("INSERT OR REPLACE INTO meta (name,value) VALUES (?,?)",
+                 {}, 'last_index_time', time());
+
         if ($after_begin) {
             $log->tracef("COMMIT");
             $dbh->commit;
@@ -680,16 +697,15 @@ sub stat_local_cpan {
 
     my $stat = {};
 
-    ($stat->{authors}) = $dbh->selectrow_array("SELECT COUNT(*) FROM author");
-    ($stat->{modules}) = $dbh->selectrow_array("SELECT COUNT(*) FROM module");
-    ($stat->{releases}) = $dbh->selectrow_array("SELECT COUNT(*) FROM file");
-    ($stat->{distributions}) = $dbh->selectrow_array("SELECT COUNT(DISTINCT name) FROM dist");
+    ($stat->{num_authors}) = $dbh->selectrow_array("SELECT COUNT(*) FROM author");
+    ($stat->{num_modules}) = $dbh->selectrow_array("SELECT COUNT(*) FROM module");
+    ($stat->{num_dists}) = $dbh->selectrow_array("SELECT COUNT(DISTINCT name) FROM dist");
     (
-        $stat->{releases},
-        $stat->{releases_have_metajson},
-        $stat->{releases_have_metayml},
-        $stat->{releases_have_makefilepl},
-        $stat->{releases_have_buildpl},
+        $stat->{num_releases},
+        $stat->{num_releases_with_metajson},
+        $stat->{num_releases_with_metayml},
+        $stat->{num_releases_with_makefilepl},
+        $stat->{num_releases_with_buildpl},
     ) = $dbh->selectrow_array("SELECT
   COUNT(*),
   SUM(CASE has_metajson WHEN 1 THEN 1 ELSE 0 END),
@@ -697,8 +713,10 @@ sub stat_local_cpan {
   SUM(CASE has_makefilepl WHEN 1 THEN 1 ELSE 0 END),
   SUM(CASE has_buildpl WHEN 1 THEN 1 ELSE 0 END)
 FROM file");
-
-    # XXX last_update_time
+    ($stat->{schema_version}) = $dbh->selectrow_array("SELECT value FROM meta WHERE name='schema_version'");
+    ($stat->{last_index_time}) = _fmt_time($dbh->selectrow_array("SELECT value FROM meta WHERE name='last_index_time'"));
+    my @st = stat "$cpan/modules/02packages.details.txt.gz";
+    ($stat->{mirror_mtime}) = _fmt_time(@st ? $st[9] : undef);
 
     [200, "OK", $stat];
 }
