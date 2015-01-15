@@ -140,6 +140,15 @@ B<Some other utilities>:
  % lcpan authordists PERLANCAR  ;# list an author's dists
  % lcpan authorrels PERLANCAR   ;# list an author's releases
 
+B<Some sample queries for CPAN authors>:
+
+Show other people using my modules on CPAN (replace with your CPAN ID):
+
+ % for mod in `lcpan modules --author PERLANCAR`; do
+     res=`lcpan rdeps "$mod" --author-isnt PERLANCAR --format text-pretty`
+     if [[ "$res" != "" ]]; then echo -e "$mod is used by:\n$res\n"; fi
+   done
+
 
 =head1 DESCRIPTION
 
