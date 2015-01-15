@@ -1464,12 +1464,14 @@ sub _get_revdeps {
     my @binds  = ($mod_id);
 
     if ($filters->{author}) {
-        push @wheres, 'cpanid=?';
-        push @binds, $filters->{author};
+        push @wheres, '('.join(' OR ', ('cpanid=?') x @{$filters->{authors}}).')';
+        push @binds, ($_) x @{$filters->{author}};
     }
     if ($filters->{author_isnt}) {
-        push @wheres, 'cpanid <> ?';
-        push @binds, $filters->{author_isnt};
+        for (@{ $filters->{author_isnt} }) {
+            push @wheres, 'cpanid <> ?';
+            push @binds, $_;
+        }
     }
 
     # get all dists that depend on that module
@@ -1591,14 +1593,24 @@ $SPEC{'list_local_cpan_rev_deps'} = {
     args => {
         %common_args,
         %mod_args,
-        %fauthor_args,
-        author_isnt => {
-            summary => 'Filter out certain author',
-            schema => 'str*',
+        author => {
+            summary => 'Filter certain author',
+            schema => ['array*', of=>'str*'],
             description => <<'_',
 
-This can be used to filter out certain author. For example if you want to know
-whether a module is being used by another CPAN author instead of just herself.
+This can be used to select certain author(s).
+
+_
+            completion => \&_complete_cpanid,
+        },
+        author_isnt => {
+            summary => 'Filter out certain author',
+            schema => ['array*', of=>'str*'],
+            description => <<'_',
+
+This can be used to filter out certain author(s). For example if you want to
+know whether a module is being used by another CPAN author instead of just
+herself.
 
 _
             completion => \&_complete_cpanid,
@@ -1611,8 +1623,8 @@ sub list_local_cpan_rev_deps {
     _set_args_default(\%args);
     my $cpan = $args{cpan};
     my $mod     = $args{module};
-    my $author = uc($args{author} // '');
-    my $author_isnt = uc($args{author_isnt} // '');
+    my $author =  $args{author} ? [map {uc} @{$args{author}}] : undef;
+    my $author_isnt = $args{author_isnt} ? [map {uc} @{$args{author_isnt}}] : undef;
 
     my $dbh     = _connect_db($cpan);
 
