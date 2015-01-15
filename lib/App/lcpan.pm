@@ -1420,6 +1420,7 @@ ORDER BY module");
         next unless $rel   eq 'ALL' || $row->{rel}   eq $rel;
         #say "include_core=$include_core, is_core($row->{module}, $row->{version}, $plver)=", Module::CoreList::is_core($row->{module}, $row->{version}, version->parse($plver)->numify);
         next if !$include_core && Module::CoreList::is_core($row->{module}, $row->{version}, version->parse($plver)->numify);
+        next unless defined $row->{module}; # BUG? we can encounter case where module is undef
         if (defined $memory->{$row->{module}}) {
             if (Version::Util::version_gt($row->{version}, $memory->{$row->{module}})) {
                 $memory->{$row->{version}} = $row->{version};
