@@ -22,7 +22,8 @@ Revision history for App-lcpan
         [DATABASE CHANGES]
 
         - Upgrade schema to v3: add columns
-          has_{metayml,metajson,makefilepl,buildpl} to 'file' table.
+          has_{metayml,metajson,makefilepl,buildpl} to 'file' table. Add
+          'version_numified' to 'dist' and 'module' tables.
 
         - Clear data for reindexing.
 

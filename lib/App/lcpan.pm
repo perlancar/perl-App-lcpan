@@ -1004,6 +1004,9 @@ $SPEC{list_local_cpan_dists} = {
         %common_args,
         %query_args,
         %author_args,
+        latest => {
+            schema => ['bool*', is=>1],
+        },
     },
     result_naked => 1,
     result => {
@@ -1055,13 +1058,16 @@ sub list_local_cpan_dists {
         push @where, "(author=?)";
         push @bind, $args{author};
     }
+    if ($args{latest}) {
+        push @where, "(NOT EXISTS (SELECT id FROM dist d2 WHERE d2.name=d1.name AND d2.version_numified>d1.version_numified))";
+    }
     my $sql = "SELECT
   name,
   abstract,
   version,
-  (SELECT name FROM file WHERE id=dist.file_id) file,
-  (SELECT cpanid FROM file WHERE id=dist.file_id) author
-FROM dist".
+  (SELECT name FROM file WHERE id=d1.file_id) file,
+  (SELECT cpanid FROM file WHERE id=d1.file_id) author
+FROM dist d1".
         (@where ? " WHERE ".join(" AND ", @where) : "").
             " ORDER BY name";
 
@@ -1085,6 +1091,9 @@ $SPEC{'list_local_cpan_releases'} = {
         has_metayml    => {schema=>'bool'},
         has_makefilepl => {schema=>'bool'},
         has_buildpl    => {schema=>'bool'},
+        latest => {
+            schema => ['bool*', is=>1],
+        },
     },
     result_naked=>1,
 };
@@ -1102,7 +1111,7 @@ sub list_local_cpan_releases {
     my @bind;
     my @where;
     if (length($q)) {
-        push @where, "(name LIKE ?)";
+        push @where, "(f1.name LIKE ?)";
         push @bind, $q;
     }
     if ($args{author}) {
@@ -1121,15 +1130,20 @@ sub list_local_cpan_releases {
     if (defined $args{has_buildpl}) {
         push @where, $args{has_buildpl} ? "(has_buildpl=1)" : "(has_buildpl=0)";
     }
+    if ($args{latest}) {
+        push @where, "(NOT EXISTS (SELECT id FROM dist d2 WHERE d1.name=d2.name AND d2.version_numified>d1.version_numified))";
+    }
     my $sql = "SELECT
-  name,
+  f1.name name,
   cpanid,
   status,
   has_metajson,
   has_metayml,
   has_makefilepl,
   has_buildpl
-FROM file".
+FROM file f1
+LEFT JOIN dist d1 ON f1.id=d1.file_id
+".
         (@where ? " WHERE ".join(" AND ", @where) : "").
             " ORDER BY name";
 
@@ -1188,6 +1202,7 @@ $SPEC{'mod2rel'} = {
     summary => 'Get release name of a module',
     args => {
         %common_args,
+        %mod_args,
         %full_path_args,
     },
     result_naked=>1,
@@ -1209,7 +1224,7 @@ LEFT JOIN file ON module.file_id=file.id
 WHERE module.name=?", {}, $mod);
     return undef unless $row;
     if ($args{full_path}) {
-        _relcpan($row->{name}, $cpan, $row->{cpanid});
+        _relpath($row->{name}, $cpan, $row->{cpanid});
     } else {
         $row->{name};
     }
