@@ -969,6 +969,7 @@ sub list_local_cpan_packages {
     my $detail = $args{detail};
     my $q = $args{query} // ''; # sqlite is case-insensitive by default, yay
     $q = '%'.$q.'%' unless $q =~ /%/;
+    my $author = uc($args{author} // '');
 
     my $dbh = _connect_db($cpan);
 
@@ -979,10 +980,10 @@ sub list_local_cpan_packages {
         push @where, "(name LIKE ? OR abstract LIKE ?)";
         push @bind, $q, $q;
     }
-    if ($args{author}) {
+    if ($author) {
         #push @where, "(dist_id IN (SELECT dist_id FROM dist WHERE auth_id IN (SELECT auth_id FROM auths WHERE cpanid=?)))";
         push @where, "(author=?)";
-        push @bind, $args{author};
+        push @bind, $author;
     }
     if ($args{dist}) {
         #push @where, "(dist_id=(SELECT dist_id FROM dist WHERE dist_name=?))";
@@ -1065,6 +1066,7 @@ sub list_local_cpan_dists {
     my $detail = $args{detail};
     my $q = $args{query} // '';
     $q = '%'.$q.'%' unless $q =~ /%/;
+    my $author = uc($args{author} // '');
 
     my $dbh = _connect_db($cpan);
 
@@ -1074,10 +1076,10 @@ sub list_local_cpan_dists {
         push @where, "(name LIKE ? OR abstract LIKE ?)";
         push @bind, $q, $q;
     }
-    if ($args{author}) {
+    if ($author) {
         #push @where, "(dist_id IN (SELECT dist_id FROM dists WHERE auth_id IN (SELECT auth_id FROM auths WHERE cpanid=?)))";
         push @where, "(author=?)";
-        push @bind, $args{author};
+        push @bind, $author;
     }
     if ($args{latest}) {
         push @where, "(NOT EXISTS (SELECT id FROM dist d2 WHERE d2.name=d1.name AND d2.version_numified>d1.version_numified))";
@@ -1124,6 +1126,7 @@ sub list_local_cpan_releases {
     my $detail = $args{detail};
     my $q = $args{query} // ''; # sqlite is case-insensitive by default, yay
     $q = '%'.$q.'%' unless $q =~ /%/;
+    my $author = uc($args{author} // '');
 
     my $dbh = _connect_db($cpan);
 
@@ -1133,9 +1136,9 @@ sub list_local_cpan_releases {
         push @where, "(f1.name LIKE ?)";
         push @bind, $q;
     }
-    if ($args{author}) {
+    if ($author) {
         push @where, "(cpanid=?)";
-        push @bind, $args{author};
+        push @bind, $author;
     }
     if (defined $args{has_metajson}) {
         push @where, $args{has_metajson} ? "(has_metajson=1)" : "(has_metajson=0)";
@@ -1607,12 +1610,14 @@ sub list_local_cpan_rev_deps {
     _set_args_default(\%args);
     my $cpan = $args{cpan};
     my $mod     = $args{module};
+    my $author = uc($args{author} // '');
+    my $author_isnt = uc($args{author_isnt} // '');
 
     my $dbh     = _connect_db($cpan);
 
     my $filters = {
-        author => $args{author},
-        author_isnt => $args{author_isnt},
+        author => $author,
+        author_isnt => $author_isnt,
     };
 
     _get_revdeps($mod, $dbh, $filters);
