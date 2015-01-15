@@ -182,9 +182,9 @@ or (specify release files directly):
 
 =head2 Count your CPAN modules, dists, and releases
 
- % lcpan authormods PERLANCAR | wc -l
- % lcpan authormods PERLANCAR | wc -l
- % lcpan authorrels PERLANCAR | wc -l
+ % lcpan authormods  PERLANCAR | wc -l
+ % lcpan authordists PERLANCAR | wc -l
+ % lcpan authorrels  PERLANCAR | wc -l
 
 =head2 Show your old releases (which you should probably delete from CPAN?)
 
