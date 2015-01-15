@@ -140,22 +140,50 @@ B<Some other utilities>:
  % lcpan authordists PERLANCAR  ;# list an author's dists
  % lcpan authorrels PERLANCAR   ;# list an author's releases
 
-B<Some sample queries for CPAN authors>:
-
-Show other people using my modules on CPAN (replace with your CPAN ID):
-
- % for mod in `lcpan modules --author PERLANCAR`; do
-     res=`lcpan rdeps "$mod" --author-isnt PERLANCAR --format text-pretty`
-     if [[ "$res" != "" ]]; then echo -e "$mod is used by:\n$res\n"; fi
-   done
-
 
 =head1 DESCRIPTION
 
 This application is a convenient bundling of C<CPAN::Mini> and an indexer so in
 addition to creating your local CPAN mirror and installing modules from it, you
 can also query various things about your local CPAN mirror quickly from the
-command-line (as well as programmatically).
+command-line (as well as programmatically). Powerful and quicker querying is the
+main reason C<lcpan> is created.
+
+
+=head1 MORE EXAMPLE QUERIES
+
+=head2 Show other people using your modules on CPAN
+
+ % for mod in `lcpan modules --author CSSON`; do
+     res=`lcpan rdeps "$mod" --author-isnt CSSON --format text-pretty`
+     if [[ "$res" != "" ]]; then echo -e "$mod is used by:\n$res\n"; fi
+   done
+
+Sample output:
+
+ Map::Metro::Plugin::Map is used by:
+ +--------+-----------------------------+--------------+-------------+
+ | cpanid | dist                        | dist_version | req_version |
+ | SREZIC | Map-Metro-Plugin-Map-Berlin | 0.02         | 0.18        |
+ +--------+-----------------------------+--------------+-------------+
+
+ MojoX::CustomTemplateFileParser is used by:
+ +--------+-------------------------------------+--------------+-------------+
+ | cpanid | dist                                | dist_version | req_version |
+ | RENEEB | Task-MojoliciousPlugins-PerlAcademy | 0.02         | 0.10        |
+ +--------+-------------------------------------+--------------+-------------+
+
+ Mojolicious::Plugin::BootstrapHelpers is used by:
+ +--------+-------------------------------------+--------------+-------------+
+ | cpanid | dist                                | dist_version | req_version |
+ | RENEEB | Task-MojoliciousPlugins-PerlAcademy | 0.02         | 0.0187      |
+ +--------+-------------------------------------+--------------+-------------+
+
+ Test::Mojo::Trim is used by:
+ +--------+----------------+--------------+-------------+
+ | cpanid | dist           | dist_version | req_version |
+ | LEEJO  | Test-Mojo-Most | 0.05         | 0.03        |
+ +--------+----------------+--------------+-------------+
 
 
 =head1 FAQ
