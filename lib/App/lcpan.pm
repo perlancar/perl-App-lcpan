@@ -1051,7 +1051,7 @@ _
         },
         {
             summary   => 'Filter by author, return JSON',
-            src       => 'list-local-cpan-dists --cpan /cpan --author perlancar --json',
+            src       => '[[prog]] --cpan /cpan --author perlancar --json',
             src_plang => 'bash',
             test      => 0,
         },
