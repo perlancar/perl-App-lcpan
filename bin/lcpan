@@ -155,7 +155,40 @@ command-line (as well as programmatically). Powerful and more convenient
 querying is the main reason C<lcpan> is created.
 
 
-=head1 MORE EXAMPLE QUERIES
+=head1 MORE EXAMPLE QUERIES AND COMMANDS FOR CPAN USERS
+
+=head2 Show how many dists will need to be installed if I install this module
+
+TODO
+
+=head2 Install all modules from a certain CPAN author
+
+ % lcpan authormods PERLANCAR | cpanm -n
+
+or (if you want to install from local CPAN mirror):
+
+ % lcpan authormods PERLANCAR | lcpanm -n
+
+or (specify release files directly):
+
+ % lcpan authorrels --latest PERLANCAR | cpanm -n
+
+=head2 Update all modules on your system, from local CPAN mirror
+
+ % cpan-outdated --mirror file:$HOME/cpan | cpanm -n
+
+
+=head1 MORE EXAMPLE QUERIES AND COMMANDS FOR CPAN AUTHORS
+
+=head2 Count your CPAN modules, dists, and releases
+
+ % lcpan authormods PERLANCAR | wc -l
+ % lcpan authormods PERLANCAR | wc -l
+ % lcpan authorrels PERLANCAR | wc -l
+
+=head2 Show your old releases (which you should probably delete from CPAN?)
+
+ % setop --diff <(lcpan authorrels PERLANCAR) <(lcpan authorrels PERLANCAR --latest)
 
 =head2 Show other people using your modules on CPAN
 
@@ -190,6 +223,10 @@ Sample output:
  | LEEJO  | Test-Mojo-Most | 0.05         | 0.03        |
  +--------+----------------+--------------+-------------+
 
+=head2 More complex queries
+
+For more complex queries, you can always access the SQLite database directly.
+
 
 =head1 FAQ
 
@@ -219,3 +256,7 @@ Run C<lcpan update-files>.
 
 
 =head1 SEE ALSO
+
+L<setop>
+
+L<cpan-outdated>
