@@ -1191,7 +1191,7 @@ my %author_args = (
         schema => 'str*',
         req => 1,
         pos => 0,
-        completion => \&_complete_author,
+        completion => \&_complete_cpanid,
     },
 );
 
