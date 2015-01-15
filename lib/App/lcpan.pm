@@ -15,9 +15,18 @@ our @EXPORT_OK = qw(
                        list_local_cpan_packages
                        list_local_cpan_modules
                        list_local_cpan_dists
+                       list_local_cpan_releases
                        list_local_cpan_authors
                        list_local_cpan_deps
                        list_local_cpan_rev_deps
+
+                       mod2dist
+                       mod2rel
+                       dist2rel
+                       distmods
+                       authormods
+                       authordists
+                       authorrels
                );
 
 our %SPEC;
@@ -45,6 +54,13 @@ sub _set_args_default {
         require File::HomeDir;
         $args->{cpan} = File::HomeDir->my_home . '/cpan';
     }
+}
+
+sub _relpath {
+    my ($filename, $cpan, $cpanid) = @_;
+    $cpanid = uc($cpanid); # just to be safe
+    "$cpan/authors/id/".substr($cpanid, 0, 1)."/".
+        substr($cpanid, 0, 2)."/$cpanid/$filename";
 }
 
 sub _create_schema {
@@ -435,8 +451,7 @@ sub update_local_cpan_index {
 
             $log->tracef("[#%i] Processing file %s ...", $i, $file->{name});
             my $status;
-            my $path = "$cpan/authors/id/".substr($file->{cpanid}, 0, 1)."/".
-                substr($file->{cpanid}, 0, 2)."/$file->{cpanid}/$file->{name}";
+            my $path = _relpath($file->{name}, $cpan, $cpanid);
 
             unless (-f $path) {
                 $log->errorf("File %s doesn't exist, skipped", $path);
@@ -635,6 +650,7 @@ sub update_local_cpan {
 
 $SPEC{'stat_local_cpan'} = {
     v => 1.1,
+    summary => 'Statistics of your local CPAN mirror',
     args => {
         %common_args,
     },
@@ -810,7 +826,7 @@ my %query_args = (
 
 $SPEC{list_local_cpan_authors} = {
     v => 1.1,
-    summary => 'List authors in local CPAN',
+    summary => 'List authors',
     args => {
         %common_args,
         %query_args,
@@ -875,7 +891,7 @@ FROM author".
 
 $SPEC{list_local_cpan_packages} = {
     v => 1.1,
-    summary => 'List packages in local CPAN',
+    summary => 'List packages/modules',
     args => {
         %common_args,
         %query_args,
@@ -966,7 +982,7 @@ my %author_args = (
 
 $SPEC{list_local_cpan_dists} = {
     v => 1.1,
-    summary => 'List distributions in local CPAN',
+    summary => 'List distributions',
     args => {
         %common_args,
         %query_args,
@@ -1039,6 +1055,147 @@ FROM dist".
         push @res, $detail ? $row : $row->{name};
     }
     \@res;
+}
+
+$SPEC{'list_local_cpan_releases'} = {
+    v => 1.1,
+    summary => 'List releases/tarballs',
+    args => {
+        %common_args,
+        %author_args,
+        %query_args,
+        has_metajson   => {schema=>'bool'},
+        has_metayml    => {schema=>'bool'},
+        has_makefilepl => {schema=>'bool'},
+        has_buildpl    => {schema=>'bool'},
+    },
+    result_naked=>1,
+};
+sub list_local_cpan_releases {
+    my %args = @_;
+
+    _set_args_default(\%args);
+    my $cpan = $args{cpan};
+    my $detail = $args{detail};
+    my $q = $args{query} // ''; # sqlite is case-insensitive by default, yay
+    $q = '%'.$q.'%' unless $q =~ /%/;
+
+    my $dbh = _connect_db($cpan);
+
+    my @bind;
+    my @where;
+    if (length($q)) {
+        push @where, "(name LIKE ?)";
+        push @bind, $q;
+    }
+    if ($args{author}) {
+        push @where, "(cpanid=?)";
+        push @bind, $args{author};
+    }
+    if (defined $args{has_metajson}) {
+        push @where, $args{has_metajson} ? "(has_metajson=1)" : "(has_metajson=0)";
+    }
+    if (defined $args{has_metayml}) {
+        push @where, $args{has_metayml} ? "(has_metayml=1)" : "(has_metayml=0)";
+    }
+    if (defined $args{has_makefilepl}) {
+        push @where, $args{has_makefilepl} ? "(has_makefilepl=1)" : "(has_makefilepl=0)";
+    }
+    if (defined $args{has_buildpl}) {
+        push @where, $args{has_buildpl} ? "(has_buildpl=1)" : "(has_buildpl=0)";
+    }
+    my $sql = "SELECT
+  name,
+  cpanid,
+  status,
+  has_metajson,
+  has_metayml,
+  has_makefilepl,
+  has_buildpl
+FROM file".
+        (@where ? " WHERE ".join(" AND ", @where) : "").
+            " ORDER BY name";
+
+    my @res;
+    my $sth = $dbh->prepare($sql);
+    $sth->execute(@bind);
+    while (my $row = $sth->fetchrow_hashref) {
+        push @res, $detail ? $row : $row->{name};
+    }
+    \@res;
+}
+
+my %mod_args = (
+    module => {
+        schema => 'str*',
+        req => 1,
+        pos => 0,
+        completion => \&_complete_mod,
+    },
+);
+
+$SPEC{'mod2dist'} = {
+    v => 1.1,
+    summary => 'Get distribution name of a module',
+    args => {
+        %common_args,
+        %mod_args,
+    },
+    result_naked=>1,
+};
+sub mod2dist {
+    my %args = @_;
+
+    _set_args_default(\%args);
+    my $cpan = $args{cpan};
+    my $mod = $args{module};
+
+    my $dbh = _connect_db($cpan);
+
+    my ($res) = $dbh->selectrow_array("SELECT dist.name
+FROM module
+LEFT JOIN file ON module.file_id=file.id
+LEFT JOIN dist ON file.id=dist.file_id
+WHERE module.name=?", {}, $mod);
+        $res;
+}
+
+my %full_path_args = (
+    full_path => {
+        schema => ['bool*' => is=>1],
+    },
+);
+
+$SPEC{'mod2rel'} = {
+    v => 1.1,
+    summary => 'Get release name of a module',
+    args => {
+        %common_args,
+        %full_path_args,
+    },
+    result_naked=>1,
+};
+sub mod2rel {
+    my %args = @_;
+
+    _set_args_default(\%args);
+    my $cpan = $args{cpan};
+    my $mod = $args{module};
+
+    my $dbh = _connect_db($cpan);
+
+    my $row = $dbh->selectrow_hashref("SELECT
+  file.cpanid cpanid,
+  file.name name
+FROM module
+LEFT JOIN file ON module.file_id=file.id
+WHERE module.name=?", {}, $mod);
+    return undef unless $row;
+    if ($args{full_path}) {
+        _relcpan($row->{name}, $cpan, $row->{cpanid});
+    } else {
+        $row->{name};
+    }
 }
 
 sub _get_prereqs {
@@ -1145,15 +1302,6 @@ ORDER BY dist");
     [200, "OK", \@res];
 }
 
-my %mod_args = (
-    module => {
-        schema => 'str*',
-        req => 1,
-        pos => 0,
-        completion => \&_complete_mod,
-    },
-);
-
 my %deps_args = (
     phase => {
         schema => ['str*' => {
@@ -1197,6 +1345,21 @@ my %deps_args = (
 $SPEC{'list_local_cpan_deps'} = {
     v => 1.1,
     summary => 'List dependencies of a module, data from local CPAN',
+    description => <<'_',
+
+By default only runtime requires are displayed. To see prereqs for other phases
+(e.g. configure, or build, or ALL) or for other relationships (e.g. recommends,
+or ALL), use the `--phase` and `--rel` options.
+
+Note that dependencies information are taken from `META.json` or `META.yml`
+files. Not all releases (especially older ones) contain them. `lcpan` (like
+MetaCPAN) does not extract information from `Makefile.PL` or `Build.PL` because
+that requires running (untrusted) code.
+
+Also, some releases specify dynamic config, so there might actually be more
+dependencies.
+
+_
     args => {
         %common_args,
         %mod_args,
@@ -1231,6 +1394,10 @@ sub list_local_cpan_deps {
 $SPEC{'list_local_cpan_rev_deps'} = {
     v => 1.1,
     summary => 'List reverse dependencies of a module, data from local CPAN',
+    description => <<'_',
+
+
+_
     args => {
         %common_args,
         %mod_args,

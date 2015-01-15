@@ -20,14 +20,24 @@ Perinci::CmdLine::Any->new(
         'update-index'  => {url=>"${prefix}update_local_cpan_index"},
         'update-files'  => {url=>"${prefix}update_local_cpan_files"},
 
-        stats      => {url=>"${prefix}stat_local_cpan"},
+        stats       => {url=>"${prefix}stat_local_cpan"},
 
-        authors    => {url=>"${prefix}list_local_cpan_authors"},
-        modules    => {url=>"${prefix}list_local_cpan_modules"},
-        dists      => {url=>"${prefix}list_local_cpan_dists"},
-        deps       => {url=>"${prefix}list_local_cpan_deps"},
-        rdeps      => {url=>"${prefix}list_local_cpan_rev_deps"},
-        #search => {url=>""},
+        authors     => {url=>"${prefix}list_local_cpan_authors"},
+        modules     => {url=>"${prefix}list_local_cpan_modules"},
+        dists       => {url=>"${prefix}list_local_cpan_dists"},
+        releases    => {url=>"${prefix}list_local_cpan_releases"},
+        deps        => {url=>"${prefix}list_local_cpan_deps"},
+        rdeps       => {url=>"${prefix}list_local_cpan_rev_deps"},
+
+        mod2dist    => {url=>"${prefix}mod2dist"},
+        mod2rel     => {url=>"${prefix}mod2rel"},
+        dist2rel    => {url=>"${prefix}dist2rel"},
+
+        distmods    => {url=>"${prefix}distmods"},
+
+        authormods  => {url=>"${prefix}authormods"},
+        authordists => {url=>"${prefix}authordists"},
+        authorrels  => {url=>"${prefix}authorrels"},
     },
 )->run;
 
@@ -79,51 +89,56 @@ can take a while to get (e.g. disk-space).
 B<List modules:>
 
  % lcpan modules
-
-List modules matching some query (name):
-
- % lcpan modules smtp
-
-List modules by certain author, show detail instead of just module names:
-
- % lcpan modules --author PERLANCAR --detail
-
-List modules from a certain dist:
-
- % lcpan modules --dist libwww-perl --detail
+ % lcpan modules SOMEQUERY --detail
+ % lcpan modules --author PERLANCAR ;# modules by some author only
+ % lcpan modules --dist libwww-perl ;# from certain dist only
 
 B<List distributions:>
 
  % lcpan dists
-
-List distributions matching some query (name, filename, abstract), show detail
-instead of just distribution name:
-
- % lcpan dists critic --detail
-
-List distributions released by a certain author:
-
- % lcpan dists --author PERLANCAR
+ % lcpan dists SOMEQUERY --detail
+ % lcpan dists --author PERLANCAR ;# from certain author only
 
 B<List authors:>
 
  % lcpan authors
+ % lcpan authors SOMEQUERY --detail
 
-List authors matching some query (PAUSE ID, name, email), show detail instead of
-just ID:
+B<List releases (tarballs):>
 
- % lcpan authors tatsuhiko --detail
+ % lcpan releases
+ % lcpan releases SOMEQUERY --detail
+ % lcpan releases --author PERLANCAR ;# from certain authors only
+ % lcpan releases --author PERLANCAR ;# from certain authors only
 
 B<Show dependencies and reverse dependencies>:
 
- # which modules does Text::ANSITable depend on?
- % lcpan deps Text::ANSITable
+ % lcpan deps Text::ANSITable    ;# which modules does Text::ANSITable depend on?
+ % lcpan deps Text::ANSITable -R ;# recursive
+ % lcpan deps Task::BeLike::CSSON --phase build
+ % lcpan deps Text::ANSITable --phase ALL --rel ALL
 
- # do it recursively
- % lcpan deps Text::ANSITable -R
+ % lcpan rdeps Text::ANSITable ;# which dists depend on Text::ANSITable?
 
- # which distributions depend on Text::ANSITable?
- % lcpan rdeps Text::ANSITable
+B<Some other utilities>:
+
+ % lcpan mod2dist Text::ANSITable::ColorTheme::Default ;# -> Text-ANSITable
+
+ % lcpan mod2rel  Text::ANSITable::ColorTheme::Default ;# -> Text-ANSITable-0.39.tar.gz
+ % lcpan mod2rel  Text::ANSITable --full-path          ;# -> /cpan/authors/id/P/PE/PERLANCAR/Text-ANSITable-0.39.tar.gz
+
+ % lcpan dist2rel Text-ANSITable             ;# -> Text-ANSITable-0.39.tar.gz
+ % lcpan dist2rel Text-ANSITable --full-path ;# -> /cpan/authors/id/P/PE/PERLANCAR/Text-ANSITable-0.39.tar.gz
+
+ % lcpan distmods Text-ANSITable ;# list modules in a distribution
+ Text::ANSITable
+ Text::ANSITable::BorderStyle::Default
+ Text::ANSITable::ColorTheme::Default
+ Text::ANSITable::StyleSet::AltRow
+
+ % lcpan authormods PERLANCAR   ;# list an author's modules
+ % lcpan authordists PERLANCAR  ;# list an author's dists
+ % lcpan authorrels PERLANCAR   ;# list an author's releases
 
 
 =head1 DESCRIPTION
