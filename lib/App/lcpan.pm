@@ -841,6 +841,24 @@ my %query_args = (
     },
 );
 
+my %fauthor_args = (
+    author => {
+        summary => 'Filter by author',
+        schema => 'str*',
+        cmdline_aliases => {a=>{}},
+        completion => \&_complete_cpanid,
+    },
+);
+
+my %fdist_args = (
+    dist => {
+        summary => 'Filter by distribution',
+        schema => 'str*',
+        cmdline_aliases => {d=>{}},
+        completion => \&_complete_dist,
+    },
+);
+
 $SPEC{list_local_cpan_authors} = {
     v => 1.1,
     summary => 'List authors',
@@ -912,18 +930,8 @@ $SPEC{list_local_cpan_packages} = {
     args => {
         %common_args,
         %query_args,
-        author => {
-            summary => 'Filter by author',
-            schema => 'str*',
-            cmdline_aliases => {a=>{}},
-            completion => \&_complete_cpanid,
-        },
-        dist => {
-            summary => 'Filter by distribution',
-            schema => 'str*',
-            cmdline_aliases => {d=>{}},
-            completion => \&_complete_dist,
-        },
+        %fauthor_args,
+        %fdist_args,
     },
     result_naked => 1,
     result => {
@@ -988,12 +996,9 @@ sub list_local_cpan_modules {
     goto &list_local_cpan_packages;
 }
 
-my %author_args = (
-    author => {
-        summary => 'Filter by author',
-        schema => 'str*',
-        cmdline_aliases => {a=>{}},
-        completion => \&_complete_cpanid,
+my %flatest_args = (
+    latest => {
+        schema => ['bool*', is=>1],
     },
 );
 
@@ -1003,10 +1008,8 @@ $SPEC{list_local_cpan_dists} = {
     args => {
         %common_args,
         %query_args,
-        %author_args,
-        latest => {
-            schema => ['bool*', is=>1],
-        },
+        %fauthor_args,
+        %flatest_args,
     },
     result_naked => 1,
     result => {
@@ -1085,15 +1088,13 @@ $SPEC{'list_local_cpan_releases'} = {
     summary => 'List releases/tarballs',
     args => {
         %common_args,
-        %author_args,
+        %fauthor_args,
         %query_args,
         has_metajson   => {schema=>'bool'},
         has_metayml    => {schema=>'bool'},
         has_makefilepl => {schema=>'bool'},
         has_buildpl    => {schema=>'bool'},
-        latest => {
-            schema => ['bool*', is=>1],
-        },
+        %flatest_args,
     },
     result_naked=>1,
 };
@@ -1165,6 +1166,15 @@ my %mod_args = (
     },
 );
 
+my %author_args = (
+    author => {
+        schema => 'str*',
+        req => 1,
+        pos => 0,
+        completion => \&_complete_author,
+    },
+);
+
 $SPEC{'mod2dist'} = {
     v => 1.1,
     summary => 'Get distribution name of a module',
@@ -1199,11 +1209,12 @@ my %full_path_args = (
 
 $SPEC{'mod2rel'} = {
     v => 1.1,
-    summary => 'Get release name of a module',
+    summary => 'Get (latest) release name of a module',
     args => {
         %common_args,
         %mod_args,
         %full_path_args,
+        # all=>1
     },
     result_naked=>1,
 };
@@ -1221,13 +1232,142 @@ sub mod2rel {
   file.name name
 FROM module
 LEFT JOIN file ON module.file_id=file.id
-WHERE module.name=?", {}, $mod);
+WHERE module.name=?
+ORDER BY version_numified DESC
+", {}, $mod);
     return undef unless $row;
     if ($args{full_path}) {
         _relpath($row->{name}, $cpan, $row->{cpanid});
     } else {
         $row->{name};
     }
+}
+
+my %dist_args = (
+    dist => {
+        schema => 'str*',
+        req => 1,
+        pos => 0,
+        completion => \&_complete_dist,
+    },
+);
+
+$SPEC{'dist2rel'} = {
+    v => 1.1,
+    summary => 'Get (latest) release name of a distribution',
+    args => {
+        %common_args,
+        %dist_args,
+        %full_path_args,
+        # all=>1
+    },
+    result_naked=>1,
+};
+sub dist2rel {
+    my %args = @_;
+
+    _set_args_default(\%args);
+    my $cpan = $args{cpan};
+    my $dist = $args{dist};
+
+    my $dbh = _connect_db($cpan);
+
+    my $row = $dbh->selectrow_hashref("SELECT
+  file.cpanid cpanid,
+  file.name name
+FROM dist
+LEFT JOIN file ON dist.file_id=file.id
+WHERE dist.name=?
+ORDER BY version_numified DESC", {}, $dist);
+    return undef unless $row;
+    if ($args{full_path}) {
+        _relpath($row->{name}, $cpan, $row->{cpanid});
+    } else {
+        $row->{name};
+    }
+}
+
+$SPEC{'distmods'} = {
+    v => 1.1,
+    summary => 'List modules in a distribution',
+    args => {
+        %common_args,
+        %dist_args,
+        # XXX specify dist version?
+    },
+    result_naked=>1,
+};
+sub distmods {
+    my %args = @_;
+
+    _set_args_default(\%args);
+    my $cpan = $args{cpan};
+    my $dist = $args{dist};
+
+    my $dbh = _connect_db($cpan);
+
+    my $sth = $dbh->prepare("SELECT
+  module.name name,
+  module.version version
+FROM module
+LEFT JOIN file ON module.file_id=file.id
+LEFT JOIN dist ON file.id=dist.file_id
+WHERE dist.name=?
+ORDER BY name DESC");
+    $sth->execute($dist);
+    my @res;
+    while (my $row = $sth->fetchrow_hashref) {
+        push @res, $row->{name};
+    }
+    \@res;
+}
+
+$SPEC{'authormods'} = {
+    v => 1.1,
+    summary => 'List modules of an author',
+    args => {
+        %common_args,
+        %author_args,
+        # XXX specify dist version?
+    },
+    result_naked=>1,
+};
+sub authormods {
+    my %args = @_;
+
+    list_local_cpan_modules(%args);
+}
+
+$SPEC{'authordists'} = {
+    v => 1.1,
+    summary => 'List distributions of an author',
+    args => {
+        %common_args,
+        %author_args,
+        %flatest_args,
+    },
+    result_naked=>1,
+};
+sub authordists {
+    my %args = @_;
+
+    list_local_cpan_dists(%args);
+}
+
+$SPEC{'authorrels'} = {
+    v => 1.1,
+    summary => 'List releases of an author',
+    args => {
+        %common_args,
+        %author_args,
+        %flatest_args,
+    },
+    result_naked=>1,
+};
+sub authorrels {
+    my %args = @_;
+
+    list_local_cpan_releases(%args);
 }
 
 sub _get_prereqs {
@@ -1426,14 +1566,10 @@ sub list_local_cpan_deps {
 $SPEC{'list_local_cpan_rev_deps'} = {
     v => 1.1,
     summary => 'List reverse dependencies of a module, data from local CPAN',
-    description => <<'_',
-
-
-_
     args => {
         %common_args,
         %mod_args,
-        %author_args,
+        %fauthor_args,
         author_isnt => {
             summary => 'Filter out certain author',
             schema => 'str*',
