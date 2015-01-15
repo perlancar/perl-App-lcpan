@@ -907,7 +907,6 @@ _
         },
     ],
 };
-# XXX filter cpanid
 sub list_local_cpan_authors {
     my %args = @_;
 
@@ -1314,7 +1313,6 @@ $SPEC{'distmods'} = {
     args => {
         %common_args,
         %dist_args,
-        # XXX specify dist version?
     },
     result_naked=>1,
 };
@@ -1349,7 +1347,6 @@ $SPEC{'authormods'} = {
     args => {
         %common_args,
         %author_args,
-        # XXX specify dist version?
     },
     result_naked=>1,
 };
