@@ -1102,6 +1102,12 @@ FROM dist d1".
     \@res;
 }
 
+my %full_path_args = (
+    full_path => {
+        schema => ['bool*' => is=>1],
+    },
+);
+
 $SPEC{'list_local_cpan_releases'} = {
     v => 1.1,
     summary => 'List releases/tarballs',
@@ -1114,6 +1120,7 @@ $SPEC{'list_local_cpan_releases'} = {
         has_makefilepl => {schema=>'bool'},
         has_buildpl    => {schema=>'bool'},
         %flatest_args,
+        %full_path_args,
     },
     result_naked=>1,
 };
@@ -1172,6 +1179,7 @@ LEFT JOIN dist d1 ON f1.id=d1.file_id
     my $sth = $dbh->prepare($sql);
     $sth->execute(@bind);
     while (my $row = $sth->fetchrow_hashref) {
+        if ($args{full_path}) { $row->{name} = _relpath($row->{name}, $cpan, $row->{cpanid}) }
         push @res, $detail ? $row : $row->{name};
     }
     \@res;
@@ -1220,12 +1228,6 @@ LEFT JOIN dist ON file.id=dist.file_id
 WHERE module.name=?", {}, $mod);
         $res;
 }
-
-my %full_path_args = (
-    full_path => {
-        schema => ['bool*' => is=>1],
-    },
-);
 
 $SPEC{'mod2rel'} = {
     v => 1.1,
@@ -1379,6 +1381,7 @@ $SPEC{'authorrels'} = {
         %common_args,
         %author_args,
         %flatest_args,
+        %full_path_args,
     },
     result_naked=>1,
 };
