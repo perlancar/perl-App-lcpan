@@ -1421,6 +1421,15 @@ ORDER BY module");
     while (my $row = $sth->fetchrow_hashref) {
         next unless $phase eq 'ALL' || $row->{phase} eq $phase;
         next unless $rel   eq 'ALL' || $row->{rel}   eq $rel;
+
+        # some dists, e.g. XML-SimpleObject-LibXML (0.60) have garbled prereqs,
+        # e.g. they write PREREQ_PM => { mod1, mod2 } when it should've been
+        # PREREQ_PM => {mod1 => 0, mod2=>1.23}. we ignore such deps.
+        unless (eval { version->parse($row->{version}); 1 }) {
+            $log->info("Invalid version dependency for '$mod': $row->{module} version $row->{version}, skipped");
+            next;
+        }
+
         #say "include_core=$include_core, is_core($row->{module}, $row->{version}, $plver)=", Module::CoreList::is_core($row->{module}, $row->{version}, version->parse($plver)->numify);
         next if !$include_core && Module::CoreList::is_core($row->{module}, $row->{version}, version->parse($plver)->numify);
         next unless defined $row->{module}; # BUG? we can encounter case where module is undef
