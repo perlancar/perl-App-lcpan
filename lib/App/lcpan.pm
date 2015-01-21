@@ -1513,6 +1513,13 @@ my %deps_args = (
             in => [qw/develop configure build runtime test ALL/],
         }],
         default => 'runtime',
+        cmdline_aliases => {
+            all => {
+                summary => 'Equivalent to --phase ALL --rel ALL',
+                is_flag => 1,
+                code => sub { $_[0]{phase} = 'ALL'; $_[0]{rel} = 'ALL' },
+            },
+        },
     },
     rel => {
         schema => ['str*' => {
