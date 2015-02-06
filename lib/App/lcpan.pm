@@ -45,6 +45,7 @@ my %common_args = (
 Defaults to C<~/cpan>.
 
 _
+        tags => ['common'],
     },
 );
 
