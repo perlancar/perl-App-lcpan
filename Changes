@@ -1,5 +1,13 @@
 Revision history for App-lcpan
 
+0.10    2015-02-06 (PERLANCAR)
+
+	- Mark common args with 'common' tag.
+
+	- Add convenient option --all (equivalent to: --phase ALL --rel
+	  ALL).
+
+
 0.09    2015-01-20 (PERLANCAR)
 
 	- Skip erroneous version in dep information, instead of exploding.
