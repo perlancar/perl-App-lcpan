@@ -8,7 +8,7 @@ use strict;
 use warnings;
 
 use App::lcpan;
-use Perinci::CmdLine::Any -prefer_lite=>1;
+use Perinci::CmdLine::Any;
 
 my $prefix = '/App/lcpan/';
 
