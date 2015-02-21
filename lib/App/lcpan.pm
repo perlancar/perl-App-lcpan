@@ -334,6 +334,16 @@ information.
 _
     args => {
         %common_args,
+        num_backups => {
+            summary => 'Keep a number of backups',
+            schema  => 'int*',
+            default => 7,
+            description => <<'_',
+
+Will create `index.db.1`, `index.db.2` and so on containing the older indexes.
+
+_
+        },
     },
 };
 sub update_local_cpan_index {
@@ -345,6 +355,20 @@ sub update_local_cpan_index {
     my %args = @_;
     _set_args_default(\%args);
     my $cpan = $args{cpan};
+
+    if ($args{num_backups} > 0 && (-f $cpan)) {
+        require File::Copy;
+        require Logfile::Rotate;
+        $log->infof("Rotating old indexes ...");
+        my $rotate = Logfile::Rotate->new(
+            File  => $cpan,
+            Count => $args{num_backups},
+            Gzip  => 'no',
+        );
+        $rotate->rotate;
+        File::Copy::copy("$cpan.1", $cpan)
+              or return [500, "Copy $cpan.1 -> $cpan failed: $!"];
+    }
 
     my $dbh  = _connect_db($cpan);
 
