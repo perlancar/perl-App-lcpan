@@ -60,6 +60,9 @@ sub _set_args_default {
         require File::HomeDir;
         $args->{cpan} = File::HomeDir->my_home . '/cpan';
     }
+    if (!defined($args->{num_backups})) {
+        $args->{num_backups} = 7;
+    }
 }
 
 sub _fmt_time {
@@ -183,12 +186,17 @@ sub _create_schema {
         unless $res->[0] == 200;
 }
 
+sub _db_path {
+    my $cpan = shift;
+    "$cpan/index.db";
+}
+
 sub _connect_db {
     require DBI;
 
     my $cpan = shift;
 
-    my $db_path = "$cpan/index.db";
+    my $db_path = _db_path($cpan);
     $log->tracef("Connecting to SQLite database at %s ...", $db_path);
     my $dbh = DBI->connect("dbi:SQLite:dbname=$db_path", undef, undef,
                            {RaiseError=>1});
@@ -282,8 +290,6 @@ sub update_local_cpan_files {
     my $remote_url = $args{remote_url} // "http://mirrors.kernel.org/cpan";
     my $max_file_size = $args{max_file_size};
 
-    my $dbh = _connect_db($cpan);
-
     local $ENV{PERL5OPT} = "-MLWP::UserAgent::Patch::FilterMirrorMaxSize=-size,".($max_file_size+0).",-verbose,1"
         if defined $max_file_size;
 
@@ -294,6 +300,7 @@ sub update_local_cpan_files {
         @cmd,
     );
 
+    my $dbh = _connect_db($cpan);
     $dbh->do("INSERT OR REPLACE INTO meta (name,value) VALUES (?,?)",
              {}, 'last_mirror_time', time());
 
@@ -356,18 +363,19 @@ sub update_local_cpan_index {
     _set_args_default(\%args);
     my $cpan = $args{cpan};
 
-    if ($args{num_backups} > 0 && (-f $cpan)) {
+    my $db_path = _db_path($cpan);
+    if ($args{num_backups} > 0 && (-f $db_path)) {
         require File::Copy;
         require Logfile::Rotate;
         $log->infof("Rotating old indexes ...");
         my $rotate = Logfile::Rotate->new(
-            File  => $cpan,
+            File  => $db_path,
             Count => $args{num_backups},
             Gzip  => 'no',
         );
         $rotate->rotate;
-        File::Copy::copy("$cpan.1", $cpan)
-              or return [500, "Copy $cpan.1 -> $cpan failed: $!"];
+        File::Copy::copy("$db_path.1", $db_path)
+              or return [500, "Copy $db_path.1 -> $db_path failed: $!"];
     }
 
     my $dbh  = _connect_db($cpan);
@@ -679,9 +687,6 @@ sub update_local_cpan_index {
         }
         $dbh->commit;
     }
-
-    $log->tracef("Disconnecting from SQLite database ...");
-    $dbh->disconnect;
 
     [200];
 }
