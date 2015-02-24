@@ -1,5 +1,11 @@
 Revision history for App-lcpan
 
+0.11    2015-02-24 (PERLANCAR)
+
+        - To help chase bugs in updating index, now keeps old indexes (by
+          default 7, customize via --num-backups).
+
+
 0.10    2015-02-06 (PERLANCAR)
 
 	- Mark common args with 'common' tag.
