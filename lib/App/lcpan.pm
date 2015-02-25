@@ -200,10 +200,15 @@ sub _db_path {
 sub _connect_db {
     require DBI;
 
-    my ($cpan, $index_name) = @_;
+    my ($mode, $cpan, $index_name) = @_;
 
     my $db_path = _db_path($cpan, $index_name);
     $log->tracef("Connecting to SQLite database at %s ...", $db_path);
+    if ($mode eq 'ro') {
+        # avoid creating the index file automatically if we are only in
+        # read-only mode
+        die "Can't find index '$db_path'\n" unless -f $db_path;
+    }
     my $dbh = DBI->connect("dbi:SQLite:dbname=$db_path", undef, undef,
                            {RaiseError=>1});
     _create_schema($dbh);
@@ -307,7 +312,7 @@ sub update_local_cpan_files {
         @cmd,
     );
 
-    my $dbh = _connect_db($cpan, $index_name);
+    my $dbh = _connect_db('rw', $cpan, $index_name);
     $dbh->do("INSERT OR REPLACE INTO meta (name,value) VALUES (?,?)",
              {}, 'last_mirror_time', time());
 
@@ -386,7 +391,7 @@ sub update_local_cpan_index {
               or return [500, "Copy $db_path.1 -> $db_path failed: $!"];
     }
 
-    my $dbh  = _connect_db($cpan, $index_name);
+    my $dbh  = _connect_db('rw', $cpan, $index_name);
 
     # parse 01mailrc.txt.gz and insert the parse result to 'author' table
     {
@@ -732,7 +737,7 @@ sub stat_local_cpan {
     _set_args_default(\%args);
     my $cpan = $args{cpan};
     my $index_name = $args{index_name};
-    my $dbh = _connect_db($cpan, $index_name);
+    my $dbh = _connect_db('ro', $cpan, $index_name);
 
     my $stat = {};
 
@@ -776,7 +781,7 @@ sub _complete_mod {
     _set_args_default($res->[2]);
 
     my $dbh;
-    eval { $dbh = _connect_db($res->[2]{cpan}, $res->[2]{index_name}) };
+    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}) };
 
     # if we can't connect (probably because database is not yet setup), bail
     if ($@) {
@@ -820,7 +825,7 @@ sub _complete_dist {
     _set_args_default($res->[2]);
 
     my $dbh;
-    eval { $dbh = _connect_db($res->[2]{cpan}, $res->[2]{index_name}) };
+    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}) };
 
     # if we can't connect (probably because database is not yet setup), bail
     if ($@) {
@@ -864,7 +869,7 @@ sub _complete_cpanid {
     _set_args_default($res->[2]);
 
     my $dbh;
-    eval { $dbh = _connect_db($res->[2]{cpan}, $res->[2]{index_name}) };
+    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}) };
 
     # if we can't connect (probably because database is not yet setup), bail
     if ($@) {
@@ -956,7 +961,7 @@ sub list_local_cpan_authors {
     my $q = $args{query} // ''; # sqlite is case-insensitive by default, yay
     $q = '%'.$q.'%' unless $q =~ /%/;
 
-    my $dbh = _connect_db($cpan, $index_name);
+    my $dbh = _connect_db('ro', $cpan, $index_name);
 
     my @bind;
     my @where;
@@ -1011,7 +1016,7 @@ sub list_local_cpan_packages {
     $q = '%'.$q.'%' unless $q =~ /%/;
     my $author = uc($args{author} // '');
 
-    my $dbh = _connect_db($cpan, $index_name);
+    my $dbh = _connect_db('ro', $cpan, $index_name);
 
     my @bind;
     my @where;
@@ -1109,7 +1114,7 @@ sub list_local_cpan_dists {
     $q = '%'.$q.'%' unless $q =~ /%/;
     my $author = uc($args{author} // '');
 
-    my $dbh = _connect_db($cpan, $index_name);
+    my $dbh = _connect_db('ro', $cpan, $index_name);
 
     my @bind;
     my @where;
@@ -1177,7 +1182,7 @@ sub list_local_cpan_releases {
     $q = '%'.$q.'%' unless $q =~ /%/;
     my $author = uc($args{author} // '');
 
-    my $dbh = _connect_db($cpan, $index_name);
+    my $dbh = _connect_db('ro', $cpan, $index_name);
 
     my @bind;
     my @where;
@@ -1263,7 +1268,7 @@ sub mod2dist {
     my $index_name = $args{index_name};
     my $mod = $args{module};
 
-    my $dbh = _connect_db($cpan, $index_name);
+    my $dbh = _connect_db('ro', $cpan, $index_name);
 
     my ($res) = $dbh->selectrow_array("SELECT dist.name
 FROM module
@@ -1292,7 +1297,7 @@ sub mod2rel {
     my $index_name = $args{index_name};
     my $mod = $args{module};
 
-    my $dbh = _connect_db($cpan, $index_name);
+    my $dbh = _connect_db('ro', $cpan, $index_name);
 
     my $row = $dbh->selectrow_hashref("SELECT
   file.cpanid cpanid,
@@ -1338,7 +1343,7 @@ sub dist2rel {
     my $index_name = $args{index_name};
     my $dist = $args{dist};
 
-    my $dbh = _connect_db($cpan, $index_name);
+    my $dbh = _connect_db('ro', $cpan, $index_name);
 
     my $row = $dbh->selectrow_hashref("SELECT
   file.cpanid cpanid,
@@ -1372,7 +1377,7 @@ sub distmods {
     my $index_name = $args{index_name};
     my $dist = $args{dist};
 
-    my $dbh = _connect_db($cpan, $index_name);
+    my $dbh = _connect_db('ro', $cpan, $index_name);
 
     my $sth = $dbh->prepare("SELECT
   module.name name,
@@ -1638,7 +1643,7 @@ sub list_local_cpan_deps {
     my $level   = $args{level} // 1;
     my $include_core = $args{include_core} // 0;
 
-    my $dbh     = _connect_db($cpan, $index_name);
+    my $dbh     = _connect_db('ro', $cpan, $index_name);
 
     my $res = _get_prereqs($mod, $dbh, {}, 1, $level, $phase, $rel, $include_core, $plver);
 
@@ -1691,7 +1696,7 @@ sub list_local_cpan_rev_deps {
     my $author =  $args{author} ? [map {uc} @{$args{author}}] : undef;
     my $author_isnt = $args{author_isnt} ? [map {uc} @{$args{author_isnt}}] : undef;
 
-    my $dbh     = _connect_db($cpan, $index_name);
+    my $dbh     = _connect_db('ro', $cpan, $index_name);
 
     my $filters = {
         author => $author,
