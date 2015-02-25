@@ -1,5 +1,13 @@
 Revision history for App-lcpan
 
+0.12    2015-02-25 (PERLANCAR)
+
+	- [ux] Avoid creating index database automatically when we are just
+	  reading the index (ro mode).
+
+	- Allow customizing db filename via --index-name.
+
+
 0.11    2015-02-24 (PERLANCAR)
 
         - To help chase bugs in updating index, now keeps old indexes (by
