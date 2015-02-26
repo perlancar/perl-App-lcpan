@@ -1,5 +1,12 @@
 Revision history for App-lcpan
 
+0.13    2015-02-26 (PERLANCAR)
+
+	- No functional changes.
+
+	- Forget to tag 'index_name' arg as common arg.
+
+
 0.12    2015-02-25 (PERLANCAR)
 
 	- [ux] Avoid creating index database automatically when we are just
