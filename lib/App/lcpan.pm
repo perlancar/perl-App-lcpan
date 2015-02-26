@@ -51,6 +51,7 @@ _
         summary => 'Filename of index',
         schema  => 'str*',
         default => 'index.db',
+        tags => ['common'],
     },
 );
 
