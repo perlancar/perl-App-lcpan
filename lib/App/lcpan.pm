@@ -722,7 +722,16 @@ sub update_local_cpan {
     _set_args_default(\%args);
     my $cpan = $args{cpan};
 
+    my $packages_path = "$cpan/modules/02packages.details.txt.gz";
+    my @st1 = stat($packages_path);
     update_local_cpan_files(%args);
+    my @st2 = stat($packages_path);
+
+    if (@st1 && @st2 && $st1[9] == $st2[9] && $st1[7] == $st2[7]) {
+        $log->infof("%s doesn't change mtime/size, skipping updating index",
+                $packages_path);
+        return [304, "Files did not change, index not updated"];
+    }
     update_local_cpan_index(%args);
 }
 
