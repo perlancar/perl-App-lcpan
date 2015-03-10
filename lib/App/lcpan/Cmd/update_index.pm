@@ -1,0 +1,20 @@
+package App::lcpan::Cmd::update_index;
+
+use 5.010;
+use strict;
+use warnings;
+
+require App::lcpan;
+
+our %SPEC;
+
+$SPEC{':package'} = {
+    v => 1.1,
+    summary => "'update-index' command",
+};
+
+$SPEC{handle_cmd} = $App::lcpan::SPEC{update_local_cpan_index};
+*handle_cmd = \&App::lcpan::update_local_cpan_index;
+
+1;
+# ABSTRACT:

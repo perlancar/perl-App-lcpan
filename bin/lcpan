@@ -7,29 +7,31 @@ use 5.010;
 use strict;
 use warnings;
 
-use App::lcpan;
+use Module::List qw(list_modules);
 use Perinci::CmdLine::Any;
 
 my $prefix = '/App/lcpan/';
+my $mods = list_modules("App::lcpan::Cmd::", {list_modules=>1});
+my $subcommands = {};
+for my $mod (keys %$mods) {
+    (my $sc_name = $mod) =~ s/App::lcpan::Cmd:://;
+    $sc_name =~ s/_/-/g;
+    (my $url = $mod) =~ s!::!/!g;
+    $subcommands->{$sc_name} = {
+        url => "/$url/handle_cmd",
+    };
+}
 
 Perinci::CmdLine::Any->new(
     url => $prefix,
     log => 1,
+    subcommands => $subcommands,
+)->run;
+
+__END__
+
     subcommands => {
-        update          => {url=>"${prefix}update_local_cpan"},
-        'update-index'  => {url=>"${prefix}update_local_cpan_index"},
-        'update-files'  => {url=>"${prefix}update_local_cpan_files"},
 
-        stats       => {url=>"${prefix}stat_local_cpan"},
-
-        authors     => {url=>"${prefix}list_local_cpan_authors"},
-        modules     => {url=>"${prefix}list_local_cpan_modules"},
-        dists       => {url=>"${prefix}list_local_cpan_dists"},
-        releases    => {url=>"${prefix}list_local_cpan_releases"},
-        deps        => {url=>"${prefix}list_local_cpan_deps"},
-        rdeps       => {url=>"${prefix}list_local_cpan_rev_deps"},
-
-        mod2dist    => {url=>"${prefix}mod2dist"},
         mod2rel     => {url=>"${prefix}mod2rel"},
         dist2rel    => {url=>"${prefix}dist2rel"},
 
@@ -39,7 +41,7 @@ Perinci::CmdLine::Any->new(
         authordists => {url=>"${prefix}authordists"},
         authorrels  => {url=>"${prefix}authorrels"},
     },
-)->run;
+
 
 # ABSTRACT: Manage your local CPAN mirror
 # PODNAME:
@@ -144,6 +146,9 @@ B<Some other utilities>:
  % lcpan authormods PERLANCAR   ;# list an author's modules
  % lcpan authordists PERLANCAR  ;# list an author's dists
  % lcpan authorrels PERLANCAR   ;# list an author's releases
+
+More subcommands are available. lcpan is plugin-based, see/install
+C<App::lcpan::Cmd::*> modules for more subcommands.
 
 
 =head1 DESCRIPTION

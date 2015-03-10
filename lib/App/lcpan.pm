@@ -36,7 +36,7 @@ our @EXPORT_OK = qw(
 
 our %SPEC;
 
-my %common_args = (
+our %common_args = (
     cpan => {
         schema => 'str*',
         summary => 'Location of your local CPAN mirror, e.g. /path/to/cpan',
@@ -52,6 +52,75 @@ _
         schema  => 'str*',
         default => 'index.db',
         tags => ['common'],
+    },
+);
+
+our %query_args = (
+    query => {
+        summary => 'Search query',
+        schema => 'str*',
+        cmdline_aliases => {q=>{}},
+        pos => 0,
+    },
+    detail => {
+        schema => 'bool',
+    },
+);
+
+our %fauthor_args = (
+    author => {
+        summary => 'Filter by author',
+        schema => 'str*',
+        cmdline_aliases => {a=>{}},
+        completion => \&_complete_cpanid,
+    },
+);
+
+our %fdist_args = (
+    dist => {
+        summary => 'Filter by distribution',
+        schema => 'str*',
+        cmdline_aliases => {d=>{}},
+        completion => \&_complete_dist,
+    },
+);
+
+our %flatest_args = (
+    latest => {
+        schema => ['bool*', is=>1],
+    },
+);
+
+our %full_path_args = (
+    full_path => {
+        schema => ['bool*' => is=>1],
+    },
+);
+
+our %mod_args = (
+    module => {
+        schema => 'str*',
+        req => 1,
+        pos => 0,
+        completion => \&_complete_mod,
+    },
+);
+
+our %author_args = (
+    author => {
+        schema => 'str*',
+        req => 1,
+        pos => 0,
+        completion => \&_complete_cpanid,
+    },
+);
+
+our %dist_args = (
+    dist => {
+        schema => 'str*',
+        req => 1,
+        pos => 0,
+        completion => \&_complete_dist,
     },
 );
 
@@ -901,36 +970,6 @@ sub _complete_cpanid {
     \@res;
 };
 
-my %query_args = (
-    query => {
-        summary => 'Search query',
-        schema => 'str*',
-        cmdline_aliases => {q=>{}},
-        pos => 0,
-    },
-    detail => {
-        schema => 'bool',
-    },
-);
-
-my %fauthor_args = (
-    author => {
-        summary => 'Filter by author',
-        schema => 'str*',
-        cmdline_aliases => {a=>{}},
-        completion => \&_complete_cpanid,
-    },
-);
-
-my %fdist_args = (
-    dist => {
-        summary => 'Filter by distribution',
-        schema => 'str*',
-        cmdline_aliases => {d=>{}},
-        completion => \&_complete_dist,
-    },
-);
-
 $SPEC{list_local_cpan_authors} = {
     v => 1.1,
     summary => 'List authors',
@@ -1070,12 +1109,6 @@ sub list_local_cpan_modules {
     goto &list_local_cpan_packages;
 }
 
-my %flatest_args = (
-    latest => {
-        schema => ['bool*', is=>1],
-    },
-);
-
 $SPEC{list_local_cpan_dists} = {
     v => 1.1,
     summary => 'List distributions',
@@ -1159,12 +1192,6 @@ FROM dist d1".
     \@res;
 }
 
-my %full_path_args = (
-    full_path => {
-        schema => ['bool*' => is=>1],
-    },
-);
-
 $SPEC{'list_local_cpan_releases'} = {
     v => 1.1,
     summary => 'List releases/tarballs',
@@ -1243,134 +1270,7 @@ LEFT JOIN dist d1 ON f1.id=d1.file_id
     \@res;
 }
 
-my %mod_args = (
-    module => {
-        schema => 'str*',
-        req => 1,
-        pos => 0,
-        completion => \&_complete_mod,
-    },
-);
-
-my %author_args = (
-    author => {
-        schema => 'str*',
-        req => 1,
-        pos => 0,
-        completion => \&_complete_cpanid,
-    },
-);
-
-$SPEC{'mod2dist'} = {
-    v => 1.1,
-    summary => 'Get distribution name of a module',
-    args => {
-        %common_args,
-        %mod_args,
-    },
-    result_naked=>1,
-};
-sub mod2dist {
-    my %args = @_;
-
-    _set_args_default(\%args);
-    my $cpan = $args{cpan};
-    my $index_name = $args{index_name};
-    my $mod = $args{module};
-
-    my $dbh = _connect_db('ro', $cpan, $index_name);
-
-    my ($res) = $dbh->selectrow_array("SELECT dist.name
-FROM module
-LEFT JOIN file ON module.file_id=file.id
-LEFT JOIN dist ON file.id=dist.file_id
-WHERE module.name=?", {}, $mod);
-        $res;
-}
-
-$SPEC{'mod2rel'} = {
-    v => 1.1,
-    summary => 'Get (latest) release name of a module',
-    args => {
-        %common_args,
-        %mod_args,
-        %full_path_args,
-        # all=>1
-    },
-    result_naked=>1,
-};
-sub mod2rel {
-    my %args = @_;
-
-    _set_args_default(\%args);
-    my $cpan = $args{cpan};
-    my $index_name = $args{index_name};
-    my $mod = $args{module};
-
-    my $dbh = _connect_db('ro', $cpan, $index_name);
-
-    my $row = $dbh->selectrow_hashref("SELECT
-  file.cpanid cpanid,
-  file.name name
-FROM module
-LEFT JOIN file ON module.file_id=file.id
-WHERE module.name=?
-ORDER BY version_numified DESC
-", {}, $mod);
-    return undef unless $row;
-    if ($args{full_path}) {
-        _relpath($row->{name}, $cpan, $row->{cpanid});
-    } else {
-        $row->{name};
-    }
-}
-
-my %dist_args = (
-    dist => {
-        schema => 'str*',
-        req => 1,
-        pos => 0,
-        completion => \&_complete_dist,
-    },
-);
-
-$SPEC{'dist2rel'} = {
-    v => 1.1,
-    summary => 'Get (latest) release name of a distribution',
-    args => {
-        %common_args,
-        %dist_args,
-        %full_path_args,
-        # all=>1
-    },
-    result_naked=>1,
-};
-sub dist2rel {
-    my %args = @_;
-
-    _set_args_default(\%args);
-    my $cpan = $args{cpan};
-    my $index_name = $args{index_name};
-    my $dist = $args{dist};
-
-    my $dbh = _connect_db('ro', $cpan, $index_name);
-
-    my $row = $dbh->selectrow_hashref("SELECT
-  file.cpanid cpanid,
-  file.name name
-FROM dist
-LEFT JOIN file ON dist.file_id=file.id
-WHERE dist.name=?
-ORDER BY version_numified DESC", {}, $dist);
-    return undef unless $row;
-    if ($args{full_path}) {
-        _relpath($row->{name}, $cpan, $row->{cpanid});
-    } else {
-        $row->{name};
-    }
-}
-
-$SPEC{'distmods'} = {
+$SPEC{'handle_cmd'} = {
     v => 1.1,
     summary => 'List modules in a distribution',
     args => {
@@ -1379,7 +1279,7 @@ $SPEC{'distmods'} = {
     },
     result_naked=>1,
 };
-sub distmods {
+sub handle_cmd {
     my %args = @_;
 
     _set_args_default(\%args);
