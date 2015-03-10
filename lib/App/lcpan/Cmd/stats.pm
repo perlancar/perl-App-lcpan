@@ -1,5 +1,8 @@
 package App::lcpan::Cmd::stats;
 
+# DATE
+# VERSION
+
 use 5.010;
 use strict;
 use warnings;

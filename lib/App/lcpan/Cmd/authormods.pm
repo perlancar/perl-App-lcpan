@@ -1,5 +1,8 @@
 package App::lcpan::Cmd::authormods;
 
+# DATE
+# VERSION
+
 use 5.010;
 use strict;
 use warnings;

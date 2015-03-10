@@ -1,5 +1,8 @@
 package App::lcpan::Cmd::update_index;
 
+# DATE
+# VERSION
+
 use 5.010;
 use strict;
 use warnings;

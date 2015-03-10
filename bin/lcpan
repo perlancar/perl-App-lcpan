@@ -28,21 +28,6 @@ Perinci::CmdLine::Any->new(
     subcommands => $subcommands,
 )->run;
 
-__END__
-
-    subcommands => {
-
-        mod2rel     => {url=>"${prefix}mod2rel"},
-        dist2rel    => {url=>"${prefix}dist2rel"},
-
-        distmods    => {url=>"${prefix}distmods"},
-
-        authormods  => {url=>"${prefix}authormods"},
-        authordists => {url=>"${prefix}authordists"},
-        authorrels  => {url=>"${prefix}authorrels"},
-    },
-
-
 # ABSTRACT: Manage your local CPAN mirror
 # PODNAME:
 

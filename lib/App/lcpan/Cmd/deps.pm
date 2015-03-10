@@ -1,5 +1,8 @@
 package App::lcpan::Cmd::deps;
 
+# DATE
+# VERSION
+
 use 5.010;
 use strict;
 use warnings;
