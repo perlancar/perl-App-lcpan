@@ -16,6 +16,10 @@ my $subcommands = {};
 for my $mod (keys %$mods) {
     (my $sc_name = $mod) =~ s/App::lcpan::Cmd:://;
     $sc_name =~ s/_/-/g;
+
+    # disable these first, they are too slow
+    next if $sc_name =~ /\A(authors-by-mod-count|authors-by-rel-count)\z/;
+
     (my $url = $mod) =~ s!::!/!g;
     $subcommands->{$sc_name} = {
         url => "/$url/handle_cmd",
