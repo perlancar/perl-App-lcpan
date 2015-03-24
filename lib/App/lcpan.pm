@@ -52,6 +52,31 @@ _
         schema  => 'str*',
         default => 'index.db',
         tags => ['common'],
+        completion => sub {
+            my %args = @_;
+            my $word    = $args{word} // '';
+            my $cmdline = $args{cmdline};
+            my $r       = $args{r};
+
+            return undef unless $cmdline;
+
+            # force reading config file
+            $r->{read_config} = 1;
+            my $res = $cmdline->parse_argv($r);
+
+            my $args = $res->[2];
+            _set_args_default($args);
+
+            require Complete::Util;
+            Complete::Util::complete_file(
+                word => $word,
+                starting_path => $args->{cpan},
+                filter => sub {
+                    # file or index.db*
+                    (-d $_[0]) || $_[0] =~ /index\.db/;
+                },
+            );
+        },
     },
 );
 
