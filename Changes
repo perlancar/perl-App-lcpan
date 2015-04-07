@@ -1,5 +1,24 @@
 Revision history for App-lcpan
 
+0.14    2015-04-07 (PERLANCAR)
+
+        - Make subcommands pluggable (App::lcpan::Cmd::*) to prepare for adding
+          more/custom subcommands by plugins.
+
+        - Add subcommands authors-by-mod-count & authors-by-rel-count, though
+          they are currently disabled by default because the queries are slow
+          (100+ secs).
+
+        - [Optimization] update: don't update index if mirrored files do not
+          change (done by checking the mtime of
+          modules/02packages.details.txt.gz).
+
+        - Add completion for --index-name.
+
+        - [dist] Rebuild with newer Pod::Weaver::Plugin::Rinci for producing
+          Configuration POD section.
+
+
 0.13    2015-02-26 (PERLANCAR)
 
 	- No functional changes.
