@@ -1,5 +1,20 @@
 Revision history for App-lcpan
 
+0.15    2015-04-11 (PERLANCAR)
+
+        - Bump database schema version to 4. This update mainly adds column
+          'cpanid' to tables 'module' and 'dist' to speed up queries. This
+          version requires a full reindex.
+
+        - [Bugfix] Dependency information were sometimes lost when we update
+          mirror and old files information were removed, because we stored
+          dependency information on a per-dist basis instead of per-file.
+
+        - Enable authors-by-{mod,rel}-count because the queries are now fast.
+
+        - Add command: authors-by-dist-count.
+
+
 0.14    2015-04-07 (PERLANCAR)
 
         - Make subcommands pluggable (App::lcpan::Cmd::*) to prepare for adding
