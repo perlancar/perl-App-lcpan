@@ -24,14 +24,6 @@ our @EXPORT_OK = qw(
                        list_local_cpan_authors
                        list_local_cpan_deps
                        list_local_cpan_rev_deps
-
-                       mod2dist
-                       mod2rel
-                       dist2rel
-                       distmods
-                       authormods
-                       authordists
-                       authorrels
                );
 
 our %SPEC;
@@ -191,7 +183,7 @@ sub _create_schema {
     my $dbh = shift;
 
     my $spec = {
-        latest_v => 3,
+        latest_v => 4,
 
         install => [
             'CREATE TABLE author (
@@ -222,16 +214,19 @@ sub _create_schema {
             'CREATE TABLE module (
                  id INTEGER NOT NULL PRIMARY KEY,
                  name VARCHAR(255) NOT NULL,
+                 cpanid VARCHAR(20) NOT NULL REFERENCES author(cpanid), -- [cache]
                  file_id INTEGER NOT NULL,
                  version VARCHAR(20),
                  version_numified DECIMAL
              )',
             'CREATE UNIQUE INDEX ix_module__name ON module(name)',
             'CREATE INDEX ix_module__file_id ON module(file_id)',
+            'CREATE INDEX ix_module__cpanid ON module(cpanid)',
 
             'CREATE TABLE dist (
                  id INTEGER NOT NULL PRIMARY KEY,
                  name VARCHAR(90) NOT NULL,
+                 cpanid VARCHAR(20) NOT NULL REFERENCES author(cpanid), -- [cache]
                  abstract TEXT,
                  file_id INTEGER NOT NULL,
                  version VARCHAR(20),
@@ -239,20 +234,23 @@ sub _create_schema {
              )',
             'CREATE INDEX ix_dist__name ON dist(name)',
             'CREATE UNIQUE INDEX ix_dist__file_id ON dist(file_id)',
+            'CREATE INDEX ix_dist__cpanid ON dist(cpanid)',
 
             'CREATE TABLE dep (
-                 dist_id INTEGER,
+                 file_id INTEGER,
+                 dist_id INTEGER, -- [cache]
                  module_id INTEGER, -- if module is known (listed in module table), only its id will be recorded here
                  module_name TEXT,  -- if module is unknown (unlisted in module table), only the name will be recorded here
                  rel TEXT, -- relationship: requires, ...
                  phase TEXT, -- runtime, ...
                  version VARCHAR(20),
                  version_numified DECIMAL,
+                 FOREIGN KEY (file_id) REFERENCES file(id),
                  FOREIGN KEY (dist_id) REFERENCES dist(id),
                  FOREIGN KEY (module_id) REFERENCES module(id)
              )',
             'CREATE INDEX ix_dep__module_name ON dep(module_name)',
-            'CREATE UNIQUE INDEX ix_dep__dist_id__module_id ON dep(dist_id,module_id)',
+            # 'CREATE UNIQUE INDEX ix_dep__file_id__module_id ON dep(file_id,module_id)', # not all module have module_id anyway, and ones with module_id should already be correct because dep is a hash with module name as key
         ], # install
 
         upgrade_to_v2 => [
@@ -278,6 +276,38 @@ sub _create_schema {
             'ALTER TABLE dist   ADD COLUMN version_numified DECIMAL',
             'ALTER TABLE module ADD COLUMN version_numified DECIMAL',
             'ALTER TABLE dep    ADD COLUMN version_numified DECIMAL',
+        ],
+
+        upgrade_to_v4 => [
+            # there is some changes to data structure: 1) add column 'cpanid' to
+            # module & dist (for improving performance of some queries); 2) we
+            # record deps per-file, not per-dist so we can delete old files'
+            # data more easily. we also empty data to force reindexing.
+
+            'DELETE FROM dist',
+            'DELETE FROM module',
+            'DELETE FROM file',
+
+            'ALTER TABLE module ADD COLUMN cpanid VARCHAR(20) NOT NULL DEFAULT \'\' REFERENCES author(cpanid)',
+            'CREATE INDEX ix_module__cpanid ON module(cpanid)',
+            'ALTER TABLE dist ADD COLUMN cpanid VARCHAR(20) NOT NULL DEFAULT \'\' REFERENCES author(cpanid)',
+            'CREATE INDEX ix_dist__cpanid ON dist(cpanid)',
+
+            'DROP TABLE dep',
+            'CREATE TABLE dep (
+                 file_id INTEGER,
+                 dist_id INTEGER, -- [cache]
+                 module_id INTEGER, -- if module is known (listed in module table), only its id will be recorded here
+                 module_name TEXT,  -- if module is unknown (unlisted in module table), only the name will be recorded here
+                 rel TEXT, -- relationship: requires, ...
+                 phase TEXT, -- runtime, ...
+                 version VARCHAR(20),
+                 version_numified DECIMAL,
+                 FOREIGN KEY (file_id) REFERENCES file(id),
+                 FOREIGN KEY (dist_id) REFERENCES dist(id),
+                 FOREIGN KEY (module_id) REFERENCES module(id)
+             )',
+            'CREATE INDEX ix_dep__module_name ON dep(module_name)',
         ],
     }; # spec
 
@@ -347,7 +377,7 @@ sub _parse_yaml {
 }
 
 sub _add_prereqs {
-    my ($dist_id, $hash, $phase, $rel, $sth_ins_dep, $sth_sel_mod) = @_;
+    my ($file_id, $dist_id, $hash, $phase, $rel, $sth_ins_dep, $sth_sel_mod) = @_;
     $log->tracef("  Adding prereqs (%s %s): %s", $phase, $rel, $hash);
     for my $mod (keys %$hash) {
         $sth_sel_mod->execute($mod);
@@ -359,7 +389,7 @@ sub _add_prereqs {
             $mod_name = $mod;
         }
         my $ver = $hash->{$mod};
-        $sth_ins_dep->execute($dist_id, $mod_id, $mod_name, $phase,
+        $sth_ins_dep->execute($file_id, $dist_id, $mod_id, $mod_name, $phase,
                               $rel, $ver, _numify_ver($ver));
     }
 }
@@ -527,17 +557,17 @@ sub update_local_cpan_index {
 
         my $sth_sel_file = $dbh->prepare("SELECT id FROM file WHERE name=?");
         my $sth_ins_file = $dbh->prepare("INSERT INTO file (name,cpanid) VALUES (?,?)");
-        my $sth_ins_mod  = $dbh->prepare("INSERT OR REPLACE INTO module (name,file_id,version,version_numified) VALUES (?,?,?,?)");
+        my $sth_ins_mod  = $dbh->prepare("INSERT OR REPLACE INTO module (name,file_id,cpanid,version,version_numified) VALUES (?,?,?,?,?)");
 
         $dbh->begin_work;
 
-        my %files_in_table;
+        my %file_ids_in_table;
         my $sth = $dbh->prepare("SELECT name,id FROM file");
         while (my ($name, $id) = $sth->fetchrow_array) {
-            $files_in_table{$name} = $id;
+            $file_ids_in_table{$name} = $id;
         }
 
-        my %files_in_02packages; # key=filename, val=id (or undef if already exists in db)
+        my %file_ids_in_02packages; # key=filename, val=id (or undef if already exists in db)
         my $line = 0;
         while (<$fh>) {
             $line++;
@@ -552,8 +582,8 @@ sub update_local_cpan_index {
                 next;
             };
             my $file_id;
-            if (exists $files_in_02packages{$file}) {
-                $file_id = $files_in_02packages{$file};
+            if (exists $file_ids_in_02packages{$file}) {
+                $file_id = $file_ids_in_02packages{$file};
             } else {
                 $sth_sel_file->execute($file);
                 unless ($sth_sel_file->fetchrow_arrayref) {
@@ -561,11 +591,11 @@ sub update_local_cpan_index {
                     $file_id = $dbh->last_insert_id("","","","");
                     $log->tracef("  New file: %s", $file);
                 }
-                $files_in_02packages{$file} = $file_id;
+                $file_ids_in_02packages{$file} = $file_id;
             }
             next unless $file_id;
 
-            $sth_ins_mod->execute($pkg, $file_id, $ver, _numify_ver($ver));
+            $sth_ins_mod->execute($pkg, $file_id, $author, $ver, _numify_ver($ver));
             $log->tracef("  New/updated module: %s", $pkg);
         } # while <fh>
 
@@ -574,12 +604,15 @@ sub update_local_cpan_index {
       CLEANUP:
         {
             my @old_file_ids;
-            for (keys %files_in_table) {
-                push @old_file_ids, $files_in_table{$_}
-                    unless exists $files_in_table{$_};
+            my @old_filenames;
+            for my $fname (sort keys %file_ids_in_table) {
+                next if exists $file_ids_in_02packages{$fname};
+                push @old_file_ids, $file_ids_in_table{$fname};
+                push @old_filenames, $fname;
             }
             last CLEANUP unless @old_file_ids;
-            $dbh->do("DELETE FROM dep WHERE dist_id IN (SELECT id FROM dist WHERE file_id IN (".join(",",@old_file_ids)."))");
+            $log->tracef("  Deleting old files: %s", \@old_filenames);
+            $dbh->do("DELETE FROM dep WHERE file_id IN (".join(",",@old_file_ids)."))");
             $dbh->do("DELETE FROM module WHERE file_id IN (".join(",",@old_file_ids).")");
             $dbh->do("DELETE FROM dist WHERE file_id IN (".join(",",@old_file_ids).")");
         }
@@ -598,8 +631,8 @@ sub update_local_cpan_index {
 
         my $sth_set_file_status = $dbh->prepare("UPDATE file SET status=? WHERE id=?");
         my $sth_set_file_status_etc = $dbh->prepare("UPDATE file SET status=?,has_metajson=?,has_metayml=?,has_makefilepl=?,has_buildpl=? WHERE id=?");
-        my $sth_ins_dist = $dbh->prepare("INSERT OR REPLACE INTO dist (name,abstract,file_id,version,version_numified) VALUES (?,?,?,?,?)");
-        my $sth_ins_dep = $dbh->prepare("INSERT OR REPLACE INTO dep (dist_id,module_id,module_name,phase,rel, version,version_numified) VALUES (?,?,?,?,?, ?,?)");
+        my $sth_ins_dist = $dbh->prepare("INSERT OR REPLACE INTO dist (name,cpanid,abstract,file_id,version,version_numified) VALUES (?,?,?,?,?,?)");
+        my $sth_ins_dep = $dbh->prepare("INSERT OR REPLACE INTO dep (file_id,dist_id,module_id,module_name,phase,rel, version,version_numified) VALUES (?,?,?,?,?,?, ?,?)");
         my $sth_sel_mod  = $dbh->prepare("SELECT * FROM module WHERE name=?");
 
         my $i = 0;
@@ -729,27 +762,27 @@ sub update_local_cpan_index {
             my $dist_version = $meta->{version};
             $dist_name =~ s/::/-/g; # sometimes author miswrites module name
             # insert dist record
-            $sth_ins_dist->execute($dist_name, $dist_abstract, $file->{id}, $dist_version, _numify_ver($dist_version));
+            $sth_ins_dist->execute($dist_name, $file->{cpanid}, $dist_abstract, $file->{id}, $dist_version, _numify_ver($dist_version));
             my $dist_id = $dbh->last_insert_id("","","","");
 
             # insert dependency information
             if (ref($meta->{configure_requires}) eq 'HASH') {
-                _add_prereqs($dist_id, $meta->{configure_requires}, 'configure', 'requires', $sth_ins_dep, $sth_sel_mod);
+                _add_prereqs($file->{id}, $dist_id, $meta->{configure_requires}, 'configure', 'requires', $sth_ins_dep, $sth_sel_mod);
             }
             if (ref($meta->{build_requires}) eq 'HASH') {
-                _add_prereqs($dist_id, $meta->{build_requires}, 'build', 'requires', $sth_ins_dep, $sth_sel_mod);
+                _add_prereqs($file->{id}, $dist_id, $meta->{build_requires}, 'build', 'requires', $sth_ins_dep, $sth_sel_mod);
             }
             if (ref($meta->{test_requires}) eq 'HASH') {
-                _add_prereqs($dist_id, $meta->{test_requires}, 'test', 'requires', $sth_ins_dep, $sth_sel_mod);
+                _add_prereqs($file->{id}, $dist_id, $meta->{test_requires}, 'test', 'requires', $sth_ins_dep, $sth_sel_mod);
             }
             if (ref($meta->{requires}) eq 'HASH') {
-                _add_prereqs($dist_id, $meta->{requires}, 'runtime', 'requires', $sth_ins_dep, $sth_sel_mod);
+                _add_prereqs($file->{id}, $dist_id, $meta->{requires}, 'runtime', 'requires', $sth_ins_dep, $sth_sel_mod);
             }
             if (ref($meta->{prereqs}) eq 'HASH') {
                 for my $phase (keys %{ $meta->{prereqs} }) {
                     my $phprereqs = $meta->{prereqs}{$phase};
                     for my $rel (keys %$phprereqs) {
-                        _add_prereqs($dist_id, $phprereqs->{$rel}, $phase, $rel, $sth_ins_dep, $sth_sel_mod);
+                        _add_prereqs($file->{id}, $dist_id, $phprereqs->{$rel}, $phase, $rel, $sth_ins_dep, $sth_sel_mod);
                     }
                 }
             }
@@ -773,25 +806,25 @@ sub update_local_cpan_index {
     # (e.g. non-existing file, no info, other error). we determine the dist from
     # the module name.
     {
-        my $sth = $dbh->prepare("SELECT id FROM file WHERE NOT EXISTS (SELECT id FROM dist WHERE file_id=file.id)");
-        my @file_ids;
+        my $sth = $dbh->prepare("SELECT * FROM file WHERE NOT EXISTS (SELECT id FROM dist WHERE file_id=file.id)");
+        my @files;
         $sth->execute;
-        while (my ($id) = $sth->fetchrow_array) {
-            push @file_ids, $id;
+        while (my $row = $sth->fetchrow_hashref) {
+            push @files, $row;
         }
 
         my $sth_sel_mod = $dbh->prepare("SELECT * FROM module WHERE file_id=? ORDER BY name LIMIT 1");
-        my $sth_ins_dist = $dbh->prepare("INSERT INTO dist (name,file_id,version,version_numified) VALUES (?,?,?,?)");
+        my $sth_ins_dist = $dbh->prepare("INSERT INTO dist (name,cpanid,file_id,version,version_numified) VALUES (?,?,?,?,?)");
 
         $dbh->begin_work;
       FILE:
-        for my $file_id (@file_ids) {
-            $sth_sel_mod->execute($file_id);
+        for my $file (@files) {
+            $sth_sel_mod->execute($file->{id});
             my $row = $sth_sel_mod->fetchrow_hashref or next FILE;
             my $dist_name = $row->{name};
             $dist_name =~ s/::/-/g;
             $log->tracef("Setting dist name for %s as %s", $row->{name}, $dist_name);
-            $sth_ins_dist->execute($dist_name, $file_id, $row->{version}, _numify_ver($row->{version}));
+            $sth_ins_dist->execute($dist_name, $file->{cpanid}, $file->{id}, $row->{version}, _numify_ver($row->{version}));
         }
         $dbh->commit;
     }
@@ -1100,7 +1133,6 @@ sub list_local_cpan_packages {
         push @bind, $q, $q;
     }
     if ($author) {
-        #push @where, "(dist_id IN (SELECT dist_id FROM dist WHERE auth_id IN (SELECT auth_id FROM auths WHERE cpanid=?)))";
         push @where, "(author=?)";
         push @bind, $author;
     }
@@ -1114,7 +1146,7 @@ sub list_local_cpan_packages {
   version,
   (SELECT name FROM dist WHERE dist.file_id=module.file_id) dist,
   (SELECT abstract FROM dist WHERE dist.file_id=module.file_id) abstract,
-  (SELECT cpanid FROM file WHERE id=module.file_id) author
+  cpanid author
 FROM module".
         (@where ? " WHERE ".join(" AND ", @where) : "").
             " ORDER BY name";
@@ -1191,7 +1223,6 @@ sub list_local_cpan_dists {
         push @bind, $q, $q;
     }
     if ($author) {
-        #push @where, "(dist_id IN (SELECT dist_id FROM dists WHERE auth_id IN (SELECT auth_id FROM auths WHERE cpanid=?)))";
         push @where, "(author=?)";
         push @bind, $author;
     }
@@ -1203,7 +1234,7 @@ sub list_local_cpan_dists {
   abstract,
   version,
   (SELECT name FROM file WHERE id=d1.file_id) file,
-  (SELECT cpanid FROM file WHERE id=d1.file_id) author
+  cpanid author
 FROM dist d1".
         (@where ? " WHERE ".join(" AND ", @where) : "").
             " ORDER BY name";
@@ -1253,7 +1284,7 @@ sub list_local_cpan_releases {
         push @bind, $q;
     }
     if ($author) {
-        push @where, "(cpanid=?)";
+        push @where, "(f1.cpanid=?)";
         push @bind, $author;
     }
     if (defined $args{has_metajson}) {
@@ -1273,7 +1304,7 @@ sub list_local_cpan_releases {
     }
     my $sql = "SELECT
   f1.name name,
-  cpanid,
+  f1.cpanid cpanid,
   status,
   has_metajson,
   has_metayml,
@@ -1391,7 +1422,7 @@ sub _get_revdeps {
     my $sth = $dbh->prepare("SELECT
   (SELECT name    FROM dist WHERE dp.dist_id=dist.id) AS dist,
   (SELECT version FROM dist WHERE dp.dist_id=dist.id) AS dist_version,
-  (SELECT cpanid  FROM file WHERE dp.dist_id=(SELECT id FROM dist WHERE file.id=dist.file_id)) AS cpanid,
+  (SELECT cpanid  FROM file WHERE dp.file_id=file.id) AS cpanid,
   -- phase,
   -- rel,
   version req_version
@@ -1405,7 +1436,7 @@ ORDER BY dist");
         #next unless $rel   eq 'ALL' || $row->{rel}   eq $rel;
         #delete $row->{phase} unless $phase eq 'ALL';
         #delete $row->{rel}   unless $rel   eq 'ALL';
-        push @res, $row;
+        push @res, {dist=>$row->{dist}, version=>$row->{dist_version}};
     }
 
     [200, "OK", \@res];

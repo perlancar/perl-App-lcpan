@@ -1,7 +1,5 @@
 package App::lcpan::Cmd::authors_by_mod_count;
 
-# XXX fix query (too slow)
-
 # DATE
 # VERSION
 
@@ -36,9 +34,10 @@ sub handle_cmd {
     my $dbh = App::lcpan::_connect_db('ro', $cpan, $index_name);
 
     my $sql = "SELECT
-  cpanid id,
-  (SELECT COUNT(*) FROM module WHERE file_id IN (SELECT id FROM file WHERE cpanid=a.cpanid)) AS mod_count
-FROM author a
+  cpanid author,
+  COUNT(*) AS mod_count
+FROM module m
+GROUP BY cpanid
 ORDER BY mod_count DESC
 ";
 

@@ -34,9 +34,10 @@ sub handle_cmd {
     my $dbh = App::lcpan::_connect_db('ro', $cpan, $index_name);
 
     my $sql = "SELECT
-  cpanid id,
-  (SELECT COUNT(*) FROM file WHERE cpanid=a.cpanid) AS rel_count
-FROM author a
+  cpanid author,
+  COUNT(*) AS rel_count
+FROM file a
+GROUP BY cpanid
 ORDER BY rel_count DESC
 ";
 
