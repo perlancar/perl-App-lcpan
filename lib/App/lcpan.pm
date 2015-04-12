@@ -1035,7 +1035,6 @@ $SPEC{list_local_cpan_authors} = {
         %common_args,
         %query_args,
     },
-    result_naked => 1,
     result => {
         description => <<'_',
 
@@ -1090,7 +1089,10 @@ FROM author".
     while (my $row = $sth->fetchrow_hashref) {
         push @res, $detail ? $row : $row->{id};
     }
-    \@res;
+    my $resmeta = {};
+    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/id name email/]]}}
+        if $detail;
+    [200, "OK", \@res, $resmeta];
 }
 
 $SPEC{list_local_cpan_packages} = {
@@ -1102,7 +1104,6 @@ $SPEC{list_local_cpan_packages} = {
         %fauthor_args,
         %fdist_args,
     },
-    result_naked => 1,
     result => {
         description => <<'_',
 
@@ -1144,9 +1145,9 @@ sub list_local_cpan_packages {
     my $sql = "SELECT
   name,
   version,
+  cpanid author
   (SELECT name FROM dist WHERE dist.file_id=module.file_id) dist,
   (SELECT abstract FROM dist WHERE dist.file_id=module.file_id) abstract,
-  cpanid author
 FROM module".
         (@where ? " WHERE ".join(" AND ", @where) : "").
             " ORDER BY name";
@@ -1158,7 +1159,10 @@ FROM module".
         delete $row->{abstract};
         push @res, $detail ? $row : $row->{name};
     }
-    \@res;
+    my $resmeta = {};
+    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/name author version dist abstract/]]}}
+        if $detail;
+    [200, "OK", \@res, $resmeta];
 }
 
 $SPEC{list_local_cpan_modules} = $SPEC{list_local_cpan_packages};
@@ -1175,7 +1179,6 @@ $SPEC{list_local_cpan_dists} = {
         %fauthor_args,
         %flatest_args,
     },
-    result_naked => 1,
     result => {
         description => <<'_',
 
@@ -1231,10 +1234,10 @@ sub list_local_cpan_dists {
     }
     my $sql = "SELECT
   name,
-  abstract,
+  cpanid author,
   version,
   (SELECT name FROM file WHERE id=d1.file_id) file,
-  cpanid author
+  abstract
 FROM dist d1".
         (@where ? " WHERE ".join(" AND ", @where) : "").
             " ORDER BY name";
@@ -1245,7 +1248,10 @@ FROM dist d1".
     while (my $row = $sth->fetchrow_hashref) {
         push @res, $detail ? $row : $row->{name};
     }
-    \@res;
+    my $resmeta = {};
+    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/name author version file abstract/]]}}
+        if $detail;
+    [200, "OK", \@res, $resmeta];
 }
 
 $SPEC{'list_local_cpan_releases'} = {
@@ -1262,7 +1268,6 @@ $SPEC{'list_local_cpan_releases'} = {
         %flatest_args,
         %full_path_args,
     },
-    result_naked=>1,
 };
 sub list_local_cpan_releases {
     my %args = @_;
@@ -1304,7 +1309,7 @@ sub list_local_cpan_releases {
     }
     my $sql = "SELECT
   f1.name name,
-  f1.cpanid cpanid,
+  f1.cpanid author,
   status,
   has_metajson,
   has_metayml,
@@ -1323,7 +1328,10 @@ LEFT JOIN dist d1 ON f1.id=d1.file_id
         if ($args{full_path}) { $row->{name} = _relpath($row->{name}, $cpan, $row->{cpanid}) }
         push @res, $detail ? $row : $row->{name};
     }
-    \@res;
+    my $resmeta = {};
+    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/name author status has_metayaml has_metajson has_makefilepl has_buildpl/]]}}
+        if $detail;
+    [200, "OK", \@res, $resmeta];
 }
 
 sub _get_prereqs {
@@ -1536,6 +1544,9 @@ sub list_local_cpan_deps {
         delete $_->{level};
     }
 
+    my $resmeta = {};
+    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/module version/]]}};
+    $res->[3] = $resmeta;
     $res;
 }
 
@@ -1586,7 +1597,12 @@ sub list_local_cpan_rev_deps {
         author_isnt => $author_isnt,
     };
 
-    _get_revdeps($mod, $dbh, $filters);
+    my $res = _get_revdeps($mod, $dbh, $filters);
+
+    my $resmeta = {};
+    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/dist version/]]}};
+    $res->[3] = $resmeta;
+    $res;
 }
 
 1;

@@ -23,11 +23,13 @@ for my $mod (keys %$mods) {
     };
 }
 
-Perinci::CmdLine::Any->new(
+my $cli = Perinci::CmdLine::Any->new(
     url => $prefix,
     log => 1,
     subcommands => $subcommands,
-)->run;
+);
+$cli->common_opts->{naked_res}{default} = 1;
+$cli->run;
 
 # ABSTRACT: Manage your local CPAN mirror
 # PODNAME:
