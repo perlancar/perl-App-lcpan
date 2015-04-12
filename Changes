@@ -1,5 +1,14 @@
 Revision history for App-lcpan
 
+0.16    2015-04-12 (PERLANCAR)
+
+        - [ux] Rename functions in App::lcpan to match CLI subcommand names
+          (e.g. list_local_cpan_authors -> authors) to make codebase easier to
+          use/understand.
+
+        - Various minor tweaks and fixes.
+
+
 0.15    2015-04-11 (PERLANCAR)
 
         - Bump database schema version to 4. This update mainly adds column
