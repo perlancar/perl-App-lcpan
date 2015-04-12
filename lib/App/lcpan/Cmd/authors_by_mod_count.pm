@@ -22,7 +22,6 @@ $SPEC{'handle_cmd'} = {
     args => {
         %App::lcpan::common_args,
     },
-    result_naked=>1,
 };
 sub handle_cmd {
     my %args = @_;
@@ -47,7 +46,9 @@ ORDER BY mod_count DESC
     while (my $row = $sth->fetchrow_hashref) {
         push @res, $row;
     }
-    \@res;
+    my $resmeta = {};
+    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/author mod_count/]]}};
+    [200, "OK", \@res, $resmeta];
 }
 
 1;

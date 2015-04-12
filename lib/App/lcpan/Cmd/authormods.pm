@@ -22,13 +22,15 @@ $SPEC{'handle_cmd'} = {
     args => {
         %App::lcpan::common_args,
         %App::lcpan::author_args,
+        detail => {
+            schema => 'bool',
+        },
     },
-    result_naked=>1,
 };
 sub handle_cmd {
     my %args = @_;
 
-    App::lcpan::list_local_cpan_modules(%args);
+    App::lcpan::modules(%args);
 }
 
 1;

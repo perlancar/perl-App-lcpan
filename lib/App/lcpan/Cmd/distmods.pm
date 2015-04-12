@@ -22,8 +22,10 @@ $SPEC{'handle_cmd'} = {
     args => {
         %App::lcpan::common_args,
         %App::lcpan::dist_args,
+        detail => {
+            schema => 'bool',
+        },
     },
-    result_naked=>1,
 };
 sub handle_cmd {
     my %args = @_;
@@ -32,6 +34,7 @@ sub handle_cmd {
     my $cpan = $args{cpan};
     my $index_name = $args{index_name};
     my $dist = $args{dist};
+    my $detail = $args{detail};
 
     my $dbh = App::lcpan::_connect_db('ro', $cpan, $index_name);
 
@@ -46,9 +49,12 @@ ORDER BY name DESC");
     $sth->execute($dist);
     my @res;
     while (my $row = $sth->fetchrow_hashref) {
-        push @res, $row->{name};
+        push @res, $detail ? $row : $row->{name};
     }
-    \@res;
+    my $resmeta = {};
+    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/name version/]]}}
+        if $detail;
+    [200, "OK", \@res, $resmeta];
 }
 
 1;

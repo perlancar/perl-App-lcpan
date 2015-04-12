@@ -16,8 +16,8 @@ $SPEC{':package'} = {
     summary => "'stats' command",
 };
 
-$SPEC{handle_cmd} = $App::lcpan::SPEC{stat_local_cpan};
-*handle_cmd = \&App::lcpan::stat_local_cpan;
+$SPEC{handle_cmd} = $App::lcpan::SPEC{stats};
+*handle_cmd = \&App::lcpan::stats;
 
 1;
 # ABSTRACT:

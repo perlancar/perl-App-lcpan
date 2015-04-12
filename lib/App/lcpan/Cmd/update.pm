@@ -16,8 +16,8 @@ $SPEC{':package'} = {
     summary => "'update' command",
 };
 
-$SPEC{handle_cmd} = $App::lcpan::SPEC{update_local_cpan};
-*handle_cmd = \&App::lcpan::update_local_cpan;
+$SPEC{handle_cmd} = $App::lcpan::SPEC{update};
+*handle_cmd = \&App::lcpan::update;
 
 1;
 # ABSTRACT:

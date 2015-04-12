@@ -14,16 +14,15 @@ use POSIX ();
 use Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = qw(
-                       update_local_cpan
-                       update_local_cpan_files
-                       update_local_cpan_index
-                       list_local_cpan_packages
-                       list_local_cpan_modules
-                       list_local_cpan_dists
-                       list_local_cpan_releases
-                       list_local_cpan_authors
-                       list_local_cpan_deps
-                       list_local_cpan_rev_deps
+                       update
+                       update_files
+                       update_index
+                       modules
+                       dists
+                       releases
+                       authors
+                       deps
+                       rdeps
                );
 
 our %SPEC;
@@ -394,7 +393,7 @@ sub _add_prereqs {
     }
 }
 
-$SPEC{'update_local_cpan_files'} = {
+$SPEC{'update_files'} = {
     v => 1.1,
     summary => 'Update local CPAN mirror files using minicpan command',
     description => <<'_',
@@ -417,7 +416,7 @@ _
         },
     },
 };
-sub update_local_cpan_files {
+sub update_files {
     require IPC::System::Options;
 
     my %args = @_;
@@ -458,7 +457,7 @@ sub _check_meta {
     1;
 }
 
-$SPEC{'update_local_cpan_index'} = {
+$SPEC{'update_index'} = {
     v => 1.1,
     summary => 'Create/update index.db in local CPAN mirror',
     description => <<'_',
@@ -490,7 +489,7 @@ _
         },
     },
 };
-sub update_local_cpan_index {
+sub update_index {
     require DBI;
     require File::Slurp::Tiny;
     require File::Temp;
@@ -832,7 +831,7 @@ sub update_local_cpan_index {
     [200];
 }
 
-$SPEC{'update_local_cpan'} = {
+$SPEC{'update'} = {
     v => 1.1,
     summary => 'Update local CPAN mirror files, followed by create/update the index.db',
     description => <<'_',
@@ -844,14 +843,14 @@ _
         %common_args,
     },
 };
-sub update_local_cpan {
+sub update {
     my %args = @_;
     _set_args_default(\%args);
     my $cpan = $args{cpan};
 
     my $packages_path = "$cpan/modules/02packages.details.txt.gz";
     my @st1 = stat($packages_path);
-    update_local_cpan_files(%args);
+    update_files(%args);
     my @st2 = stat($packages_path);
 
     if (@st1 && @st2 && $st1[9] == $st2[9] && $st1[7] == $st2[7]) {
@@ -859,17 +858,17 @@ sub update_local_cpan {
                 $packages_path);
         return [304, "Files did not change, index not updated"];
     }
-    update_local_cpan_index(%args);
+    update_index(%args);
 }
 
-$SPEC{'stat_local_cpan'} = {
+$SPEC{'stats'} = {
     v => 1.1,
     summary => 'Statistics of your local CPAN mirror',
     args => {
         %common_args,
     },
 };
-sub stat_local_cpan {
+sub stats {
     my %args = @_;
     _set_args_default(\%args);
     my $cpan = $args{cpan};
@@ -1028,7 +1027,7 @@ sub _complete_cpanid {
     \@res;
 };
 
-$SPEC{list_local_cpan_authors} = {
+$SPEC{authors} = {
     v => 1.1,
     summary => 'List authors',
     args => {
@@ -1057,7 +1056,7 @@ _
         },
     ],
 };
-sub list_local_cpan_authors {
+sub authors {
     my %args = @_;
 
     _set_args_default(\%args);
@@ -1095,9 +1094,9 @@ FROM author".
     [200, "OK", \@res, $resmeta];
 }
 
-$SPEC{list_local_cpan_packages} = {
+$SPEC{modules} = {
     v => 1.1,
-    summary => 'List packages/modules',
+    summary => 'List modules/packages',
     args => {
         %common_args,
         %query_args,
@@ -1113,7 +1112,7 @@ will return array of records.
 _
     },
 };
-sub list_local_cpan_packages {
+sub modules {
     my %args = @_;
 
     _set_args_default(\%args);
@@ -1145,9 +1144,9 @@ sub list_local_cpan_packages {
     my $sql = "SELECT
   name,
   version,
-  cpanid author
+  cpanid author,
   (SELECT name FROM dist WHERE dist.file_id=module.file_id) dist,
-  (SELECT abstract FROM dist WHERE dist.file_id=module.file_id) abstract,
+  (SELECT abstract FROM dist WHERE dist.file_id=module.file_id) abstract
 FROM module".
         (@where ? " WHERE ".join(" AND ", @where) : "").
             " ORDER BY name";
@@ -1165,12 +1164,10 @@ FROM module".
     [200, "OK", \@res, $resmeta];
 }
 
-$SPEC{list_local_cpan_modules} = $SPEC{list_local_cpan_packages};
-sub list_local_cpan_modules {
-    goto &list_local_cpan_packages;
-}
+$SPEC{packages} = $SPEC{modules};
+sub packages { goto &modules }
 
-$SPEC{list_local_cpan_dists} = {
+$SPEC{dists} = {
     v => 1.1,
     summary => 'List distributions',
     args => {
@@ -1206,7 +1203,7 @@ _
         },
     ],
 };
-sub list_local_cpan_dists {
+sub dists {
     my %args = @_;
 
     _set_args_default(\%args);
@@ -1254,7 +1251,7 @@ FROM dist d1".
     [200, "OK", \@res, $resmeta];
 }
 
-$SPEC{'list_local_cpan_releases'} = {
+$SPEC{'releases'} = {
     v => 1.1,
     summary => 'List releases/tarballs',
     args => {
@@ -1268,8 +1265,18 @@ $SPEC{'list_local_cpan_releases'} = {
         %flatest_args,
         %full_path_args,
     },
+    description => <<'_',
+
+The status field is the processing status of the file/release by lcpan. `ok`
+means file has been extracted and the meta files parsed, `nofile` means file is
+not found in mirror (possibly because the mirroring process excludes the file
+e.g. due to file size too large), `nometa` means file does not contain
+META.{yml,json}, `unsupported` means file archive format is not supported (e.g.
+rar), `err` means some other error in processing file.
+
+_
 };
-sub list_local_cpan_releases {
+sub releases {
     my %args = @_;
 
     _set_args_default(\%args);
@@ -1310,11 +1317,11 @@ sub list_local_cpan_releases {
     my $sql = "SELECT
   f1.name name,
   f1.cpanid author,
-  status,
   has_metajson,
   has_metayml,
   has_makefilepl,
-  has_buildpl
+  has_buildpl,
+  status
 FROM file f1
 LEFT JOIN dist d1 ON f1.id=d1.file_id
 ".
@@ -1329,7 +1336,7 @@ LEFT JOIN dist d1 ON f1.id=d1.file_id
         push @res, $detail ? $row : $row->{name};
     }
     my $resmeta = {};
-    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/name author status has_metayaml has_metajson has_makefilepl has_buildpl/]]}}
+    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/name author has_metayml has_metajson has_makefilepl has_buildpl status/]]}}
         if $detail;
     [200, "OK", \@res, $resmeta];
 }
@@ -1352,7 +1359,8 @@ sub _get_prereqs {
 
     # fetch the dependency information
     $sth = $dbh->prepare("SELECT
-  CASE WHEN dp.module_id THEN (SELECT name FROM module WHERE id=dp.module_id) ELSE dp.module_name END AS module,
+  CASE WHEN dp.module_id THEN (SELECT name   FROM module WHERE id=dp.module_id) ELSE dp.module_name END AS module,
+  CASE WHEN dp.module_id THEN (SELECT cpanid FROM module WHERE id=dp.module_id) ELSE NULL END AS author,
   phase,
   rel,
   version
@@ -1429,8 +1437,8 @@ sub _get_revdeps {
     # get all dists that depend on that module
     my $sth = $dbh->prepare("SELECT
   (SELECT name    FROM dist WHERE dp.dist_id=dist.id) AS dist,
+  (SELECT cpanid  FROM file WHERE dp.file_id=file.id) AS author,
   (SELECT version FROM dist WHERE dp.dist_id=dist.id) AS dist_version,
-  (SELECT cpanid  FROM file WHERE dp.file_id=file.id) AS cpanid,
   -- phase,
   -- rel,
   version req_version
@@ -1444,7 +1452,7 @@ ORDER BY dist");
         #next unless $rel   eq 'ALL' || $row->{rel}   eq $rel;
         #delete $row->{phase} unless $phase eq 'ALL';
         #delete $row->{rel}   unless $rel   eq 'ALL';
-        push @res, {dist=>$row->{dist}, version=>$row->{dist_version}};
+        push @res, {dist=>$row->{dist}, author=>$row->{author}, version=>$row->{dist_version}};
     }
 
     [200, "OK", \@res];
@@ -1497,7 +1505,7 @@ my %deps_args = (
     },
 );
 
-$SPEC{'list_local_cpan_deps'} = {
+$SPEC{'deps'} = {
     v => 1.1,
     summary => 'List dependencies of a module, data from local CPAN',
     description => <<'_',
@@ -1521,7 +1529,7 @@ _
         %deps_args,
     },
 };
-sub list_local_cpan_deps {
+sub deps {
     my %args = @_;
 
     _set_args_default(\%args);
@@ -1545,12 +1553,12 @@ sub list_local_cpan_deps {
     }
 
     my $resmeta = {};
-    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/module version/]]}};
+    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/module author version/]]}};
     $res->[3] = $resmeta;
     $res;
 }
 
-$SPEC{'list_local_cpan_rev_deps'} = {
+$SPEC{'rdeps'} = {
     v => 1.1,
     summary => 'List reverse dependencies of a module, data from local CPAN',
     args => {
@@ -1580,7 +1588,7 @@ _
         },
     },
 };
-sub list_local_cpan_rev_deps {
+sub rdeps {
     my %args = @_;
 
     _set_args_default(\%args);
@@ -1600,7 +1608,7 @@ sub list_local_cpan_rev_deps {
     my $res = _get_revdeps($mod, $dbh, $filters);
 
     my $resmeta = {};
-    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/dist version/]]}};
+    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/dist author version/]]}};
     $res->[3] = $resmeta;
     $res;
 }

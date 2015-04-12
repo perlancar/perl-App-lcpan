@@ -16,8 +16,8 @@ $SPEC{':package'} = {
     summary => "'dists' command",
 };
 
-$SPEC{handle_cmd} = $App::lcpan::SPEC{list_local_cpan_dists};
-*handle_cmd = \&App::lcpan::list_local_cpan_dists;
+$SPEC{handle_cmd} = $App::lcpan::SPEC{dists};
+*handle_cmd = \&App::lcpan::dists;
 
 1;
 # ABSTRACT:

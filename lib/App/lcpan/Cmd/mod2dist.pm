@@ -23,7 +23,6 @@ $SPEC{'handle_cmd'} = {
         %App::lcpan::common_args,
         %App::lcpan::mod_args,
     },
-    result_naked=>1,
 };
 sub handle_cmd {
     my %args = @_;
@@ -40,7 +39,7 @@ FROM module
 LEFT JOIN file ON module.file_id=file.id
 LEFT JOIN dist ON file.id=dist.file_id
 WHERE module.name=?", {}, $mod);
-        $res;
+    [200, "OK", $res];
 }
 
 1;

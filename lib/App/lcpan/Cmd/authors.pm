@@ -16,8 +16,8 @@ $SPEC{':package'} = {
     summary => "'authors' command",
 };
 
-$SPEC{handle_cmd} = $App::lcpan::SPEC{list_local_cpan_authors};
-*handle_cmd = \&App::lcpan::list_local_cpan_authors;
+$SPEC{handle_cmd} = $App::lcpan::SPEC{authors};
+*handle_cmd = \&App::lcpan::authors;
 
 1;
 # ABSTRACT:

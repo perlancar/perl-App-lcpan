@@ -16,8 +16,8 @@ $SPEC{':package'} = {
     summary => "'deps' command",
 };
 
-$SPEC{handle_cmd} = $App::lcpan::SPEC{list_local_cpan_deps};
-*handle_cmd = \&App::lcpan::list_local_cpan_deps;
+$SPEC{handle_cmd} = $App::lcpan::SPEC{deps};
+*handle_cmd = \&App::lcpan::deps;
 
 1;
 # ABSTRACT:

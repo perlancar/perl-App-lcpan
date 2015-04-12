@@ -25,7 +25,6 @@ $SPEC{'handle_cmd'} = {
         %App::lcpan::full_path_args,
         # all=>1
     },
-    result_naked=>1,
 };
 sub handle_cmd {
     my %args = @_;
@@ -44,12 +43,16 @@ FROM dist
 LEFT JOIN file ON dist.file_id=file.id
 WHERE dist.name=?
 ORDER BY version_numified DESC", {}, $dist);
-    return undef unless $row;
-    if ($args{full_path}) {
-        _relpath($row->{name}, $cpan, $row->{cpanid});
-    } else {
-        $row->{name};
+    my $rel;
+
+    if ($row) {
+        if ($args{full_path}) {
+            $rel = App::lcpan::_relpath($row->{name}, $cpan, $row->{cpanid});
+        } else {
+            $rel = $row->{name};
+        }
     }
+    [200, "OK", $rel];
 }
 
 1;

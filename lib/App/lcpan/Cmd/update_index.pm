@@ -16,8 +16,8 @@ $SPEC{':package'} = {
     summary => "'update-index' command",
 };
 
-$SPEC{handle_cmd} = $App::lcpan::SPEC{update_local_cpan_index};
-*handle_cmd = \&App::lcpan::update_local_cpan_index;
+$SPEC{handle_cmd} = $App::lcpan::SPEC{update_index};
+*handle_cmd = \&App::lcpan::update_index;
 
 1;
 # ABSTRACT:
