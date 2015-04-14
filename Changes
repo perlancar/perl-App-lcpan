@@ -1,5 +1,13 @@
 Revision history for App-lcpan
 
+0.17    2015-04-14 (PERLANCAR)
+
+        - Add command: mods-from-same-dist.
+
+        - stats: Add raw_mirror_mtime & raw_last_index_time to ease scripts
+          calculating freshness.
+
+
 0.16    2015-04-12 (PERLANCAR)
 
         - [ux] Rename functions in App::lcpan to match CLI subcommand names
