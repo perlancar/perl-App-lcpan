@@ -894,9 +894,17 @@ sub stats {
   SUM(CASE has_buildpl WHEN 1 THEN 1 ELSE 0 END)
 FROM file");
     ($stat->{schema_version}) = $dbh->selectrow_array("SELECT value FROM meta WHERE name='schema_version'");
-    ($stat->{last_index_time}) = _fmt_time($dbh->selectrow_array("SELECT value FROM meta WHERE name='last_index_time'"));
-    my @st = stat "$cpan/modules/02packages.details.txt.gz";
-    ($stat->{mirror_mtime}) = _fmt_time(@st ? $st[9] : undef);
+
+    {
+        my ($time) = $dbh->selectrow_array("SELECT value FROM meta WHERE name='last_index_time'");
+        $stat->{raw_last_index_time} = $time;
+        $stat->{last_index_time} = _fmt_time($time);
+    }
+    {
+        my @st = stat "$cpan/modules/02packages.details.txt.gz";
+        $stat->{mirror_mtime} = _fmt_time(@st ? $st[9] : undef);
+        $stat->{raw_mirror_mtime} = $st[9];
+    }
 
     [200, "OK", $stat];
 }
