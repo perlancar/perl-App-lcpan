@@ -21,7 +21,7 @@ $SPEC{'handle_cmd'} = {
     summary => 'Given a module, list all modules in the same distribution',
     args => {
         %App::lcpan::common_args,
-        %App::lcpan::mod_args,
+        %App::lcpan::mods_args,
         detail => {
             schema => 'bool',
         },
@@ -34,11 +34,11 @@ sub handle_cmd {
     my $cpan = $args{cpan};
     my $index_name = $args{index_name};
 
-    my $mod = $args{module};
     my $detail = $args{detail};
 
     my $dbh = App::lcpan::_connect_db('ro', $cpan, $index_name);
 
+    my $emods = join(",", map {$dbh->quote($_)} @{ $args{modules} });
     my $sth = $dbh->prepare("SELECT
   module.name name,
   module.version version,
@@ -46,9 +46,9 @@ sub handle_cmd {
   dist.version dist_version
 FROM module
 JOIN dist ON module.file_id=dist.file_id
-WHERE dist.name=(SELECT name FROM dist WHERE file_id=(SELECT file_id FROM module WHERE name=?))
+WHERE dist.name IN (SELECT name FROM dist WHERE file_id IN (SELECT file_id FROM module WHERE name IN ($emods)))
 ORDER BY name DESC");
-    $sth->execute($mod);
+    $sth->execute;
     my @res;
     while (my $row = $sth->fetchrow_hashref) {
         push @res, $detail ? $row : $row->{name};

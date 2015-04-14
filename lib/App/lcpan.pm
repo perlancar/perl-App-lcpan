@@ -122,6 +122,17 @@ our %mod_args = (
     },
 );
 
+our %mods_args = (
+    modules => {
+        schema => ['array*', of=>'str*', min_len=>1],
+        'x.name.is_plural' => 1,
+        req => 1,
+        pos => 0,
+        greedy => 1,
+        element_completion => \&_complete_mod,
+    },
+);
+
 our %author_args = (
     author => {
         schema => 'str*',
