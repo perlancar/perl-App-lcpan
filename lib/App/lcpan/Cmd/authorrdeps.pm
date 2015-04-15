@@ -18,13 +18,19 @@ $SPEC{':package'} = {
 
 $SPEC{'handle_cmd'} = {
     v => 1.1,
-    summary => "Find all other authors' distributions that use one of author's modules",
+    summary => "Find distributions that use one of author's modules",
     args => {
         %App::lcpan::common_args,
         %App::lcpan::author_args,
         #detail => {
         #    schema => 'bool',
         #},
+        user_author => {
+            schema => ['array*', of=>'str*'],
+        },
+        user_author_isnt => {
+            schema => ['array*', of=>'str*'],
+        },
     },
 };
 sub handle_cmd {
@@ -36,8 +42,13 @@ sub handle_cmd {
     return $res if $res->[0] != 200;
 
     my $mods = $res->[2];
-    delete $args{author};
-    $res = App::lcpan::rdeps(%args, author_isnt=>[$author], modules=>$mods);
+    my %rdeps_args = %args;
+    $rdeps_args{modules} = $mods;
+    delete $rdeps_args{author};
+    delete $rdeps_args{author_isnt};
+    $rdeps_args{author} = $args{user_author};
+    $rdeps_args{author_isnt} = $args{user_author_isnt};
+    $res = App::lcpan::rdeps(%rdeps_args);
     return $res if $res->[0] != 200;
 
     $res;
