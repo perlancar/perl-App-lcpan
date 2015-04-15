@@ -1,5 +1,17 @@
 Revision history for App-lcpan
 
+0.22    2015-04-15 (PERLANCAR)
+
+        - rdeps: Accept multiple modules.
+
+        - New subcommand: authorrdeps. If you are a CPAN author, this subcommand
+          makes it easy to list all distributions that use one of your modules.
+          To filter only distributions created by others, just pass
+          --user-author-isnt YOURCPANID.
+
+        - New subcommand: mods-by-rdep-count.
+
+
 0.21    2015-04-15 (PERLANCAR)
 
         - [Removed feature] Remove separate 'update-files' and 'update-index'
