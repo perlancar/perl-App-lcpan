@@ -138,6 +138,16 @@ B<Some other utilities>:
  % lcpan authordists PERLANCAR  ;# list an author's dists
  % lcpan authorrels PERLANCAR   ;# list an author's releases
 
+ % lcpan authors-by-rel-count
+ % lcpan authors-by-dist-count
+ % lcpan authors-by-mod-count
+
+ # show all other authors' distributions using one of your modules
+ % lcpan authorrdeps PERLANCAR
+
+ # show your old releases (which you should probably delete from CPAN?)
+ % lcpan releases --author PERLANCAR --nolatest
+
 More subcommands are available. lcpan is plugin-based, see/install
 C<App::lcpan::Cmd::*> modules for more subcommands.
 
@@ -171,7 +181,7 @@ or (specify release files directly):
 
 =head2 Update all modules on your system, from local CPAN mirror
 
- % cpan-outdated --mirror file:$HOME/cpan | cpanm -n
+ % cpan-outdated --mirror file:$HOME/cpan | lcpanm -n
 
 
 =head1 MORE EXAMPLE QUERIES AND COMMANDS FOR CPAN AUTHORS
@@ -181,43 +191,6 @@ or (specify release files directly):
  % lcpan authormods  PERLANCAR | wc -l
  % lcpan authordists PERLANCAR | wc -l
  % lcpan authorrels  PERLANCAR | wc -l
-
-=head2 Show your old releases (which you should probably delete from CPAN?)
-
- % setop --diff <(lcpan authorrels PERLANCAR) <(lcpan authorrels PERLANCAR --latest)
-
-=head2 Show other people using your modules on CPAN
-
- % for mod in `lcpan modules --author CSSON`; do
-     res=`lcpan rdeps "$mod" --author-isnt CSSON --format text-pretty`
-     if [[ "$res" != "" ]]; then echo -e "$mod is used by:\n$res\n"; fi
-   done
-
-Sample output:
-
- Map::Metro::Plugin::Map is used by:
- +--------+-----------------------------+--------------+-------------+
- | cpanid | dist                        | dist_version | req_version |
- | SREZIC | Map-Metro-Plugin-Map-Berlin | 0.02         | 0.18        |
- +--------+-----------------------------+--------------+-------------+
-
- MojoX::CustomTemplateFileParser is used by:
- +--------+-------------------------------------+--------------+-------------+
- | cpanid | dist                                | dist_version | req_version |
- | RENEEB | Task-MojoliciousPlugins-PerlAcademy | 0.02         | 0.10        |
- +--------+-------------------------------------+--------------+-------------+
-
- Mojolicious::Plugin::BootstrapHelpers is used by:
- +--------+-------------------------------------+--------------+-------------+
- | cpanid | dist                                | dist_version | req_version |
- | RENEEB | Task-MojoliciousPlugins-PerlAcademy | 0.02         | 0.0187      |
- +--------+-------------------------------------+--------------+-------------+
-
- Test::Mojo::Trim is used by:
- +--------+----------------+--------------+-------------+
- | cpanid | dist           | dist_version | req_version |
- | LEEJO  | Test-Mojo-Most | 0.05         | 0.03        |
- +--------+----------------+--------------+-------------+
 
 =head2 More complex queries
 

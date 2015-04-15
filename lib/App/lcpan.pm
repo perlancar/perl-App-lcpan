@@ -1492,12 +1492,12 @@ sub _get_revdeps {
     my @binds  = ();
 
     if ($filters->{author}) {
-        push @wheres, '('.join(' OR ', ('cpanid=?') x @{$filters->{authors}}).')';
+        push @wheres, '('.join(' OR ', ('author=?') x @{$filters->{author}}).')';
         push @binds, ($_) x @{$filters->{author}};
     }
     if ($filters->{author_isnt}) {
         for (@{ $filters->{author_isnt} }) {
-            push @wheres, 'cpanid <> ?';
+            push @wheres, 'author <> ?';
             push @binds, $_;
         }
     }
