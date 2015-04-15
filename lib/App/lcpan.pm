@@ -1474,16 +1474,22 @@ ORDER BY module");
 }
 
 sub _get_revdeps {
-    my ($mod, $dbh, $filters) = @_;
+    use experimental 'smartmatch';
 
-    $log->tracef("Finding reverse dependencies for module %s ...", $mod);
+    my ($mods, $dbh, $filters) = @_;
 
-    # first, check that module is listed
-    my ($mod_id) = $dbh->selectrow_array("SELECT id FROM module WHERE name=?", {}, $mod)
-        or return [404, "No such module: $mod"];
+    $log->tracef("Finding reverse dependencies for module(s) %s ...", $mods);
 
-    my @wheres = ('module_id=?');
-    my @binds  = ($mod_id);
+    # first, check that all modules are listed
+    my @mod_ids;
+    for my $mod (@$mods) {
+        my ($mod_id) = $dbh->selectrow_array("SELECT id FROM module WHERE name=?", {}, $mod)
+            or return [404, "No such module: $mod"];
+        push @mod_ids, $mod_id unless $mod_id ~~ @mod_ids;
+    }
+
+    my @wheres = ('module_id IN ('.join(",", @mod_ids).')');
+    my @binds  = ();
 
     if ($filters->{author}) {
         push @wheres, '('.join(' OR ', ('cpanid=?') x @{$filters->{authors}}).')';
@@ -1498,9 +1504,10 @@ sub _get_revdeps {
 
     # get all dists that depend on that module
     my $sth = $dbh->prepare("SELECT
-  (SELECT name    FROM dist WHERE dp.dist_id=dist.id) AS dist,
-  (SELECT cpanid  FROM file WHERE dp.file_id=file.id) AS author,
-  (SELECT version FROM dist WHERE dp.dist_id=dist.id) AS dist_version,
+  (SELECT name    FROM module WHERE dp.module_id=module.id) AS name,
+  (SELECT name    FROM dist WHERE dp.dist_id=dist.id)       AS dist,
+  (SELECT cpanid  FROM file WHERE dp.file_id=file.id)       AS author,
+  (SELECT version FROM dist WHERE dp.dist_id=dist.id)       AS dist_version,
   -- phase,
   -- rel,
   version req_version
@@ -1514,7 +1521,12 @@ ORDER BY dist");
         #next unless $rel   eq 'ALL' || $row->{rel}   eq $rel;
         #delete $row->{phase} unless $phase eq 'ALL';
         #delete $row->{rel}   unless $rel   eq 'ALL';
-        push @res, {dist=>$row->{dist}, author=>$row->{author}, version=>$row->{dist_version}};
+        push @res, {
+            (name=>$row->{name}) x !!(@mod_ids > 1),
+            dist=>$row->{dist},
+            author=>$row->{author},
+            version=>$row->{dist_version},
+        };
     }
 
     [200, "OK", \@res];
@@ -1625,7 +1637,7 @@ $SPEC{'rdeps'} = {
     summary => 'List reverse dependencies of a module, data from local CPAN',
     args => {
         %common_args,
-        %mod_args,
+        %mods_args,
         author => {
             summary => 'Filter certain author',
             schema => ['array*', of=>'str*'],
@@ -1656,7 +1668,7 @@ sub rdeps {
     _set_args_default(\%args);
     my $cpan = $args{cpan};
     my $index_name = $args{index_name};
-    my $mod     = $args{module};
+    my $mods    = $args{modules};
     my $author =  $args{author} ? [map {uc} @{$args{author}}] : undef;
     my $author_isnt = $args{author_isnt} ? [map {uc} @{$args{author_isnt}}] : undef;
 
@@ -1667,10 +1679,10 @@ sub rdeps {
         author_isnt => $author_isnt,
     };
 
-    my $res = _get_revdeps($mod, $dbh, $filters);
+    my $res = _get_revdeps($mods, $dbh, $filters);
 
     my $resmeta = {};
-    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/dist author version/]]}};
+    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/name dist author version/]]}};
     $res->[3] = $resmeta;
     $res;
 }
