@@ -193,7 +193,7 @@ sub _create_schema {
     my $dbh = shift;
 
     my $spec = {
-        latest_v => 4,
+        latest_v => 5,
 
         install => [
             'CREATE TABLE author (
@@ -217,8 +217,8 @@ sub _create_schema {
                  has_metajson INTEGER,
                  has_metayml INTEGER,
                  has_makefilepl INTEGER,
-                 has_buildpl INTEGER
-             )',
+                 has_buildpl INTEGER,
+            )',
             'CREATE UNIQUE INDEX ix_file__name ON file(name)',
 
             'CREATE TABLE module (
@@ -240,7 +240,8 @@ sub _create_schema {
                  abstract TEXT,
                  file_id INTEGER NOT NULL,
                  version VARCHAR(20),
-                 version_numified DECIMAL
+                 version_numified DECIMAL,
+                 is_newest BOOLEAN -- [cache]
              )',
             'CREATE INDEX ix_dist__name ON dist(name)',
             'CREATE UNIQUE INDEX ix_dist__file_id ON dist(file_id)',
@@ -318,6 +319,10 @@ sub _create_schema {
                  FOREIGN KEY (module_id) REFERENCES module(id)
              )',
             'CREATE INDEX ix_dep__module_name ON dep(module_name)',
+        ],
+
+        upgrade_to_v5 => [
+            'ALTER TABLE dist ADD COLUMN is_newest BOOLEAN',
         ],
     }; # spec
 
@@ -557,6 +562,10 @@ sub update_index {
         $dbh->commit;
     }
 
+    # these hashes maintain the dist names that are changed so we can refresh
+    # the 'is_newest' field later at the end of indexing process
+    my %changed_dists;
+
     # parse 02packages.details.txt.gz and insert the parse result to 'file' and
     # 'module' tables. we haven't parsed distribution names yet because that
     # will need information from META.{json,yaml} inside release files.
@@ -624,7 +633,14 @@ sub update_index {
             $log->tracef("  Deleting old files: %s", \@old_filenames);
             $dbh->do("DELETE FROM dep WHERE file_id IN (".join(",",@old_file_ids)."))");
             $dbh->do("DELETE FROM module WHERE file_id IN (".join(",",@old_file_ids).")");
-            $dbh->do("DELETE FROM dist WHERE file_id IN (".join(",",@old_file_ids).")");
+            {
+                my $sth = $dbh->prepare("SELECT name FROM dist WHERE file_id IN (".join(",",@old_file_ids).")");
+                $sth->execute;
+                while (my @row = $sth->fetchrow_array) {
+                    $changed_dists{$row[0]}++;
+                }
+                $dbh->do("DELETE FROM dist WHERE file_id IN (".join(",",@old_file_ids).")");
+            }
         }
 
         $dbh->commit;
@@ -803,9 +819,6 @@ sub update_index {
                 $file->{id});
         } # for file
 
-        $dbh->do("INSERT OR REPLACE INTO meta (name,value) VALUES (?,?)",
-                 {}, 'last_index_time', time());
-
         if ($after_begin) {
             $log->tracef("COMMIT");
             $dbh->commit;
@@ -838,6 +851,22 @@ sub update_index {
         }
         $dbh->commit;
     }
+
+    {
+        $log->tracef("Updating is_newest column ...");
+        my %dists = %changed_dists;
+        my $sth = $dbh->prepare("SELECT DISTINCT(name) FROM dist WHERE is_newest IS NULL");
+        $sth->execute;
+        while (my @row = $sth->fetchrow_array) {
+            $dists{$row[0]}++;
+        }
+        last unless keys %dists;
+        $dbh->do("UPDATE dist SET is_newest=(SELECT CASE WHEN EXISTS(SELECT name FROM dist d WHERE d.name=dist.name AND d.version_numified>dist.version_numified) THEN 0 ELSE 1 END)".
+                     " WHERE name IN (".join(", ", map {$dbh->quote($_)} sort keys %dists).")");
+    }
+
+    $dbh->do("INSERT OR REPLACE INTO meta (name,value) VALUES (?,?)",
+             {}, 'last_index_time', time());
 
     [200];
 }
