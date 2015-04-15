@@ -17,6 +17,9 @@ for my $mod (keys %$mods) {
     (my $sc_name = $mod) =~ s/App::lcpan::Cmd:://;
     $sc_name =~ s/_/-/g;
 
+    # old subcommands
+    next if $sc_name =~ /\A(update-files|update-index)\z/;
+
     (my $url = $mod) =~ s!::!/!g;
     $subcommands->{$sc_name} = {
         url => "/$url/handle_cmd",
@@ -241,11 +244,11 @@ In C<$cpan/index.db>.
 
 =head2 How do I reindex from scratch (without downloading the mirror)?
 
-Just delete the C<index.db> and run C<lcpan update-index> again.
+Just delete the C<index.db> and run C<lcpan update --noupdate-files> again.
 
 =head2 How do I download the mirror without indexing?
 
-Run C<lcpan update-files>.
+Run C<lcpan update --noupdate-index>.
 
 
 =head1 SEE ALSO
