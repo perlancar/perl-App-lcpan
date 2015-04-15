@@ -1,5 +1,11 @@
 Revision history for App-lcpan
 
+0.19    2015-04-15 (PERLANCAR)
+
+	- Replace Module::CoreList->is_core with
+	  Module::CoreList::More->is_still_core.
+
+
 0.18    2015-04-15 (PERLANCAR)
 
 	- mods-from-same-dist: Accept multiple modules.
