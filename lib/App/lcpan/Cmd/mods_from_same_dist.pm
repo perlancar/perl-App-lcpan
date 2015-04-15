@@ -22,6 +22,7 @@ $SPEC{'handle_cmd'} = {
     args => {
         %App::lcpan::common_args,
         %App::lcpan::mods_args,
+        %App::lcpan::flatest_args,
         detail => {
             schema => 'bool',
         },
@@ -39,6 +40,13 @@ sub handle_cmd {
     my $dbh = App::lcpan::_connect_db('ro', $cpan, $index_name);
 
     my $emods = join(",", map {$dbh->quote($_)} @{ $args{modules} });
+    my @where;
+    push @where, "dist.name IN (SELECT name FROM dist WHERE file_id IN (SELECT file_id FROM module WHERE name IN ($emods)))";
+    if ($args{latest}) {
+        push @where, "dist.is_latest";
+    } elsif (defined $args{latest}) {
+        push @where, "NOT(dist.is_latest)";
+    }
     my $sth = $dbh->prepare("SELECT
   module.name name,
   module.version version,
@@ -46,7 +54,7 @@ sub handle_cmd {
   dist.version dist_version
 FROM module
 JOIN dist ON module.file_id=dist.file_id
-WHERE dist.name IN (SELECT name FROM dist WHERE file_id IN (SELECT file_id FROM module WHERE name IN ($emods)))
+WHERE ".join(" AND ", @where)."
 ORDER BY name DESC");
     $sth->execute;
     my @res;

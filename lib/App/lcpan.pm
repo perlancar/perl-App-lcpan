@@ -1150,6 +1150,7 @@ $SPEC{modules} = {
         %query_args,
         %fauthor_args,
         %fdist_args,
+        %flatest_args,
     },
     result => {
         description => <<'_',
@@ -1188,6 +1189,11 @@ sub modules {
         #push @where, "(dist_id=(SELECT dist_id FROM dist WHERE dist_name=?))";
         push @where, "(dist=?)";
         push @bind, $args{dist};
+    }
+    if ($args{latest}) {
+        push @where, "(SELECT is_latest FROM dist d WHERE d.file_id=module.file_id)";
+    } elsif (defined $args{latest}) {
+        push @where, "NOT(SELECT is_latest FROM dist d WHERE d.file_id=module.file_id)";
     }
     my $sql = "SELECT
   name,
