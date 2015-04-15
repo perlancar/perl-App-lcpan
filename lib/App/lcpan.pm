@@ -15,8 +15,6 @@ use Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = qw(
                        update
-                       update_files
-                       update_index
                        modules
                        dists
                        releases
@@ -409,36 +407,14 @@ sub _add_prereqs {
     }
 }
 
-$SPEC{'update_files'} = {
-    v => 1.1,
-    summary => 'Update local CPAN mirror files using minicpan command',
-    description => <<'_',
-
-This subcommand runs the `minicpan` command to download/update your local CPAN
-mirror files.
-
-Note: you can also run `minicpan` yourself.
-
-_
-    args => {
-        %common_args,
-        max_file_size => {
-            summary => 'If set, skip downloading files larger than this',
-            schema => 'int',
-        },
-        remote_url => {
-            summary => 'Select CPAN mirror to download from',
-            schema => 'str*',
-        },
-    },
-};
-sub update_files {
+sub _update_files {
     require IPC::System::Options;
 
     my %args = @_;
     _set_args_default(\%args);
     my $cpan = $args{cpan};
     my $index_name = $args{index_name};
+
     my $remote_url = $args{remote_url} // "http://mirrors.kernel.org/cpan";
     my $max_file_size = $args{max_file_size};
 
@@ -473,39 +449,7 @@ sub _check_meta {
     1;
 }
 
-$SPEC{'update_index'} = {
-    v => 1.1,
-    summary => 'Create/update index.db in local CPAN mirror',
-    description => <<'_',
-
-This subcommand is called by the `update` subcommand after `update-files` but
-can be performed separately via `update-index`. Its task is to create/update
-`index.db` SQLite database containing list of authors, modules, dists, and
-dependencies.
-
-It gets list of authors from parsing `authors/01mailrc.txt.gz` file.
-
-It gets list of packages from parsing `modules/02packages.details.txt.gz`.
-Afterwards, it tries to extract dist metadata `META.yml` or `META.json` from
-each release file to get distribution name, abstract, and dependencies
-information.
-
-_
-    args => {
-        %common_args,
-        num_backups => {
-            summary => 'Keep a number of backups',
-            schema  => 'int*',
-            default => 7,
-            description => <<'_',
-
-Will create `index.db.1`, `index.db.2` and so on containing the older indexes.
-
-_
-        },
-    },
-};
-sub update_index {
+sub _update_index {
     require DBI;
     require File::Slurp::Tiny;
     require File::Temp;
@@ -873,14 +817,36 @@ sub update_index {
 
 $SPEC{'update'} = {
     v => 1.1,
-    summary => 'Update local CPAN mirror files, followed by create/update the index.db',
+    summary => 'Create/update local CPAN mirror',
     description => <<'_',
 
-This subcommand calls the `update-files` followed by `update-index`.
+This subcommand first create/update the mirror files by downloading from a
+remote CPAN mirror, then update the index.
 
 _
     args => {
         %common_args,
+        max_file_size => {
+            summary => 'If set, skip downloading files larger than this',
+            schema => 'int',
+            tags => ['category:filter'],
+        },
+        remote_url => {
+            summary => 'Select CPAN mirror to download from',
+            schema => 'str*',
+        },
+        update_files => {
+            summary => 'Update the files',
+            'summary.alt.bool.not' => 'Skip updating the files',
+            schema => 'bool',
+            default => 1,
+        },
+        update_index => {
+            summary => 'Update the index',
+            'summary.alt.bool.not' => 'Skip updating the index',
+            schema => 'bool',
+            default => 1,
+        },
     },
 };
 sub update {
@@ -890,15 +856,24 @@ sub update {
 
     my $packages_path = "$cpan/modules/02packages.details.txt.gz";
     my @st1 = stat($packages_path);
-    update_files(%args);
+    if (!$args{update_files}) {
+        $log->infof("Skipped updating files (option)");
+    } else {
+        _update_files(%args);
+    }
     my @st2 = stat($packages_path);
 
-    if (@st1 && @st2 && $st1[9] == $st2[9] && $st1[7] == $st2[7]) {
+    if (!$args{update_index}) {
+        $log->infof("Skipped updating index (option)");
+    } elsif ($args{update_files} &&
+                 @st1 && @st2 && $st1[9] == $st2[9] && $st1[7] == $st2[7]) {
         $log->infof("%s doesn't change mtime/size, skipping updating index",
                 $packages_path);
         return [304, "Files did not change, index not updated"];
+    } else {
+        _update_index(%args);
     }
-    update_index(%args);
+    [200, "OK"];
 }
 
 $SPEC{'stats'} = {
