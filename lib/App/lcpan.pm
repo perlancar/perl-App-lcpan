@@ -103,7 +103,7 @@ our %fdist_args = (
 
 our %flatest_args = (
     latest => {
-        schema => ['bool*', is=>1],
+        schema => ['bool*'],
     },
 );
 
@@ -241,7 +241,7 @@ sub _create_schema {
                  file_id INTEGER NOT NULL,
                  version VARCHAR(20),
                  version_numified DECIMAL,
-                 is_newest BOOLEAN -- [cache]
+                 is_latest BOOLEAN -- [cache]
              )',
             'CREATE INDEX ix_dist__name ON dist(name)',
             'CREATE UNIQUE INDEX ix_dist__file_id ON dist(file_id)',
@@ -322,7 +322,7 @@ sub _create_schema {
         ],
 
         upgrade_to_v5 => [
-            'ALTER TABLE dist ADD COLUMN is_newest BOOLEAN',
+            'ALTER TABLE dist ADD COLUMN is_latest BOOLEAN',
         ],
     }; # spec
 
@@ -563,7 +563,7 @@ sub update_index {
     }
 
     # these hashes maintain the dist names that are changed so we can refresh
-    # the 'is_newest' field later at the end of indexing process
+    # the 'is_latest' field later at the end of indexing process
     my %changed_dists;
 
     # parse 02packages.details.txt.gz and insert the parse result to 'file' and
@@ -853,15 +853,15 @@ sub update_index {
     }
 
     {
-        $log->tracef("Updating is_newest column ...");
+        $log->tracef("Updating is_latest column ...");
         my %dists = %changed_dists;
-        my $sth = $dbh->prepare("SELECT DISTINCT(name) FROM dist WHERE is_newest IS NULL");
+        my $sth = $dbh->prepare("SELECT DISTINCT(name) FROM dist WHERE is_latest IS NULL");
         $sth->execute;
         while (my @row = $sth->fetchrow_array) {
             $dists{$row[0]}++;
         }
         last unless keys %dists;
-        $dbh->do("UPDATE dist SET is_newest=(SELECT CASE WHEN EXISTS(SELECT name FROM dist d WHERE d.name=dist.name AND d.version_numified>dist.version_numified) THEN 0 ELSE 1 END)".
+        $dbh->do("UPDATE dist SET is_latest=(SELECT CASE WHEN EXISTS(SELECT name FROM dist d WHERE d.name=dist.name AND d.version_numified>dist.version_numified) THEN 0 ELSE 1 END)".
                      " WHERE name IN (".join(", ", map {$dbh->quote($_)} sort keys %dists).")");
     }
 
@@ -1239,6 +1239,11 @@ _
             test    => 0,
         },
         {
+            summary => 'List all distributions (latest version only)',
+            argv    => ['--cpan', '/cpan', '--latest'],
+            test    => 0,
+        },
+        {
             summary => 'Grep by distribution name, return detailed record',
             argv    => ['--cpan', '/cpan', 'data-table'],
             test    => 0,
@@ -1275,7 +1280,9 @@ sub dists {
         push @bind, $author;
     }
     if ($args{latest}) {
-        push @where, "(NOT EXISTS (SELECT id FROM dist d2 WHERE d2.name=d1.name AND d2.version_numified>d1.version_numified))";
+        push @where, "is_latest";
+    } elsif (defined $args{latest}) {
+        push @where, "NOT(is_latest)";
     }
     my $sql = "SELECT
   name,
@@ -1360,7 +1367,9 @@ sub releases {
         push @where, $args{has_buildpl} ? "(has_buildpl=1)" : "(has_buildpl=0)";
     }
     if ($args{latest}) {
-        push @where, "(NOT EXISTS (SELECT id FROM dist d2 WHERE d1.name=d2.name AND d2.version_numified>d1.version_numified))";
+        push @where, "d1.is_latest";
+    } elsif (defined $args{latest}) {
+        push @where, "NOT(d1.is_latest)";
     }
     my $sql = "SELECT
   f1.name name,
