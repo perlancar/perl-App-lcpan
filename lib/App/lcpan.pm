@@ -418,13 +418,25 @@ sub _update_files {
     my $remote_url = $args{remote_url} // "http://mirrors.kernel.org/cpan";
     my $max_file_size = $args{max_file_size};
 
-    local $ENV{PERL5OPT} = "-MLWP::UserAgent::Patch::FilterMirrorMaxSize=-size,".($max_file_size+0).",-verbose,1"
-        if defined $max_file_size;
+    my @filter_args;
+    if ($args{max_file_size}) {
+        push @filter_args, "-size", $args{max_file_size};
+    }
+    if ($args{include_author} && @{ $args{include_author} }) {
+        push @filter_args, "-include_author", join(";", @{$args{include_author}});
+    }
+    if ($args{exclude_author} && @{ $args{exclude_author} }) {
+        push @filter_args, "-exclude_author", join(";", @{$args{exclude_author}});
+    }
+    push @filter_args, "-verbose", 1 if $log->is_info;
 
     my @cmd = ("minicpan", "-l", $cpan, "-r", $remote_url);
+    my $env = {};
+    $env->{PERL5OPT} = "-MLWP::UserAgent::Patch::FilterLcpan=".join(",", @filter_args)
+        if @filter_args;
 
     IPC::System::Options::system(
-        {die=>1, log=>1},
+        {die=>1, log=>1, env=>$env},
         @cmd,
     );
 
@@ -829,6 +841,18 @@ _
         max_file_size => {
             summary => 'If set, skip downloading files larger than this',
             schema => 'int',
+            tags => ['category:filter'],
+        },
+        include_author => {
+            summary => 'Only include files from certain author(s)',
+            'summary.alt.plurality.singular' => 'Only include files from certain author',
+            schema => ['array*', of=>['str*', match=>qr/\A[A-Z]{2,9}\z/]],
+            tags => ['category:filter'],
+        },
+        exclude_author => {
+            summary => 'Exclude files from certain author(s)',
+            'summary.alt.plurality.singular' => 'Exclude files from certain author',
+            schema => ['array*', of=>['str*', match=>qr/\A[A-Z]{2,9}\z/]],
             tags => ['category:filter'],
         },
         remote_url => {
