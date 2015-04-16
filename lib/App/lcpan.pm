@@ -1532,7 +1532,7 @@ ORDER BY dist");
     [200, "OK", \@res];
 }
 
-my %deps_args = (
+our %deps_phase_arg = (
     phase => {
         schema => ['str*' => {
             in => [qw/develop configure build runtime test ALL/],
@@ -1545,13 +1545,23 @@ my %deps_args = (
                 code => sub { $_[0]{phase} = 'ALL'; $_[0]{rel} = 'ALL' },
             },
         },
+        tags => ['category:filter'],
     },
+);
+
+our %deps_rel_arg = (
     rel => {
         schema => ['str*' => {
             in => [qw/requires recommends suggests conflicts ALL/],
         }],
         default => 'requires',
+        tags => ['category:filter'],
     },
+);
+
+our %deps_args = (
+    %deps_phase_arg,
+    %deps_rel_arg,
     level => {
         summary => 'Recurse for a number of levels (-1 means unlimited)',
         schema  => 'int*',

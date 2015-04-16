@@ -22,8 +22,12 @@ $SPEC{'handle_cmd'} = {
     args => {
         %App::lcpan::common_args,
         %App::lcpan::fauthor_args,
+        %App::lcpan::deps_phase_arg,
+        %App::lcpan::deps_rel_arg,
     },
 };
+delete $SPEC{'handle_cmd'}{args}{phase}{default};
+delete $SPEC{'handle_cmd'}{args}{rel}{default};
 sub handle_cmd {
     my %args = @_;
 
@@ -38,6 +42,14 @@ sub handle_cmd {
     if ($args{author}) {
         push @where, "(author=?)";
         push @binds, $args{author};
+    }
+    if ($args{phase} && $args{phase} ne 'ALL') {
+        push @where, "(phase=?)";
+        push @binds, $args{phase};
+    }
+    if ($args{rel} && $args{rel} ne 'ALL') {
+        push @where, "(rel=?)";
+        push @binds, $args{rel};
     }
     @where = (1) if !@where;
 
