@@ -1,5 +1,18 @@
 Revision history for App-lcpan
 
+0.23    2015-04-16 (PERLANCAR)
+
+	- Add subcommand: dists-by-dep-count.
+
+	- Add subcommand: authors-by-rdep-count.
+
+	- Remove unnecessary (and unhelpful) package metadata in command
+	  modules, module abstract will be retrieved from handle_cmd's
+	  metadata anyway.
+
+	- mods-by-rdep-count: Add filter options --phase & --rel.
+
+
 0.22    2015-04-15 (PERLANCAR)
 
         - rdeps: Accept multiple modules.
