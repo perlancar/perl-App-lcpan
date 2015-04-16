@@ -11,11 +11,6 @@ require App::lcpan;
 
 our %SPEC;
 
-$SPEC{':package'} = {
-    v => 1.1,
-    summary => "'mods-by-rdep-count' command",
-};
-
 $SPEC{'handle_cmd'} = {
     v => 1.1,
     summary => 'List modules ranked by number of reverse dependencies',

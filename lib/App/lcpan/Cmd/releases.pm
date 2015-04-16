@@ -11,11 +11,6 @@ require App::lcpan;
 
 our %SPEC;
 
-$SPEC{':package'} = {
-    v => 1.1,
-    summary => "'releases' command",
-};
-
 $SPEC{handle_cmd} = $App::lcpan::SPEC{releases};
 *handle_cmd = \&App::lcpan::releases;
 

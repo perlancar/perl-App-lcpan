@@ -11,11 +11,6 @@ require App::lcpan;
 
 our %SPEC;
 
-$SPEC{':package'} = {
-    v => 1.1,
-    summary => "'distmods' command",
-};
-
 $SPEC{'handle_cmd'} = {
     v => 1.1,
     summary => 'List modules in a distribution',

@@ -11,11 +11,6 @@ require App::lcpan;
 
 our %SPEC;
 
-$SPEC{':package'} = {
-    v => 1.1,
-    summary => "'dists' command",
-};
-
 $SPEC{handle_cmd} = $App::lcpan::SPEC{dists};
 *handle_cmd = \&App::lcpan::dists;
 

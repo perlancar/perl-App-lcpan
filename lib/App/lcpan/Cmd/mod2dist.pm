@@ -11,11 +11,6 @@ require App::lcpan;
 
 our %SPEC;
 
-$SPEC{':package'} = {
-    v => 1.1,
-    summary => "'mod2dist' command",
-};
-
 $SPEC{'handle_cmd'} = {
     v => 1.1,
     summary => 'Get distribution name of a module',

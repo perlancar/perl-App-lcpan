@@ -11,11 +11,6 @@ require App::lcpan;
 
 our %SPEC;
 
-$SPEC{':package'} = {
-    v => 1.1,
-    summary => "'authors' command",
-};
-
 $SPEC{handle_cmd} = $App::lcpan::SPEC{authors};
 *handle_cmd = \&App::lcpan::authors;
 

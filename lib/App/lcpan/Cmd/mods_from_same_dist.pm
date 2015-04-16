@@ -11,11 +11,6 @@ require App::lcpan;
 
 our %SPEC;
 
-$SPEC{':package'} = {
-    v => 1.1,
-    summary => "'mods_from_same_dist' command",
-};
-
 $SPEC{'handle_cmd'} = {
     v => 1.1,
     summary => 'Given a module, list all modules in the same distribution',

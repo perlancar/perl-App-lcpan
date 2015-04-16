@@ -11,11 +11,6 @@ require App::lcpan;
 
 our %SPEC;
 
-$SPEC{':package'} = {
-    v => 1.1,
-    summary => "'rdeps' command",
-};
-
 $SPEC{handle_cmd} = $App::lcpan::SPEC{rdeps};
 *handle_cmd = \&App::lcpan::rdeps;
 

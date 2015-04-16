@@ -11,11 +11,6 @@ require App::lcpan;
 
 our %SPEC;
 
-$SPEC{':package'} = {
-    v => 1.1,
-    summary => "'authorrdeps' command",
-};
-
 $SPEC{'handle_cmd'} = {
     v => 1.1,
     summary => "Find distributions that use one of author's modules",
