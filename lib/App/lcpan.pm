@@ -1606,7 +1606,7 @@ our %deps_args = (
 
 $SPEC{'deps'} = {
     v => 1.1,
-    summary => 'List dependencies of a module, data from local CPAN',
+    summary => 'List dependencies',
     description => <<'_',
 
 By default only runtime requires are displayed. To see prereqs for other phases
@@ -1661,7 +1661,7 @@ sub deps {
 
 $SPEC{'rdeps'} = {
     v => 1.1,
-    summary => 'List reverse dependencies of a module, data from local CPAN',
+    summary => 'List reverse dependencies',
     args => {
         %common_args,
         %mods_args,
