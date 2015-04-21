@@ -1407,29 +1407,29 @@ sub _get_prereqs {
     require Module::CoreList::More;
     require Version::Util;
 
-    my ($mod, $dbh, $memory, $level, $max_level, $phase, $rel, $include_core, $plver) = @_;
+    my ($mods, $dbh, $memory, $level, $max_level, $phase, $rel, $include_core, $plver) = @_;
 
-    $log->tracef("Finding dependencies for module %s (level=%i) ...", $mod, $level);
+    $log->tracef("Finding dependencies for module(s) %s (level=%i) ...", $mods, $level);
 
-    return [404, "No such module: $mod"] unless $dbh->selectrow_arrayref("SELECT id FROM module WHERE name=?", {}, $mod);
-
-    # first find out which distribution that module belongs to
-    my $sth = $dbh->prepare("SELECT id FROM dist WHERE file_id=(SELECT file_id FROM module WHERE name=?)");
-    $sth->execute($mod);
-    my ($dist_id) = $sth->fetchrow_array;
-    return [404, "Module '$mod' is not in any dist, index problem?"] unless $dist_id;
+    # first, check that all modules are listed and belong to a dist
+    my @dist_ids;
+    for my $mod (@$mods) {
+        my ($dist_id) = $dbh->selectrow_array("SELECT dist_id FROM module WHERE name=?", {}, $mod)
+            or return [404, "No such module: $mod"];
+        push @dist_ids, $dist_id unless $dist_id ~~ @dist_ids;
+    }
 
     # fetch the dependency information
     $sth = $dbh->prepare("SELECT
-  CASE WHEN dp.module_id THEN (SELECT name   FROM module WHERE id=dp.module_id) ELSE dp.module_name END AS module,
-  CASE WHEN dp.module_id THEN (SELECT cpanid FROM module WHERE id=dp.module_id) ELSE NULL END AS author,
+  (SELECT name   FROM module WHERE id=dp.module_id) AS module,
+  (SELECT cpanid FROM module WHERE id=dp.module_id) AS author,
   phase,
   rel,
   version
 FROM dep dp
-WHERE dp.dist_id=?
+WHERE dp.dist_id IN (".join(",",@dist_ids).")
 ORDER BY module");
-    $sth->execute($dist_id);
+    $sth->execute;
     my @res;
     while (my $row = $sth->fetchrow_hashref) {
         next unless $phase eq 'ALL' || $row->{phase} eq $phase;
@@ -1458,6 +1458,8 @@ ORDER BY module");
         push @res, $row;
         $memory->{$row->{module}} = $row->{version};
     }
+
+    # XXX check circular?
 
     if (@res && ($max_level==-1 || $level < $max_level)) {
         my $i = @res-1;
@@ -1609,7 +1611,7 @@ dependencies.
 _
     args => {
         %common_args,
-        %mod_args,
+        %mods_args,
         %deps_args,
     },
 };
@@ -1619,7 +1621,7 @@ sub deps {
     _set_args_default(\%args);
     my $cpan = $args{cpan};
     my $index_name = $args{index_name};
-    my $mod     = $args{module};
+    my $mods    = $args{modules};
     my $phase   = $args{phase} // 'runtime';
     my $rel     = $args{rel} // 'requires';
     my $plver   = $args{perl_version} // "$^V";
@@ -1628,7 +1630,7 @@ sub deps {
 
     my $dbh     = _connect_db('ro', $cpan, $index_name);
 
-    my $res = _get_prereqs($mod, $dbh, {}, 1, $level, $phase, $rel, $include_core, $plver);
+    my $res = _get_prereqs($mods, $dbh, {}, 1, $level, $phase, $rel, $include_core, $plver);
 
     return $res unless $res->[0] == 200;
     for (@{$res->[2]}) {
