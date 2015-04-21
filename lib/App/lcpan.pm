@@ -8,7 +8,6 @@ use strict;
 use warnings;
 use Log::Any '$log';
 
-use version;
 use POSIX ();
 
 use Exporter;
@@ -549,7 +548,6 @@ sub _update_index {
             next unless /\S/;
             next if /^\S+:\s/;
             chomp;
-            #say "D:$_";
             my ($pkg, $ver, $path) = split /\s+/, $_;
             $ver = undef if $ver eq 'undef';
             my ($author, $file) = $path =~ m!^./../(.+?)/(.+)! or do {
@@ -1407,22 +1405,28 @@ sub _get_prereqs {
     require Module::CoreList::More;
     require Version::Util;
 
-    my ($mods, $dbh, $memory, $level, $max_level, $phase, $rel, $include_core, $plver) = @_;
+    my ($mods, $dbh, $memory_by_mod_name, $memory_by_dist_id,
+        $level, $max_level, $phase, $rel, $include_core, $plver) = @_;
 
     $log->tracef("Finding dependencies for module(s) %s (level=%i) ...", $mods, $level);
 
     # first, check that all modules are listed and belong to a dist
     my @dist_ids;
     for my $mod (@$mods) {
-        my ($dist_id) = $dbh->selectrow_array("SELECT dist_id FROM module WHERE name=?", {}, $mod)
+        my ($dist_id) = $dbh->selectrow_array("SELECT id FROM dist WHERE is_latest AND file_id=(SELECT file_id FROM module WHERE name=?)", {}, $mod)
             or return [404, "No such module: $mod"];
-        push @dist_ids, $dist_id unless $dist_id ~~ @dist_ids;
+        unless ($memory_by_dist_id->{$dist_id}) {
+            push @dist_ids, $dist_id;
+            $memory_by_dist_id->{$dist_id} = $mod;
+        }
     }
 
     # fetch the dependency information
-    $sth = $dbh->prepare("SELECT
+    my $sth = $dbh->prepare("SELECT
+  dp.dist_id dependant_dist_id,
   (SELECT name   FROM module WHERE id=dp.module_id) AS module,
   (SELECT cpanid FROM module WHERE id=dp.module_id) AS author,
+  (SELECT id     FROM dist   WHERE is_latest AND file_id=(SELECT file_id FROM module WHERE id=dp.module_id)) AS module_dist_id,
   phase,
   rel,
   version
@@ -1439,36 +1443,45 @@ ORDER BY module");
         # e.g. they write PREREQ_PM => { mod1, mod2 } when it should've been
         # PREREQ_PM => {mod1 => 0, mod2=>1.23}. we ignore such deps.
         unless (eval { version->parse($row->{version}); 1 }) {
-            $log->info("Invalid version dependency for '$mod': $row->{module} version $row->{version}, skipped");
+            $log->info("Invalid version $row->{version} (in dependency to $row->{module}), skipped");
             next;
         }
 
         #say "include_core=$include_core, is_core($row->{module}, $row->{version}, $plver)=", Module::CoreList::More->is_still_core($row->{module}, $row->{version}, version->parse($plver)->numify);
         next if !$include_core && Module::CoreList::More->is_still_core($row->{module}, $row->{version}, version->parse($plver)->numify);
         next unless defined $row->{module}; # BUG? we can encounter case where module is undef
-        if (defined $memory->{$row->{module}}) {
-            if (Version::Util::version_gt($row->{version}, $memory->{$row->{module}})) {
-                $memory->{$row->{version}} = $row->{version};
+        if (defined $memory_by_mod_name->{$row->{module}}) {
+            if (Version::Util::version_gt($row->{version}, $memory_by_mod_name->{$row->{module}})) {
+                $memory_by_mod_name->{$row->{version}} = $row->{version};
             }
             next;
         }
         delete $row->{phase} unless $phase eq 'ALL';
         delete $row->{rel}   unless $rel   eq 'ALL';
+        $memory_by_mod_name->{$row->{module}} = $row->{version};
         $row->{level} = $level;
         push @res, $row;
-        $memory->{$row->{module}} = $row->{version};
     }
 
     # XXX check circular?
 
     if (@res && ($max_level==-1 || $level < $max_level)) {
-        my $i = @res-1;
-        while ($i >= 0) {
-            my $subres = _get_prereqs($res[$i]{module}, $dbh, $memory,
-                                      $level+1, $max_level, $phase, $rel, $include_core, $plver);
-            $i--;
-            next if $subres->[0] != 200;
-            splice @res, $i+2, 0, @{$subres->[2]};
+        my $subres = _get_prereqs([map {$_->{module}} @res], $dbh,
+                                  $memory_by_mod_name,
+                                  $memory_by_dist_id,
+                                  $level+1, $max_level, $phase, $rel, $include_core, $plver);
+        return $subres if $subres->[0] != 200;
+        # insert to res in appropriate places
+      SUBRES_TO_INSERT:
+        for my $s (@{$subres->[2]}) {
+            for my $i (0..@res-1) {
+                my $r = $res[$i];
+                if ($s->{dependant_dist_id} == $r->{module_dist_id}) {
+                    splice @res, $i+1, 0, $s;
+                    next SUBRES_TO_INSERT;
+                }
+            }
+            return [500, "Bug? Can't insert subres (module=$s->{module}, dist_id=$s->{module_dist_id})"];
         }
     }
 
@@ -1630,12 +1643,14 @@ sub deps {
 
     my $dbh     = _connect_db('ro', $cpan, $index_name);
 
-    my $res = _get_prereqs($mods, $dbh, {}, 1, $level, $phase, $rel, $include_core, $plver);
+    my $res = _get_prereqs($mods, $dbh, {}, {}, 1, $level, $phase, $rel, $include_core, $plver);
 
     return $res unless $res->[0] == 200;
     for (@{$res->[2]}) {
         $_->{module} = ("  " x ($_->{level}-1)) . $_->{module};
         delete $_->{level};
+        delete $_->{dependant_dist_id};
+        delete $_->{module_dist_id};
     }
 
     my $resmeta = {};
