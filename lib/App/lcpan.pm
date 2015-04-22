@@ -184,147 +184,203 @@ sub _relpath {
         substr($cpanid, 0, 2)."/$cpanid/$filename";
 }
 
+our $db_schema_spec = {
+    latest_v => 5,
+
+    install => [
+        'CREATE TABLE author (
+             cpanid VARCHAR(20) NOT NULL PRIMARY KEY,
+             fullname VARCHAR(255) NOT NULL,
+             email TEXT
+         )',
+
+        'CREATE TABLE file (
+             id INTEGER NOT NULL PRIMARY KEY,
+             name TEXT NOT NULL,
+             cpanid VARCHAR(20) NOT NULL REFERENCES author(cpanid),
+
+             -- processing status: ok (meta has been extracted and parsed),
+             -- nofile (file does not exist in mirror), unsupported (file
+             -- type is not supported, e.g. rar, non archive), metaerr
+             -- (META.json/META.yml has some error), nometa (no
+             -- META.json/META.yml found), err (other error).
+             status TEXT,
+
+             has_metajson INTEGER,
+             has_metayml INTEGER,
+             has_makefilepl INTEGER,
+             has_buildpl INTEGER
+        )',
+        'CREATE UNIQUE INDEX ix_file__name ON file(name)',
+
+        'CREATE TABLE module (
+             id INTEGER NOT NULL PRIMARY KEY,
+             name VARCHAR(255) NOT NULL,
+             cpanid VARCHAR(20) NOT NULL REFERENCES author(cpanid), -- [cache]
+             file_id INTEGER NOT NULL,
+             version VARCHAR(20),
+             version_numified DECIMAL
+         )',
+        'CREATE UNIQUE INDEX ix_module__name ON module(name)',
+        'CREATE INDEX ix_module__file_id ON module(file_id)',
+        'CREATE INDEX ix_module__cpanid ON module(cpanid)',
+
+        'CREATE TABLE dist (
+             id INTEGER NOT NULL PRIMARY KEY,
+             name VARCHAR(90) NOT NULL,
+             cpanid VARCHAR(20) NOT NULL REFERENCES author(cpanid), -- [cache]
+             abstract TEXT,
+             file_id INTEGER NOT NULL,
+             version VARCHAR(20),
+             version_numified DECIMAL,
+             is_latest BOOLEAN -- [cache]
+         )',
+        'CREATE INDEX ix_dist__name ON dist(name)',
+        'CREATE UNIQUE INDEX ix_dist__file_id ON dist(file_id)',
+        'CREATE INDEX ix_dist__cpanid ON dist(cpanid)',
+
+        'CREATE TABLE dep (
+             file_id INTEGER,
+             dist_id INTEGER, -- [cache]
+             module_id INTEGER, -- if module is known (listed in module table), only its id will be recorded here
+             module_name TEXT,  -- if module is unknown (unlisted in module table), only the name will be recorded here
+             rel TEXT, -- relationship: requires, ...
+             phase TEXT, -- runtime, ...
+             version VARCHAR(20),
+             version_numified DECIMAL,
+             FOREIGN KEY (file_id) REFERENCES file(id),
+             FOREIGN KEY (dist_id) REFERENCES dist(id),
+             FOREIGN KEY (module_id) REFERENCES module(id)
+         )',
+        'CREATE INDEX ix_dep__module_name ON dep(module_name)',
+        # 'CREATE UNIQUE INDEX ix_dep__file_id__module_id ON dep(file_id,module_id)', # not all module have module_id anyway, and ones with module_id should already be correct because dep is a hash with module name as key
+    ], # install
+
+    upgrade_to_v2 => [
+        # actually we don't have any schema changes in v2, but we want to
+        # reindex release files that haven't been successfully indexed
+        # because aside from META.{json,yml}, we now can get information
+        # from Makefile.PL or Build.PL.
+        qq|DELETE FROM dep  WHERE dist_id IN (SELECT id FROM dist WHERE file_id IN (SELECT id FROM file WHERE status<>'ok'))|, # shouldn't exist though
+        qq|DELETE FROM dist WHERE file_id IN (SELECT id FROM file WHERE status<>'ok')|,
+        qq|DELETE FROM file WHERE status<>'ok'|,
+    ],
+
+    upgrade_to_v3 => [
+        # empty data, we'll reindex because we'll need to set has_* and
+        # discard all info
+        'DELETE FROM dist',
+        'DELETE FROM module',
+        'DELETE FROM file',
+        'ALTER TABLE file ADD COLUMN has_metajson   INTEGER',
+        'ALTER TABLE file ADD COLUMN has_metayml    INTEGER',
+        'ALTER TABLE file ADD COLUMN has_makefilepl INTEGER',
+        'ALTER TABLE file ADD COLUMN has_buildpl    INTEGER',
+        'ALTER TABLE dist   ADD COLUMN version_numified DECIMAL',
+        'ALTER TABLE module ADD COLUMN version_numified DECIMAL',
+        'ALTER TABLE dep    ADD COLUMN version_numified DECIMAL',
+    ],
+
+    upgrade_to_v4 => [
+        # there is some changes to data structure: 1) add column 'cpanid' to
+        # module & dist (for improving performance of some queries); 2) we
+        # record deps per-file, not per-dist so we can delete old files'
+        # data more easily. we also empty data to force reindexing.
+
+        'DELETE FROM dist',
+        'DELETE FROM module',
+        'DELETE FROM file',
+
+        'ALTER TABLE module ADD COLUMN cpanid VARCHAR(20) NOT NULL DEFAULT \'\' REFERENCES author(cpanid)',
+        'CREATE INDEX ix_module__cpanid ON module(cpanid)',
+        'ALTER TABLE dist ADD COLUMN cpanid VARCHAR(20) NOT NULL DEFAULT \'\' REFERENCES author(cpanid)',
+        'CREATE INDEX ix_dist__cpanid ON dist(cpanid)',
+
+        'DROP TABLE dep',
+        'CREATE TABLE dep (
+             file_id INTEGER,
+             dist_id INTEGER, -- [cache]
+             module_id INTEGER, -- if module is known (listed in module table), only its id will be recorded here
+             module_name TEXT,  -- if module is unknown (unlisted in module table), only the name will be recorded here
+             rel TEXT, -- relationship: requires, ...
+             phase TEXT, -- runtime, ...
+             version VARCHAR(20),
+             version_numified DECIMAL,
+             FOREIGN KEY (file_id) REFERENCES file(id),
+             FOREIGN KEY (dist_id) REFERENCES dist(id),
+             FOREIGN KEY (module_id) REFERENCES module(id)
+         )',
+        'CREATE INDEX ix_dep__module_name ON dep(module_name)',
+    ],
+
+    upgrade_to_v5 => [
+        'ALTER TABLE dist ADD COLUMN is_latest BOOLEAN',
+    ],
+
+    # for testing
+    install_v1 => [
+        'CREATE TABLE author (
+             cpanid VARCHAR(20) NOT NULL PRIMARY KEY,
+             fullname VARCHAR(255) NOT NULL,
+             email TEXT
+         )',
+
+        'CREATE TABLE file (
+             id INTEGER NOT NULL PRIMARY KEY,
+             name TEXT NOT NULL,
+             cpanid VARCHAR(20) NOT NULL REFERENCES author(cpanid),
+
+             -- processing status: ok (meta has been extracted and parsed),
+             -- nometa (file does contain cpan meta), nofile (file does not
+             -- exist in mirror), unsupported (file type is not supported,
+             -- e.g. rar, non archive), metaerr (meta has some error), err
+             -- (other error).
+             status TEXT
+         )',
+        'CREATE UNIQUE INDEX ix_file__name ON file(name)',
+
+        'CREATE TABLE module (
+             id INTEGER NOT NULL PRIMARY KEY,
+             name VARCHAR(255) NOT NULL,
+             file_id INTEGER NOT NULL,
+             version VARCHAR(20)
+         )',
+        'CREATE UNIQUE INDEX ix_module__name ON module(name)',
+        'CREATE INDEX ix_module__file_id ON module(file_id)',
+
+        # this is inserted
+        'CREATE TABLE dist (
+             id INTEGER NOT NULL PRIMARY KEY,
+             name VARCHAR(90) NOT NULL,
+             abstract TEXT,
+             file_id INTEGER NOT NULL,
+             version VARCHAR(20)
+         )',
+        'CREATE INDEX ix_dist__name ON dist(name)',
+        'CREATE UNIQUE INDEX ix_dist__file_id ON dist(file_id)',
+
+        'CREATE TABLE dep (
+             dist_id INTEGER,
+             module_id INTEGER, -- if module is known (listed in module table), only its id will be recorded here
+             module_name TEXT,  -- if module is unknown (unlisted in module table), only the name will be recorded here
+             rel TEXT, -- relationship: requires, ...
+             phase TEXT, -- runtime, ...
+             version TEXT,
+             FOREIGN KEY (dist_id) REFERENCES dist(id),
+             FOREIGN KEY (module_id) REFERENCES module(id)
+         )',
+        'CREATE INDEX ix_dep__module_name ON dep(module_name)',
+        'CREATE UNIQUE INDEX ix_dep__dist_id__module_id ON dep(dist_id,module_id)',
+    ],
+}; # spec
+
 sub _create_schema {
     require SQL::Schema::Versioned;
 
     my $dbh = shift;
 
-    my $spec = {
-        latest_v => 5,
-
-        install => [
-            'CREATE TABLE author (
-                 cpanid VARCHAR(20) NOT NULL PRIMARY KEY,
-                 fullname VARCHAR(255) NOT NULL,
-                 email TEXT
-             )',
-
-            'CREATE TABLE file (
-                 id INTEGER NOT NULL PRIMARY KEY,
-                 name TEXT NOT NULL,
-                 cpanid VARCHAR(20) NOT NULL REFERENCES author(cpanid),
-
-                 -- processing status: ok (meta has been extracted and parsed),
-                 -- nofile (file does not exist in mirror), unsupported (file
-                 -- type is not supported, e.g. rar, non archive), metaerr
-                 -- (META.json/META.yml has some error), nometa (no
-                 -- META.json/META.yml found), err (other error).
-                 status TEXT,
-
-                 has_metajson INTEGER,
-                 has_metayml INTEGER,
-                 has_makefilepl INTEGER,
-                 has_buildpl INTEGER
-            )',
-            'CREATE UNIQUE INDEX ix_file__name ON file(name)',
-
-            'CREATE TABLE module (
-                 id INTEGER NOT NULL PRIMARY KEY,
-                 name VARCHAR(255) NOT NULL,
-                 cpanid VARCHAR(20) NOT NULL REFERENCES author(cpanid), -- [cache]
-                 file_id INTEGER NOT NULL,
-                 version VARCHAR(20),
-                 version_numified DECIMAL
-             )',
-            'CREATE UNIQUE INDEX ix_module__name ON module(name)',
-            'CREATE INDEX ix_module__file_id ON module(file_id)',
-            'CREATE INDEX ix_module__cpanid ON module(cpanid)',
-
-            'CREATE TABLE dist (
-                 id INTEGER NOT NULL PRIMARY KEY,
-                 name VARCHAR(90) NOT NULL,
-                 cpanid VARCHAR(20) NOT NULL REFERENCES author(cpanid), -- [cache]
-                 abstract TEXT,
-                 file_id INTEGER NOT NULL,
-                 version VARCHAR(20),
-                 version_numified DECIMAL,
-                 is_latest BOOLEAN -- [cache]
-             )',
-            'CREATE INDEX ix_dist__name ON dist(name)',
-            'CREATE UNIQUE INDEX ix_dist__file_id ON dist(file_id)',
-            'CREATE INDEX ix_dist__cpanid ON dist(cpanid)',
-
-            'CREATE TABLE dep (
-                 file_id INTEGER,
-                 dist_id INTEGER, -- [cache]
-                 module_id INTEGER, -- if module is known (listed in module table), only its id will be recorded here
-                 module_name TEXT,  -- if module is unknown (unlisted in module table), only the name will be recorded here
-                 rel TEXT, -- relationship: requires, ...
-                 phase TEXT, -- runtime, ...
-                 version VARCHAR(20),
-                 version_numified DECIMAL,
-                 FOREIGN KEY (file_id) REFERENCES file(id),
-                 FOREIGN KEY (dist_id) REFERENCES dist(id),
-                 FOREIGN KEY (module_id) REFERENCES module(id)
-             )',
-            'CREATE INDEX ix_dep__module_name ON dep(module_name)',
-            # 'CREATE UNIQUE INDEX ix_dep__file_id__module_id ON dep(file_id,module_id)', # not all module have module_id anyway, and ones with module_id should already be correct because dep is a hash with module name as key
-        ], # install
-
-        upgrade_to_v2 => [
-            # actually we don't have any schema changes in v2, but we want to
-            # reindex release files that haven't been successfully indexed
-            # because aside from META.{json,yml}, we now can get information
-            # from Makefile.PL or Build.PL.
-            qq|DELETE FROM dep  WHERE dist_id IN (SELECT id FROM dist WHERE file_id IN (SELECT id FROM file WHERE status<>'ok'))|, # shouldn't exist though
-            qq|DELETE FROM dist WHERE file_id IN (SELECT id FROM file WHERE status<>'ok')|,
-            qq|DELETE FROM file WHERE status<>'ok'|,
-        ],
-
-        upgrade_to_v3 => [
-            # empty data, we'll reindex because we'll need to set has_* and
-            # discard all info
-            'DELETE FROM dist',
-            'DELETE FROM module',
-            'DELETE FROM file',
-            'ALTER TABLE file ADD COLUMN has_metajson   INTEGER',
-            'ALTER TABLE file ADD COLUMN has_metayml    INTEGER',
-            'ALTER TABLE file ADD COLUMN has_makefilepl INTEGER',
-            'ALTER TABLE file ADD COLUMN has_buildpl    INTEGER',
-            'ALTER TABLE dist   ADD COLUMN version_numified DECIMAL',
-            'ALTER TABLE module ADD COLUMN version_numified DECIMAL',
-            'ALTER TABLE dep    ADD COLUMN version_numified DECIMAL',
-        ],
-
-        upgrade_to_v4 => [
-            # there is some changes to data structure: 1) add column 'cpanid' to
-            # module & dist (for improving performance of some queries); 2) we
-            # record deps per-file, not per-dist so we can delete old files'
-            # data more easily. we also empty data to force reindexing.
-
-            'DELETE FROM dist',
-            'DELETE FROM module',
-            'DELETE FROM file',
-
-            'ALTER TABLE module ADD COLUMN cpanid VARCHAR(20) NOT NULL DEFAULT \'\' REFERENCES author(cpanid)',
-            'CREATE INDEX ix_module__cpanid ON module(cpanid)',
-            'ALTER TABLE dist ADD COLUMN cpanid VARCHAR(20) NOT NULL DEFAULT \'\' REFERENCES author(cpanid)',
-            'CREATE INDEX ix_dist__cpanid ON dist(cpanid)',
-
-            'DROP TABLE dep',
-            'CREATE TABLE dep (
-                 file_id INTEGER,
-                 dist_id INTEGER, -- [cache]
-                 module_id INTEGER, -- if module is known (listed in module table), only its id will be recorded here
-                 module_name TEXT,  -- if module is unknown (unlisted in module table), only the name will be recorded here
-                 rel TEXT, -- relationship: requires, ...
-                 phase TEXT, -- runtime, ...
-                 version VARCHAR(20),
-                 version_numified DECIMAL,
-                 FOREIGN KEY (file_id) REFERENCES file(id),
-                 FOREIGN KEY (dist_id) REFERENCES dist(id),
-                 FOREIGN KEY (module_id) REFERENCES module(id)
-             )',
-            'CREATE INDEX ix_dep__module_name ON dep(module_name)',
-        ],
-
-        upgrade_to_v5 => [
-            'ALTER TABLE dist ADD COLUMN is_latest BOOLEAN',
-        ],
-    }; # spec
-
     my $res = SQL::Schema::Versioned::create_or_update_db_schema(
-        dbh => $dbh, spec => $spec);
+        dbh => $dbh, spec => $db_schema_spec);
     die "Can't create/update schema: $res->[0] - $res->[1]\n"
         unless $res->[0] == 200;
 }
