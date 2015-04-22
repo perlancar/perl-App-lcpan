@@ -214,7 +214,7 @@ sub _create_schema {
                  has_metajson INTEGER,
                  has_metayml INTEGER,
                  has_makefilepl INTEGER,
-                 has_buildpl INTEGER,
+                 has_buildpl INTEGER
             )',
             'CREATE UNIQUE INDEX ix_file__name ON file(name)',
 
