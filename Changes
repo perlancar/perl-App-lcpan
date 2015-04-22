@@ -1,5 +1,12 @@
 Revision history for App-lcpan
 
+0.26    2015-04-22 (PERLANCAR)
+
+	- Add phase & rel arguments to rdeps & authorrdeps.
+
+	- Add test: xt/author/sql_schema_versioned.t.
+
+
 0.25    2015-04-22 (PERLANCAR)
 
 	- [Bugfix] Fix SQL error when creating schema.
