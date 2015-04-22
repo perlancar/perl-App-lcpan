@@ -1547,7 +1547,7 @@ ORDER BY module");
 sub _get_revdeps {
     use experimental 'smartmatch';
 
-    my ($mods, $dbh, $filters) = @_;
+    my ($mods, $dbh, $filters, $phase, $rel) = @_;
 
     $log->tracef("Finding reverse dependencies for module(s) %s ...", $mods);
 
@@ -1579,8 +1579,8 @@ sub _get_revdeps {
   (SELECT name    FROM dist WHERE dp.dist_id=dist.id)       AS dist,
   (SELECT cpanid  FROM file WHERE dp.file_id=file.id)       AS author,
   (SELECT version FROM dist WHERE dp.dist_id=dist.id)       AS dist_version,
-  -- phase,
-  -- rel,
+  phase,
+  rel,
   version req_version
 FROM dep dp
 WHERE ".join(" AND ", @wheres)."
@@ -1588,15 +1588,15 @@ ORDER BY dist");
     $sth->execute(@binds);
     my @res;
     while (my $row = $sth->fetchrow_hashref) {
-        #next unless $phase eq 'ALL' || $row->{phase} eq $phase;
-        #next unless $rel   eq 'ALL' || $row->{rel}   eq $rel;
-        #delete $row->{phase} unless $phase eq 'ALL';
-        #delete $row->{rel}   unless $rel   eq 'ALL';
+        next unless $phase eq 'ALL' || $row->{phase} eq $phase;
+        next unless $rel   eq 'ALL' || $row->{rel}   eq $rel;
         push @res, {
             (name=>$row->{name}) x !!(@mod_ids > 1),
             dist=>$row->{dist},
             author=>$row->{author},
             version=>$row->{dist_version},
+            (phase=>$row->{phase}) x !!($phase ne 'ALL'),
+            (rel=>$row->{rel}) x !!($rel ne 'ALL'),
         };
     }
 
@@ -1620,6 +1620,9 @@ our %deps_phase_arg = (
     },
 );
 
+our %rdeps_phase_arg = %deps_phase_arg;
+$rdeps_phase_arg{phase}{default} = 'ALL';
+
 our %deps_rel_arg = (
     rel => {
         schema => ['str*' => {
@@ -1629,6 +1632,9 @@ our %deps_rel_arg = (
         tags => ['category:filter'],
     },
 );
+
+our %rdeps_rel_arg = %deps_rel_arg;
+$rdeps_rel_arg{rel}{default} = 'ALL';
 
 our %deps_args = (
     %deps_phase_arg,
@@ -1721,6 +1727,8 @@ $SPEC{'rdeps'} = {
     args => {
         %common_args,
         %mods_args,
+        %rdeps_rel_arg,
+        %rdeps_phase_arg,
         author => {
             summary => 'Filter certain author',
             schema => ['array*', of=>'str*'],
@@ -1730,6 +1738,7 @@ This can be used to select certain author(s).
 
 _
             completion => \&_complete_cpanid,
+            tags => ['category:filter'],
         },
         author_isnt => {
             summary => 'Filter out certain author',
@@ -1742,6 +1751,7 @@ herself.
 
 _
             completion => \&_complete_cpanid,
+            tags => ['category:filter'],
         },
     },
 };
@@ -1762,7 +1772,7 @@ sub rdeps {
         author_isnt => $author_isnt,
     };
 
-    my $res = _get_revdeps($mods, $dbh, $filters);
+    my $res = _get_revdeps($mods, $dbh, $filters, $args{phase}, $args{rel});
 
     my $resmeta = {};
     $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/name dist author version/]]}};

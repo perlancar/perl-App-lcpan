@@ -17,6 +17,8 @@ $SPEC{'handle_cmd'} = {
     args => {
         %App::lcpan::common_args,
         %App::lcpan::author_args,
+        %App::lcpan::rdeps_rel_arg,
+        %App::lcpan::rdeps_phase_arg,
         #detail => {
         #    schema => 'bool',
         #},
@@ -43,6 +45,8 @@ sub handle_cmd {
     delete $rdeps_args{author_isnt};
     $rdeps_args{author} = $args{user_author};
     $rdeps_args{author_isnt} = $args{user_author_isnt};
+    $rdeps_args{phase} = $args{phase};
+    $rdeps_args{rel} = $args{rel};
     $res = App::lcpan::rdeps(%rdeps_args);
     return $res if $res->[0] != 200;
 
