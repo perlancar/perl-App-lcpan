@@ -46,7 +46,7 @@ Revision history for App-lcpan
 
 0.20    2015-04-15 (PERLANCAR)
 
-	- Bump database schema version to 5 (add column is_latest to dist table
+	- Bump database schema version to v5 (add column is_latest to dist table
           to ease queries).
 
         - Allow --nolatest in addition to --latest.
@@ -85,7 +85,7 @@ Revision history for App-lcpan
 
 0.15    2015-04-11 (PERLANCAR)
 
-        - Bump database schema version to 4. This update mainly adds column
+        - Bump database schema version to v4. This update mainly adds column
           'cpanid' to tables 'module' and 'dist' to speed up queries. This
           version requires a full reindex.
 
@@ -191,7 +191,7 @@ Revision history for App-lcpan
 
         [DATABASE CHANGES]
 
-        - Upgrade schema to v3: add columns
+        - Bump database schema version to v3: add columns
           has_{metayml,metajson,makefilepl,buildpl} to 'file' table. Add
           'version_numified' to 'dist' and 'module' tables.
 
@@ -215,7 +215,9 @@ Revision history for App-lcpan
 
 0.03    2015-01-14 (PERLANCAR)
 
-	- The indexer now tries to extract dist metadata from Makefile.PL or
+	- Bump database schema version to v2.
+
+        - The indexer now tries to extract dist metadata from Makefile.PL or
           Build.PL in addition to from META.{json,yml}. This allows for more
           thorough indexing of dependencies information (as well as distribution
           name & abstract), as a lot of older releases do not include CPAN META
