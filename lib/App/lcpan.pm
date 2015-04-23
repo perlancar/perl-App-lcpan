@@ -1501,6 +1501,7 @@ ORDER BY module DESC");
     $sth->execute;
     my @res;
     while (my $row = $sth->fetchrow_hashref) {
+        next unless $row->{module};
         next unless $phase eq 'ALL' || $row->{phase} eq $phase;
         next unless $rel   eq 'ALL' || $row->{rel}   eq $rel;
         next if exists $memory_by_mod_name->{$row->{module}};
