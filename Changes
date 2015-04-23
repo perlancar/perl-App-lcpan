@@ -1,5 +1,18 @@
 Revision history for App-lcpan
 
+0.27    2015-04-23 (PERLANCAR)
+
+        - rdeps: Implement recursive (-l/-R).
+
+        - deps: Ordering when in -l/-R mode.
+
+        - deps: Optimize query (avoid retrieving module ID's twice when in
+          recursive mode).
+
+        - [Bugfix] deps: Forget to clone data causing deps --phase & --level
+          defaults being reset to 'ALL'.
+
+
 0.26    2015-04-22 (PERLANCAR)
 
 	- Add phase & rel arguments to rdeps & authorrdeps.
