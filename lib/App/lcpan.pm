@@ -1496,7 +1496,7 @@ sub _get_prereqs {
   version
 FROM dep dp
 WHERE dp.dist_id IN (".join(",",@dist_ids).")
-ORDER BY module");
+ORDER BY module DESC");
     $sth->execute;
     my @res;
     while (my $row = $sth->fetchrow_hashref) {
