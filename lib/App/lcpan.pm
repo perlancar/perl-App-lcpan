@@ -1469,9 +1469,16 @@ sub _get_prereqs {
 
     # first, check that all modules are listed and belong to a dist
     my @dist_ids;
-    for my $mod (@$mods) {
-        my ($dist_id) = $dbh->selectrow_array("SELECT id FROM dist WHERE is_latest AND file_id=(SELECT file_id FROM module WHERE name=?)", {}, $mod)
-            or return [404, "No such module: $mod"];
+    for my $mod0 (@$mods) {
+        my ($mod, $dist_id);
+        if (ref($mod0) eq 'HASH') {
+            $mod = $mod0->{mod};
+            $dist_id = $mod0->{dist_id};
+        } else {
+            $mod = $mod0;
+            ($dist_id) = $dbh->selectrow_array("SELECT id FROM dist WHERE is_latest AND file_id=(SELECT file_id FROM module WHERE name=?)", {}, $mod)
+                or return [404, "No such module: $mod"];
+        }
         unless ($memory_by_dist_id->{$dist_id}) {
             push @dist_ids, $dist_id;
             $memory_by_dist_id->{$dist_id} = $mod;
@@ -1523,7 +1530,7 @@ ORDER BY module");
     # XXX check circular?
 
     if (@res && ($max_level==-1 || $level < $max_level)) {
-        my $subres = _get_prereqs([map {$_->{module}} @res], $dbh,
+        my $subres = _get_prereqs([map { {mod=>$_->{module}, dist_id=>$_->{module_dist_id}} } @res], $dbh,
                                   $memory_by_mod_name,
                                   $memory_by_dist_id,
                                   $level+1, $max_level, $phase, $rel, $include_core, $plver);
