@@ -1484,6 +1484,7 @@ sub _get_prereqs {
             $memory_by_dist_id->{$dist_id} = $mod;
         }
     }
+    return [200, "OK", []] unless @dist_ids;
 
     # fetch the dependency information
     my $sth = $dbh->prepare("SELECT
@@ -1502,6 +1503,7 @@ ORDER BY module DESC");
     while (my $row = $sth->fetchrow_hashref) {
         next unless $phase eq 'ALL' || $row->{phase} eq $phase;
         next unless $rel   eq 'ALL' || $row->{rel}   eq $rel;
+        next if exists $memory_by_mod_name->{$row->{module}};
 
         # some dists, e.g. XML-SimpleObject-LibXML (0.60) have garbled prereqs,
         # e.g. they write PREREQ_PM => { mod1, mod2 } when it should've been
@@ -1526,8 +1528,6 @@ ORDER BY module DESC");
         $row->{level} = $level;
         push @res, $row;
     }
-
-    # XXX check circular?
 
     if (@res && ($max_level==-1 || $level < $max_level)) {
         my $subres = _get_prereqs([map { {mod=>$_->{module}, dist_id=>$_->{module_dist_id}} } @res], $dbh,
@@ -1555,17 +1555,29 @@ ORDER BY module DESC");
 sub _get_revdeps {
     use experimental 'smartmatch';
 
-    my ($mods, $dbh, $filters, $phase, $rel) = @_;
+    my ($mods, $dbh, $memory_by_dist_name, $memory_by_mod_id,
+        $level, $max_level, $filters, $phase, $rel) = @_;
 
     $log->tracef("Finding reverse dependencies for module(s) %s ...", $mods);
 
     # first, check that all modules are listed
     my @mod_ids;
-    for my $mod (@$mods) {
-        my ($mod_id) = $dbh->selectrow_array("SELECT id FROM module WHERE name=?", {}, $mod)
-            or return [404, "No such module: $mod"];
-        push @mod_ids, $mod_id unless $mod_id ~~ @mod_ids;
+    for my $mod0 (@$mods) {
+        my ($mod, $mod_id) = @_;
+        if (ref($mod0) eq 'HASH') {
+            $mod = $mod0->{mod};
+            $mod_id = $mod0->{mod_id};
+        } else {
+            $mod = $mod0;
+            ($mod_id) = $dbh->selectrow_array("SELECT id FROM module WHERE name=?", {}, $mod)
+                or return [404, "No such module: $mod"];
+        }
+        unless ($memory_by_mod_id->{$mod_id}) {
+            push @mod_ids, $mod_id;
+            $memory_by_mod_id->{$mod_id} = $mod;
+        }
     }
+    return [200, "OK", []] unless @mod_ids;
 
     my @wheres = ('module_id IN ('.join(",", @mod_ids).')');
     my @binds  = ();
@@ -1580,9 +1592,13 @@ sub _get_revdeps {
             push @binds, $_;
         }
     }
+    push @wheres, "is_latest";
 
     # get all dists that depend on that module
     my $sth = $dbh->prepare("SELECT
+  dp.dist_id dist_id,
+  (SELECT is_latest FROM dist WHERE id=dp.dist_id) is_latest,
+  (SELECT id FROM dist WHERE is_latest AND file_id=(SELECT file_id FROM module WHERE id=dp.module_id)) module_dist_id,
   (SELECT name    FROM module WHERE dp.module_id=module.id) AS name,
   (SELECT name    FROM dist WHERE dp.dist_id=dist.id)       AS dist,
   (SELECT cpanid  FROM file WHERE dp.file_id=file.id)       AS author,
@@ -1592,20 +1608,43 @@ sub _get_revdeps {
   version req_version
 FROM dep dp
 WHERE ".join(" AND ", @wheres)."
-ORDER BY dist");
+ORDER BY dist DESC");
     $sth->execute(@binds);
     my @res;
     while (my $row = $sth->fetchrow_hashref) {
         next unless $phase eq 'ALL' || $row->{phase} eq $phase;
         next unless $rel   eq 'ALL' || $row->{rel}   eq $rel;
-        push @res, {
-            (name=>$row->{name}) x !!(@mod_ids > 1),
-            dist=>$row->{dist},
-            author=>$row->{author},
-            version=>$row->{dist_version},
-            (phase=>$row->{phase}) x !!($phase ne 'ALL'),
-            (rel=>$row->{rel}) x !!($rel ne 'ALL'),
-        };
+        next if exists $memory_by_dist_name->{$row->{dist}};
+        $memory_by_dist_name->{$row->{dist}} = $row->{dist_version};
+        delete $row->{phase} unless $phase eq 'ALL';
+        delete $row->{rel} unless $rel eq 'ALL';
+        $row->{level} = $level;
+        push @res, $row;
+    }
+
+    if (@res && ($max_level==-1 || $level < $max_level)) {
+        my $sth = $dbh->prepare("SELECT m.id id, m.name name FROM dist d JOIN module m ON d.file_id=m.file_id WHERE d.is_latest AND d.id IN (".join(", ", map {$_->{dist_id}} @res).")");
+        $sth->execute();
+        my @mods;
+        while (my $row = $sth->fetchrow_hashref) {
+            push @mods, {mod=>$row->{name}, mod_id=>$row->{id}};
+        }
+        my $subres = _get_revdeps(\@mods, $dbh,
+                                  $memory_by_dist_name, $memory_by_mod_id,
+                                  $level+1, $max_level, $filters, $phase, $rel);
+        return $subres if $subres->[0] != 200;
+        # insert to res in appropriate places
+      SUBRES_TO_INSERT:
+        for my $s (@{$subres->[2]}) {
+            for my $i (0..@res-1) {
+                my $r = $res[$i];
+                if ($s->{module_dist_id} == $r->{dist_id}) {
+                    splice @res, $i+1, 0, $s;
+                    next SUBRES_TO_INSERT;
+                }
+            }
+            return [500, "Bug? Can't insert subres (dist=$s->{dist}, dist_id=$s->{dist_id})"];
+        }
     }
 
     [200, "OK", \@res];
@@ -1665,6 +1704,7 @@ our %deps_args = (
         'summary.alt.bool.not' => 'Exclude Perl core modules',
         schema  => 'bool',
         default => 0,
+        tags => ['category:filter'],
     },
     perl_version => {
         summary => 'Set base Perl version for determining core modules',
@@ -1729,38 +1769,55 @@ sub deps {
     $res;
 }
 
-$SPEC{'rdeps'} = {
-    v => 1.1,
-    summary => 'List reverse dependencies',
-    args => {
-        %common_args,
-        %mods_args,
-        %rdeps_rel_arg,
-        %rdeps_phase_arg,
-        author => {
-            summary => 'Filter certain author',
-            schema => ['array*', of=>'str*'],
-            description => <<'_',
+my %rdeps_args = (
+    %common_args,
+    %mods_args,
+    %rdeps_rel_arg,
+    %rdeps_phase_arg,
+    level => {
+        summary => 'Recurse for a number of levels (-1 means unlimited)',
+        schema  => ['int*', min=>1, max=>10],
+        default => 1,
+        cmdline_aliases => {
+            l => {},
+            R => {
+                summary => 'Recurse (alias for `--level 10`)',
+                is_flag => 1,
+                code => sub { $_[0]{level} = 10 },
+            },
+        },
+    },
+    author => {
+        summary => 'Filter certain author',
+        schema => ['array*', of=>'str*'],
+        description => <<'_',
 
 This can be used to select certain author(s).
 
 _
-            completion => \&_complete_cpanid,
-            tags => ['category:filter'],
-        },
-        author_isnt => {
-            summary => 'Filter out certain author',
-            schema => ['array*', of=>'str*'],
-            description => <<'_',
+        completion => \&_complete_cpanid,
+        tags => ['category:filter'],
+    },
+    author_isnt => {
+        summary => 'Filter out certain author',
+        schema => ['array*', of=>'str*'],
+        description => <<'_',
 
 This can be used to filter out certain author(s). For example if you want to
 know whether a module is being used by another CPAN author instead of just
 herself.
 
 _
-            completion => \&_complete_cpanid,
-            tags => ['category:filter'],
-        },
+        completion => \&_complete_cpanid,
+        tags => ['category:filter'],
+    },
+);
+
+$SPEC{'rdeps'} = {
+    v => 1.1,
+    summary => 'List reverse dependencies',
+    args => {
+        %rdeps_args,
     },
 };
 sub rdeps {
@@ -1770,6 +1827,7 @@ sub rdeps {
     my $cpan = $args{cpan};
     my $index_name = $args{index_name};
     my $mods    = $args{modules};
+    my $level   = $args{level} // 1;
     my $author =  $args{author} ? [map {uc} @{$args{author}}] : undef;
     my $author_isnt = $args{author_isnt} ? [map {uc} @{$args{author_isnt}}] : undef;
 
@@ -1780,10 +1838,20 @@ sub rdeps {
         author_isnt => $author_isnt,
     };
 
-    my $res = _get_revdeps($mods, $dbh, $filters, $args{phase}, $args{rel});
+    my $res = _get_revdeps($mods, $dbh, {}, {}, 1, $level, $filters, $args{phase}, $args{rel});
+
+    return $res unless $res->[0] == 200;
+    for (@{$res->[2]}) {
+        $_->{dist} = ("  " x ($_->{level}-1)) . $_->{dist};
+        delete $_->{level};
+        delete $_->{dist_id};
+        delete $_->{module_dist_id};
+        delete $_->{name};
+        delete $_->{is_latest};
+    }
 
     my $resmeta = {};
-    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/name dist author version/]]}};
+    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/dist author dist_version req_version/]]}};
     $res->[3] = $resmeta;
     $res;
 }
