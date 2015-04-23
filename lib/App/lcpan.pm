@@ -8,6 +8,7 @@ use strict;
 use warnings;
 use Log::Any '$log';
 
+use Function::Fallback::CoreOrPP qw(clone);
 use POSIX ();
 
 use Exporter;
@@ -1620,7 +1621,7 @@ our %deps_phase_arg = (
     },
 );
 
-our %rdeps_phase_arg = %deps_phase_arg;
+our %rdeps_phase_arg = %{clone(\%deps_phase_arg)};
 $rdeps_phase_arg{phase}{default} = 'ALL';
 
 our %deps_rel_arg = (
@@ -1633,7 +1634,7 @@ our %deps_rel_arg = (
     },
 );
 
-our %rdeps_rel_arg = %deps_rel_arg;
+our %rdeps_rel_arg = %{clone(\%deps_rel_arg)};
 $rdeps_rel_arg{rel}{default} = 'ALL';
 
 our %deps_args = (
