@@ -545,6 +545,22 @@ sub _update_index {
 
     my $dbh  = _connect_db('rw', $cpan, $index_name);
 
+    # check whether we need to reindex if a sufficiently old (and possibly
+    # incorrect) version of us did the reindexing
+    {
+        no strict 'refs';
+        last unless defined ${__PACKAGE__.'::VERSION'};
+
+        my ($indexer_version) = $dbh->selectrow_array("SELECT value FROM meta WHERE name='indexer_version'");
+        if (!defined($indexer_version) || $indexer_version <= 0.28) {
+            $log->infof("Reindexing from scratch, deleting previous index content ...");
+            $dbh->do("DELETE FROM dep");
+            $dbh->do("DELETE FROM module");
+            $dbh->do("DELETE FROM dist");
+            $dbh->do("DELETE FROM file");
+        }
+    }
+
     # parse 01mailrc.txt.gz and insert the parse result to 'author' table
     {
         my $path = "$cpan/authors/01mailrc.txt.gz";
@@ -588,7 +604,8 @@ sub _update_index {
 
         my $sth_sel_file = $dbh->prepare("SELECT id FROM file WHERE name=?");
         my $sth_ins_file = $dbh->prepare("INSERT INTO file (name,cpanid) VALUES (?,?)");
-        my $sth_ins_mod  = $dbh->prepare("INSERT OR REPLACE INTO module (name,file_id,cpanid,version,version_numified) VALUES (?,?,?,?,?)");
+        my $sth_ins_mod  = $dbh->prepare("INSERT INTO module (name,file_id,cpanid,version,version_numified) VALUES (?,?,?,?,?)");
+        my $sth_upd_mod  = $dbh->prepare("UPDATE module SET file_id=?,cpanid=?,version=?,version_numified=? WHERE name=?");
 
         $dbh->begin_work;
 
@@ -625,7 +642,11 @@ sub _update_index {
             }
             next unless $file_id;
 
-            $sth_ins_mod->execute($pkg, $file_id, $author, $ver, _numify_ver($ver));
+            if ($dbh->selectrow_array("SELECT id FROM module WHERE name=?", {}, $pkg)) {
+                $sth_upd_mod->execute(      $file_id, $author, $ver, _numify_ver($ver), $pkg);
+            } else {
+                $sth_ins_mod->execute($pkg, $file_id, $author, $ver, _numify_ver($ver));
+            }
             $log->tracef("  New/updated module: %s", $pkg);
         } # while <fh>
 
@@ -669,6 +690,7 @@ sub _update_index {
         my $sth_set_file_status = $dbh->prepare("UPDATE file SET status=? WHERE id=?");
         my $sth_set_file_status_etc = $dbh->prepare("UPDATE file SET status=?,has_metajson=?,has_metayml=?,has_makefilepl=?,has_buildpl=? WHERE id=?");
         my $sth_ins_dist = $dbh->prepare("INSERT OR REPLACE INTO dist (name,cpanid,abstract,file_id,version,version_numified) VALUES (?,?,?,?,?,?)");
+        my $sth_upd_dist = $dbh->prepare("UPDATE dist SET cpanid=?,abstract=?,file_id=?,version=?,version_numified=? WHERE name=?");
         my $sth_ins_dep = $dbh->prepare("INSERT OR REPLACE INTO dep (file_id,dist_id,module_id,module_name,phase,rel, version,version_numified) VALUES (?,?,?,?,?,?, ?,?)");
         my $sth_sel_mod  = $dbh->prepare("SELECT * FROM module WHERE name=?");
 
@@ -799,7 +821,11 @@ sub _update_index {
             my $dist_version = $meta->{version};
             $dist_name =~ s/::/-/g; # sometimes author miswrites module name
             # insert dist record
-            $sth_ins_dist->execute($dist_name, $file->{cpanid}, $dist_abstract, $file->{id}, $dist_version, _numify_ver($dist_version));
+            if ($dbh->selectrow_array("SELECT id FROM dist WHERE name=?", {}, $dist_name)) {
+                $sth_upd_dist->execute(            $file->{cpanid}, $dist_abstract, $file->{id}, $dist_version, _numify_ver($dist_version), $dist_name);
+            } else {
+                $sth_ins_dist->execute($dist_name, $file->{cpanid}, $dist_abstract, $file->{id}, $dist_version, _numify_ver($dist_version));
+            }
             my $dist_id = $dbh->last_insert_id("","","","");
 
             # insert dependency information
@@ -878,6 +904,12 @@ sub _update_index {
 
     $dbh->do("INSERT OR REPLACE INTO meta (name,value) VALUES (?,?)",
              {}, 'last_index_time', time());
+    {
+        # record the module version that does the indexing
+        no strict 'refs';
+        $dbh->do("INSERT OR REPLACE INTO meta (name,value) VALUES (?,?)",
+                 {}, 'indexer_version', ${__PACKAGE__.'::VERSION'});
+    }
 
     [200];
 }
@@ -993,6 +1025,10 @@ FROM file");
         my ($time) = $dbh->selectrow_array("SELECT value FROM meta WHERE name='last_index_time'");
         $stat->{raw_last_index_time} = $time;
         $stat->{last_index_time} = _fmt_time($time);
+    }
+    {
+        my ($ver) = $dbh->selectrow_array("SELECT value FROM meta WHERE name='indexer_version'");
+        $stat->{indexer_version} = $ver;
     }
     {
         my @st = stat "$cpan/modules/02packages.details.txt.gz";
