@@ -1,5 +1,12 @@
 Revision history for App-lcpan
 
+0.28    2015-04-24 (PERLANCAR)
+
+	- No functional changes.
+
+	- Avoid perl undef warning.
+
+
 0.27    2015-04-23 (PERLANCAR)
 
         - rdeps: Implement recursive (-l/-R).
