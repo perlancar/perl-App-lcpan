@@ -1,5 +1,15 @@
 Revision history for App-lcpan
 
+0.29    2015-04-24 (PERLANCAR)
+
+	- [Bugfix] Fix missing dependencies/reverse dependencies information
+          when a depended module is updated, this is because we used INSERT OR
+          REPLACE {dist,module} which changes module/dist IDs. We should've used
+          INSERT or UPDATE. From this new version on we record the module
+          version which did the reindexing. We are doing a full reindex when
+          indexer <= 0.28.
+
+
 0.28    2015-04-24 (PERLANCAR)
 
 	- No functional changes.
