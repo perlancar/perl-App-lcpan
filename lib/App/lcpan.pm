@@ -552,7 +552,7 @@ sub _update_index {
         last unless defined ${__PACKAGE__.'::VERSION'};
 
         my ($indexer_version) = $dbh->selectrow_array("SELECT value FROM meta WHERE name='indexer_version'");
-        if (!defined($indexer_version) || $indexer_version <= 0.28) {
+        if (!defined($indexer_version) || $indexer_version <= 0.29) {
             $log->infof("Reindexing from scratch, deleting previous index content ...");
             $dbh->do("DELETE FROM dep");
             $dbh->do("DELETE FROM module");
@@ -1526,6 +1526,7 @@ sub _get_prereqs {
     # fetch the dependency information
     my $sth = $dbh->prepare("SELECT
   dp.dist_id dependant_dist_id,
+  (SELECT name   FROM dist   WHERE id=dp.dist_id) AS dist,
   (SELECT name   FROM module WHERE id=dp.module_id) AS module,
   (SELECT cpanid FROM module WHERE id=dp.module_id) AS author,
   (SELECT id     FROM dist   WHERE is_latest AND file_id=(SELECT file_id FROM module WHERE id=dp.module_id)) AS module_dist_id,
@@ -1534,7 +1535,7 @@ sub _get_prereqs {
   version
 FROM dep dp
 WHERE dp.dist_id IN (".join(",",@dist_ids).")
-ORDER BY module DESC");
+ORDER BY module".($level > 1 ? " DESC" : ""));
     $sth->execute;
     my @res;
     while (my $row = $sth->fetchrow_hashref) {
@@ -1637,7 +1638,7 @@ sub _get_revdeps {
   dp.dist_id dist_id,
   (SELECT is_latest FROM dist WHERE id=dp.dist_id) is_latest,
   (SELECT id FROM dist WHERE is_latest AND file_id=(SELECT file_id FROM module WHERE id=dp.module_id)) module_dist_id,
-  (SELECT name    FROM module WHERE dp.module_id=module.id) AS name,
+  (SELECT name    FROM module WHERE dp.module_id=module.id) AS module,
   (SELECT name    FROM dist WHERE dp.dist_id=dist.id)       AS dist,
   (SELECT cpanid  FROM file WHERE dp.file_id=file.id)       AS author,
   (SELECT version FROM dist WHERE dp.dist_id=dist.id)       AS dist_version,
@@ -1646,7 +1647,7 @@ sub _get_revdeps {
   version req_version
 FROM dep dp
 WHERE ".join(" AND ", @wheres)."
-ORDER BY dist DESC");
+ORDER BY dist".($level > 1 ? " DESC" : ""));
     $sth->execute(@binds);
     my @res;
     while (my $row = $sth->fetchrow_hashref) {
@@ -1674,7 +1675,7 @@ ORDER BY dist DESC");
         # insert to res in appropriate places
       SUBRES_TO_INSERT:
         for my $s (@{$subres->[2]}) {
-            for my $i (0..@res-1) {
+            for my $i (reverse 0..@res-1) {
                 my $r = $res[$i];
                 if ($s->{module_dist_id} == $r->{dist_id}) {
                     splice @res, $i+1, 0, $s;
@@ -1797,12 +1798,13 @@ sub deps {
     for (@{$res->[2]}) {
         $_->{module} = ("  " x ($_->{level}-1)) . $_->{module};
         delete $_->{level};
+        delete $_->{dist} unless @$mods > 1;
         delete $_->{dependant_dist_id};
         delete $_->{module_dist_id};
     }
 
     my $resmeta = {};
-    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/module author version/]]}};
+    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/dist module author version/]]}};
     $res->[3] = $resmeta;
     $res;
 }
@@ -1884,12 +1886,12 @@ sub rdeps {
         delete $_->{level};
         delete $_->{dist_id};
         delete $_->{module_dist_id};
-        delete $_->{name};
+        delete $_->{module} unless @$mods > 1;
         delete $_->{is_latest};
     }
 
     my $resmeta = {};
-    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/dist author dist_version req_version/]]}};
+    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/module dist author dist_version req_version/]]}};
     $res->[3] = $resmeta;
     $res;
 }
