@@ -1,5 +1,15 @@
 Revision history for App-lcpan
 
+0.30    2015-04-26 (PERLANCAR)
+
+        - This version will require full reindex.
+
+        - [Bugfix] When indexing, used wrong dist_id (from last_insert_id())
+          when record already exists.
+
+        - [Bugfix] deps, rdeps: Result ordering fixes.
+
+
 0.29    2015-04-24 (PERLANCAR)
 
 	- [Bugfix] Fix missing dependencies/reverse dependencies information
