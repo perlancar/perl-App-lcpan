@@ -821,12 +821,13 @@ sub _update_index {
             my $dist_version = $meta->{version};
             $dist_name =~ s/::/-/g; # sometimes author miswrites module name
             # insert dist record
-            if ($dbh->selectrow_array("SELECT id FROM dist WHERE name=?", {}, $dist_name)) {
+            my $dist_id;
+            if (($dist_id) = $dbh->selectrow_array("SELECT id FROM dist WHERE name=?", {}, $dist_name)) {
                 $sth_upd_dist->execute(            $file->{cpanid}, $dist_abstract, $file->{id}, $dist_version, _numify_ver($dist_version), $dist_name);
             } else {
                 $sth_ins_dist->execute($dist_name, $file->{cpanid}, $dist_abstract, $file->{id}, $dist_version, _numify_ver($dist_version));
+                $dist_id = $dbh->last_insert_id("","","","");
             }
-            my $dist_id = $dbh->last_insert_id("","","","");
 
             # insert dependency information
             if (ref($meta->{configure_requires}) eq 'HASH') {
