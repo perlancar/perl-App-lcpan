@@ -1,5 +1,11 @@
 Revision history for App-lcpan
 
+0.31    2015-04-28 (PERLANCAR)
+
+	- [Bugfix] Don't update dist by name because name is not unique,
+	  update by id instead.
+
+
 0.30    2015-04-26 (PERLANCAR)
 
         - This version will require full reindex.
