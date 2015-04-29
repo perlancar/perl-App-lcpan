@@ -229,6 +229,7 @@ our $db_schema_spec = {
         'CREATE TABLE namespace (
             name VARCHAR(255) NOT NULL,
             num_sep INT NOT NULL,
+            has_child BOOL NOT NULL,
             num_modules INT NOT NULL
         )',
         'CREATE UNIQUE INDEX ix_namespace__name ON namespace(name)',
@@ -329,26 +330,29 @@ our $db_schema_spec = {
         'CREATE TABLE namespace (
             name VARCHAR(255) NOT NULL,
             num_sep INT NOT NULL,
+            has_child BOOL NOT NULL,
             num_modules INT NOT NULL
         )',
         'CREATE UNIQUE INDEX ix_namespace__name ON namespace(name)',
         sub {
             my $dbh = shift;
             my $sth_sel_mod = $dbh->prepare("SELECT name FROM module");
-            my $sth_ins_ns  = $dbh->prepare("INSERT INTO namespace (name, num_sep, num_modules) VALUES (?,?,1)");
-            my $sth_upd_ns_inc_num_mod = $dbh->prepare("UPDATE namespace SET num_modules=num_modules+1 WHERE name=?");
+            my $sth_ins_ns  = $dbh->prepare("INSERT INTO namespace (name, num_sep, has_child, num_modules) VALUES (?,?,?,1)");
+            my $sth_upd_ns_inc_num_mod = $dbh->prepare("UPDATE namespace SET num_modules=num_modules+1, has_child=1 WHERE name=?");
             $sth_sel_mod->execute;
             my %cache;
             while (my ($mod) = $sth_sel_mod->fetchrow_array) {
+                my $has_child = 0;
                 while (1) {
                     if ($cache{$mod}++) {
                         $sth_upd_ns_inc_num_mod->execute($mod);
                     } else {
                         my $num_sep = 0;
                         while ($mod =~ /::/g) { $num_sep++ }
-                        $sth_ins_ns->execute($mod, $num_sep);
+                        $sth_ins_ns->execute($mod, $has_child, $num_sep);
                     }
                     $mod =~ s/::\w+\z// or last;
+                    $has_child = 1;
                 }
             }
         },
