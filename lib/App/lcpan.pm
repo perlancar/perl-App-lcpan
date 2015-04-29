@@ -185,6 +185,52 @@ sub _relpath {
         substr($cpanid, 0, 2)."/$cpanid/$filename";
 }
 
+sub _fill_namespace {
+    my $dbh = shift;
+
+    my $sth_sel_mod = $dbh->prepare("SELECT name FROM module");
+    my $sth_ins_ns  = $dbh->prepare("INSERT INTO namespace (name, num_sep, has_child, num_modules) VALUES (?,?,?,1)");
+    my $sth_upd_ns_inc_num_mod = $dbh->prepare("UPDATE namespace SET num_modules=num_modules+1, has_child=1 WHERE name=?");
+    $sth_sel_mod->execute;
+    my %cache;
+    while (my ($mod) = $sth_sel_mod->fetchrow_array) {
+        my $has_child = 0;
+        while (1) {
+            if ($cache{$mod}++) {
+                $sth_upd_ns_inc_num_mod->execute($mod);
+            } else {
+                my $num_sep = 0;
+                while ($mod =~ /::/g) { $num_sep++ }
+                $sth_ins_ns->execute($mod, $num_sep, $has_child);
+            }
+            $mod =~ s/::\w+\z// or last;
+            $has_child = 1;
+        }
+    }
+}
+
+sub _set_namespace {
+    my ($dbh, $mod) = @_;
+    my $sth_sel_ns  = $dbh->prepare("SELECT name FROM namespace WHERE name=?");
+    my $sth_ins_ns  = $dbh->prepare("INSERT INTO namespace (name, num_sep, has_child, num_modules) VALUES (?,?,?,1)");
+    my $sth_upd_ns_inc_num_mod = $dbh->prepare("UPDATE namespace SET num_modules=num_modules+1, has_child=1 WHERE name=?");
+
+    my $has_child = 0;
+    while (1) {
+        $sth_sel_ns->execute($mod);
+        my $row = $sth_sel_ns->fetchrow_arrayref;
+        if ($row) {
+            $sth_upd_ns_inc_num_mod->execute($mod);
+        } else {
+            my $num_sep = 0;
+            while ($mod =~ /::/g) { $num_sep++ }
+            $sth_ins_ns->execute($mod, $num_sep, $has_child);
+        }
+        $mod =~ s/::\w+\z// or last;
+        $has_child = 1;
+    }
+}
+
 our $db_schema_spec = {
     latest_v => 6,
 
@@ -334,28 +380,7 @@ our $db_schema_spec = {
             num_modules INT NOT NULL
         )',
         'CREATE UNIQUE INDEX ix_namespace__name ON namespace(name)',
-        sub {
-            my $dbh = shift;
-            my $sth_sel_mod = $dbh->prepare("SELECT name FROM module");
-            my $sth_ins_ns  = $dbh->prepare("INSERT INTO namespace (name, num_sep, has_child, num_modules) VALUES (?,?,?,1)");
-            my $sth_upd_ns_inc_num_mod = $dbh->prepare("UPDATE namespace SET num_modules=num_modules+1, has_child=1 WHERE name=?");
-            $sth_sel_mod->execute;
-            my %cache;
-            while (my ($mod) = $sth_sel_mod->fetchrow_array) {
-                my $has_child = 0;
-                while (1) {
-                    if ($cache{$mod}++) {
-                        $sth_upd_ns_inc_num_mod->execute($mod);
-                    } else {
-                        my $num_sep = 0;
-                        while ($mod =~ /::/g) { $num_sep++ }
-                        $sth_ins_ns->execute($mod, $has_child, $num_sep);
-                    }
-                    $mod =~ s/::\w+\z// or last;
-                    $has_child = 1;
-                }
-            }
-        },
+        \&_fill_namespace,
     ],
 
     # for testing
@@ -599,6 +624,14 @@ sub _update_index {
             $dbh->do("DELETE FROM dist");
             $dbh->do("DELETE FROM file");
         }
+
+        # i screwed up and mixed num_sep and has_child columns in v0.32, so we
+        # need to set the table again
+        if (defined($indexer_version) && $indexer_version <= 0.32) {
+            $log->infof("Emptying and re-filling namespace ...");
+            $dbh->do("DELETE FROM namespace");
+            _fill_namespace($dbh);
+        }
     }
 
     # parse 01mailrc.txt.gz and insert the parse result to 'author' table
@@ -686,7 +719,9 @@ sub _update_index {
                 $sth_upd_mod->execute(      $file_id, $author, $ver, _numify_ver($ver), $pkg);
             } else {
                 $sth_ins_mod->execute($pkg, $file_id, $author, $ver, _numify_ver($ver));
+                _set_namespace($dbh, $pkg);
             }
+
             $log->tracef("  New/updated module: %s", $pkg);
         } # while <fh>
 
