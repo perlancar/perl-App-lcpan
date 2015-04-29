@@ -1,5 +1,16 @@
 Revision history for App-lcpan
 
+0.32    2015-04-29 (PERLANCAR)
+
+        - Bump database schema version to v6 (add table namespaces). This is
+          mostly to help speed up tab completion query when completing module
+          name.
+
+        - Add subcommand: namespaces.
+
+        - modules: Add filter option --namespace.
+
+
 0.31    2015-04-28 (PERLANCAR)
 
 	- [Bugfix] Don't update dist by name because name is not unique,
