@@ -91,6 +91,10 @@ B<List modules:>
  % lcpan modules --author PERLANCAR ;# modules by some author only
  % lcpan modules --dist libwww-perl ;# from certain dist only
 
+B<List namespaces:>
+
+ % lcpan namespaces -l1 --detail --sort -num_modules ;# list top-level namespaces sorted by number of packages
+
 B<List distributions:>
 
  % lcpan dists

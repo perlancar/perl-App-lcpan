@@ -186,7 +186,7 @@ sub _relpath {
 }
 
 our $db_schema_spec = {
-    latest_v => 5,
+    latest_v => 6,
 
     install => [
         'CREATE TABLE author (
@@ -225,6 +225,13 @@ our $db_schema_spec = {
         'CREATE UNIQUE INDEX ix_module__name ON module(name)',
         'CREATE INDEX ix_module__file_id ON module(file_id)',
         'CREATE INDEX ix_module__cpanid ON module(cpanid)',
+
+        'CREATE TABLE namespace (
+            name VARCHAR(255) NOT NULL,
+            num_sep INT NOT NULL,
+            num_modules INT NOT NULL
+        )',
+        'CREATE UNIQUE INDEX ix_namespace__name ON namespace(name)',
 
         'CREATE TABLE dist (
              id INTEGER NOT NULL PRIMARY KEY,
@@ -316,6 +323,35 @@ our $db_schema_spec = {
 
     upgrade_to_v5 => [
         'ALTER TABLE dist ADD COLUMN is_latest BOOLEAN',
+    ],
+
+    upgrade_to_v6 => [
+        'CREATE TABLE namespace (
+            name VARCHAR(255) NOT NULL,
+            num_sep INT NOT NULL,
+            num_modules INT NOT NULL
+        )',
+        'CREATE UNIQUE INDEX ix_namespace__name ON namespace(name)',
+        sub {
+            my $dbh = shift;
+            my $sth_sel_mod = $dbh->prepare("SELECT name FROM module");
+            my $sth_ins_ns  = $dbh->prepare("INSERT INTO namespace (name, num_sep, num_modules) VALUES (?,?,1)");
+            my $sth_upd_ns_inc_num_mod = $dbh->prepare("UPDATE namespace SET num_modules=num_modules+1 WHERE name=?");
+            $sth_sel_mod->execute;
+            my %cache;
+            while (my ($mod) = $sth_sel_mod->fetchrow_array) {
+                while (1) {
+                    if ($cache{$mod}++) {
+                        $sth_upd_ns_inc_num_mod->execute($mod);
+                    } else {
+                        my $num_sep = 0;
+                        while ($mod =~ /::/g) { $num_sep++ }
+                        $sth_ins_ns->execute($mod, $num_sep);
+                    }
+                    $mod =~ s/::\w+\z// or last;
+                }
+            }
+        },
     ],
 
     # for testing
@@ -662,9 +698,27 @@ sub _update_index {
                 push @old_filenames, $fname;
             }
             last CLEANUP unless @old_file_ids;
-            $log->tracef("  Deleting old files: %s", \@old_filenames);
+            $log->tracef("  Deleting old files records: %s", \@old_filenames);
             $dbh->do("DELETE FROM dep WHERE file_id IN (".join(",",@old_file_ids)."))");
-            $dbh->do("DELETE FROM module WHERE file_id IN (".join(",",@old_file_ids).")");
+            {
+                my $sth = $dbh->prepare("SELECT name FROM module WHERE file_id IN (".join(",",@old_file_ids).")");
+                $sth->execute;
+                my @mods;
+                while (my ($mod) = $sth->fetchrow_array) {
+                    push @mods, $mod;
+                }
+
+                my $sth_upd_ns_dec_num_mod = $dbh->prepare("UPDATE namespace SET num_modules=num_modules-1 WHERE name=?");
+                for my $mod (@mods) {
+                    while (1) {
+                        $sth_upd_ns_dec_num_mod->execute($mod);
+                        $mod =~ s/::\w+\z// or last;
+                    }
+                }
+                $dbh->do("DELETE FROM namespace WHERE num_modules <= 0");
+
+                $dbh->do("DELETE FROM module WHERE file_id IN (".join(",",@old_file_ids).")");
+            }
             {
                 my $sth = $dbh->prepare("SELECT name FROM dist WHERE file_id IN (".join(",",@old_file_ids).")");
                 $sth->execute;
@@ -1006,6 +1060,7 @@ sub stats {
 
     ($stat->{num_authors}) = $dbh->selectrow_array("SELECT COUNT(*) FROM author");
     ($stat->{num_modules}) = $dbh->selectrow_array("SELECT COUNT(*) FROM module");
+    ($stat->{num_namespaces}) = $dbh->selectrow_array("SELECT COUNT(*) FROM namespace");
     ($stat->{num_dists}) = $dbh->selectrow_array("SELECT COUNT(DISTINCT name) FROM dist");
     (
         $stat->{num_releases},
@@ -1242,6 +1297,11 @@ $SPEC{modules} = {
         %fauthor_args,
         %fdist_args,
         %flatest_args,
+        namespace => {
+            summary => 'Select modules belonging to certain namespace',
+            schema => 'str*',
+            tags => ['category:filtering'],
+        },
     },
     result => {
         description => <<'_',
@@ -1280,6 +1340,11 @@ sub modules {
         #push @where, "(dist_id=(SELECT dist_id FROM dist WHERE dist_name=?))";
         push @where, "(dist=?)";
         push @bind, $args{dist};
+    }
+    if ($args{namespace}) {
+        return [400, "Invalid namespace, please use Word or Word(::Sub)+"]
+            unless $args{namespace} =~ /\A\w+(::\w+)*\z/;
+        push @where, "(name='$args{namespace}' OR name LIKE '$args{namespace}%')";
     }
     if ($args{latest}) {
         push @where, "(SELECT is_latest FROM dist d WHERE d.file_id=module.file_id)";
@@ -1894,6 +1959,86 @@ sub rdeps {
     $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/module dist author dist_version req_version/]]}};
     $res->[3] = $resmeta;
     $res;
+}
+
+$SPEC{namespaces} = {
+    v => 1.1,
+    summary => 'List namespaces',
+    args => {
+        %common_args,
+        %query_args,
+        from_level => {
+            schema => ['int*', min=>0],
+            tags => ['category:filtering'],
+        },
+        to_level => {
+            schema => ['int*', min=>0],
+            tags => ['category:filtering'],
+        },
+        level => {
+            schema => ['int*', min=>0],
+            cmdline_aliases => {l=>{}},
+            tags => ['category:filtering'],
+        },
+        sort => {
+            schema => ['str*', in=>[qw/name -name num_modules -num_modules/]],
+            tags => ['category:sorting'],
+        },
+    },
+};
+sub namespaces {
+    my %args = @_;
+
+    _set_args_default(\%args);
+    my $cpan = $args{cpan};
+    my $index_name = $args{index_name};
+    my $detail = $args{detail};
+    my $q = $args{query} // ''; # sqlite is case-insensitive by default, yay
+    $q = '%'.$q.'%' unless $q =~ /%/;
+
+    my $dbh = _connect_db('ro', $cpan, $index_name);
+
+    my @bind;
+    my @where;
+    if (length($q)) {
+        push @where, "(name LIKE ?)";
+        push @bind, $q;
+    }
+    if (defined $args{from_level}) {
+        push @where, "(num_sep >= ?)";
+        push @bind, $args{from_level}-1;
+    }
+    if (defined $args{to_level}) {
+        push @where, "(num_sep <= ?)";
+        push @bind, $args{to_level}-1;
+    }
+    if (defined $args{level}) {
+        push @where, "(num_sep = ?)";
+        push @bind, $args{level}-1;
+    }
+    my $order = 'name';
+    if ($args{sort} eq 'num_modules') {
+        $order = "num_modules";
+    } elsif ($args{sort} eq '-num_modules') {
+        $order = "num_modules DESC";
+    }
+    my $sql = "SELECT
+  name,
+  num_modules
+FROM namespace".
+    (@where ? " WHERE ".join(" AND ", @where) : "")."
+ORDER BY $order";
+
+    my @res;
+    my $sth = $dbh->prepare($sql);
+    $sth->execute(@bind);
+    while (my $row = $sth->fetchrow_hashref) {
+        push @res, $detail ? $row : $row->{name};
+    }
+    my $resmeta = {};
+    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/name num_modules/]]}}
+        if $detail;
+    [200, "OK", \@res, $resmeta];
 }
 
 1;
