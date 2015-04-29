@@ -1,5 +1,15 @@
 Revision history for App-lcpan
 
+0.33    2015-04-29 (PERLANCAR)
+
+        - [Bugfix] (update schema) Mixed up 'has_child' and 'num_sep' columns
+          When filling the 'namespace' table. So we need to empty and re-fill
+          the table.
+
+        - [Bugfix] update: Forgot to update 'namespace' table when adding a new
+          module.
+
+
 0.32    2015-04-29 (PERLANCAR)
 
         - Bump database schema version to v6 (add table namespaces). This is
