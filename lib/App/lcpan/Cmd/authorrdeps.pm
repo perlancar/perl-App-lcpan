@@ -24,9 +24,11 @@ $SPEC{'handle_cmd'} = {
         #},
         user_author => {
             schema => ['array*', of=>'str*'],
+            completion => \&App::lcpan::_complete_cpanid,
         },
         user_author_isnt => {
             schema => ['array*', of=>'str*'],
+            completion => \&App::lcpan::_complete_cpanid,
         },
     },
 };
