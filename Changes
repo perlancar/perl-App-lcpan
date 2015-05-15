@@ -1,5 +1,12 @@
 Revision history for App-lcpan
 
+0.34    2015-05-15 (PERLANCAR)
+
+        - mod2dist: Accept multiple modules.
+
+        - authorrdeps: Add completion for --user-author{,--isnt}.
+
+
 0.33    2015-04-29 (PERLANCAR)
 
         - [Bugfix] (update schema) Mixed up 'has_child' and 'num_sep' columns
