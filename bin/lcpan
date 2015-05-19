@@ -207,6 +207,7 @@ or (specify release files directly):
 =head2 More complex queries
 
 For more complex queries, you can always access the SQLite database directly.
+See L<App::lcpan> for the database schema.
 
 
 =head1 FAQ
