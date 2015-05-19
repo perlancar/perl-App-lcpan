@@ -1424,6 +1424,22 @@ $SPEC{dists} = {
         %query_args,
         %fauthor_args,
         %flatest_args,
+        has_makefilepl => {
+            schema => 'bool',
+            tags => ['category:filtering'],
+        },
+        has_buildpl => {
+            schema => 'bool',
+            tags => ['category:filtering'],
+        },
+        has_metayml => {
+            schema => 'bool',
+            tags => ['category:filtering'],
+        },
+        has_metajson => {
+            schema => 'bool',
+            tags => ['category:filtering'],
+        },
     },
     result => {
         description => <<'_',
@@ -1473,7 +1489,7 @@ sub dists {
     my @bind;
     my @where;
     if (length($q)) {
-        push @where, "(name LIKE ? OR abstract LIKE ?)";
+        push @where, "(d.name LIKE ? OR abstract LIKE ?)";
         push @bind, $q, $q;
     }
     if ($author) {
@@ -1485,15 +1501,45 @@ sub dists {
     } elsif (defined $args{latest}) {
         push @where, "NOT(is_latest)";
     }
+    if (defined $args{has_makefilepl}) {
+        if ($args{has_makefilepl}) {
+            push @where, "has_makefilepl<>0";
+        } else {
+            push @where, "has_makefilepl=0";
+        }
+    }
+    if (defined $args{has_buildpl}) {
+        if ($args{has_buildpl}) {
+            push @where, "has_buildpl<>0";
+        } else {
+            push @where, "has_buildpl=0";
+        }
+    }
+    if (defined $args{has_metayml}) {
+        if ($args{has_metayml}) {
+            push @where, "has_metayml<>0";
+        } else {
+            push @where, "has_metayml=0";
+        }
+    }
+    if (defined $args{has_metajson}) {
+        if ($args{has_metajson}) {
+            push @where, "has_metajson<>0";
+        } else {
+            push @where, "has_metajson=0";
+        }
+    }
     my $sql = "SELECT
-  name,
-  cpanid author,
+  d.name name,
+  d.cpanid author,
   version,
-  (SELECT name FROM file WHERE id=d1.file_id) file,
+  f.name file,
   abstract
-FROM dist d1".
+FROM dist d
+LEFT JOIN file f ON d.file_id=f.id
+".
         (@where ? " WHERE ".join(" AND ", @where) : "").
-            " ORDER BY name";
+            " ORDER BY d.name";
 
     my @res;
     my $sth = $dbh->prepare($sql);
@@ -1568,9 +1614,9 @@ sub releases {
         push @where, $args{has_buildpl} ? "(has_buildpl=1)" : "(has_buildpl=0)";
     }
     if ($args{latest}) {
-        push @where, "d1.is_latest";
+        push @where, "d.is_latest";
     } elsif (defined $args{latest}) {
-        push @where, "NOT(d1.is_latest)";
+        push @where, "NOT(d.is_latest)";
     }
     my $sql = "SELECT
   f1.name name,
@@ -1581,7 +1627,7 @@ sub releases {
   has_buildpl,
   status
 FROM file f1
-LEFT JOIN dist d1 ON f1.id=d1.file_id
+LEFT JOIN dist d ON f1.id=d.file_id
 ".
         (@where ? " WHERE ".join(" AND ", @where) : "").
             " ORDER BY name";
