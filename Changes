@@ -1,5 +1,11 @@
 Revision history for App-lcpan
 
+0.35    2015-05-19 (PERLANCAR)
+
+	- dists: Add filtering options
+	  --has-{makefilepl,buildpl,metayml,metajson}.
+
+
 0.34    2015-05-15 (PERLANCAR)
 
         - mod2dist: Accept multiple modules.
