@@ -833,10 +833,10 @@ sub _update_index {
                         $zip->read($path) == Archive::Zip::AZ_OK()
                             or die "Can't read zip file";
                         my @members = $zip->members;
-                        $has_metajson   = (grep {m!(?:/|\\)META\.json$!} @members) ? 1:0;
-                        $has_metayml    = (grep {m!(?:/|\\)META\.yml$!} @members) ? 1:0;
-                        $has_makefilepl = (grep {m!(?:/|\\)Makefile\.PL$!} @members) ? 1:0;
-                        $has_buildpl    = (grep {m!(?:/|\\)Build\.PL$!} @members) ? 1:0;
+                        $has_metajson   = (grep {m!^[/\\]?(?:[^/\\]+[/\\])?META\.json$!} @members) ? 1:0;
+                        $has_metayml    = (grep {m!^[/\\]?(?:[^/\\]+[/\\])?META\.yml$!} @members) ? 1:0;
+                        $has_makefilepl = (grep {m!^[/\\]?(?:[^/\\]+[/\\])?Makefile\.PL$!} @members) ? 1:0;
+                        $has_buildpl    = (grep {m!^[/\\]?(?:[^/\\]+[/\\])?Build\.PL$!} @members) ? 1:0;
 
                         for my $member (@members) {
                             if ($member->fileName =~ m!(?:/|\\)(META\.yml|META\.json)$!) {
@@ -859,10 +859,10 @@ sub _update_index {
                         my $tar = Archive::Tar->new;
                         $tar->read($path);
                         my @members = $tar->list_files;
-                        $has_metajson   = (grep {m!/META\.json$!} @members) ? 1:0;
-                        $has_metayml    = (grep {m!/META\.yml$!} @members) ? 1:0;
-                        $has_makefilepl = (grep {m!/Makefile\.PL$!} @members) ? 1:0;
-                        $has_buildpl    = (grep {m!/Build\.PL$!} @members) ? 1:0;
+                        $has_metajson   = (grep {m!^/([^/]+)?META\.json$!} @members) ? 1:0;
+                        $has_metayml    = (grep {m!/([^/]+)?META\.yml$!} @members) ? 1:0;
+                        $has_makefilepl = (grep {m!/([^/]+)?Makefile\.PL$!} @members) ? 1:0;
+                        $has_buildpl    = (grep {m!/([^/]+)?Build\.PL$!} @members) ? 1:0;
 
                         for my $member (@members) {
                             if ($member =~ m!/(META\.yml|META\.json)$!) {
