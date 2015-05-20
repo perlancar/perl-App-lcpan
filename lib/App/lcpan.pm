@@ -494,13 +494,13 @@ sub _parse_json {
 }
 
 sub _parse_yaml {
-    require YAML::Syck;
+    require YAML::XS;
 
     my $content = shift;
 
     my $data;
     eval {
-        $data = YAML::Syck::Load($content);
+        $data = YAML::XS::Load($content);
     };
     if ($@) {
         $log->errorf("Can't parse YAML: %s", $@);
