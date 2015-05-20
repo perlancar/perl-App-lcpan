@@ -617,7 +617,7 @@ sub _update_index {
         last unless defined ${__PACKAGE__.'::VERSION'};
 
         my ($indexer_version) = $dbh->selectrow_array("SELECT value FROM meta WHERE name='indexer_version'");
-        if (!defined($indexer_version) || $indexer_version <= 0.29) {
+        if (!defined($indexer_version) || $indexer_version <= 0.35) {
             $log->infof("Reindexing from scratch, deleting previous index content ...");
             $dbh->do("DELETE FROM dep");
             $dbh->do("DELETE FROM module");

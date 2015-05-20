@@ -1,5 +1,14 @@
 Revision history for App-lcpan
 
+0.36    2015-05-20 (PERLANCAR)
+
+	- [Bugfix] Search for META.json, META.yml, Build.PL, Makefile.PL at
+	  the top-level or second-level only, not anywhere.
+
+	- Switch from YAML::Syck to YAML::XS (YAML::Syck can't parse things
+	  like '--- # YAML1.0' header).
+
+
 0.35    2015-05-19 (PERLANCAR)
 
 	- dists: Add filtering options
