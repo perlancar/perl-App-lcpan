@@ -474,17 +474,34 @@ sub _connect_db {
     $dbh;
 }
 
-sub _parse_meta {
+sub _parse_meta_json {
     require Parse::CPAN::Meta;
 
     my $content = shift;
 
     my $data;
     eval {
-        $data = Parse::CPAN::Meta::Load($content);
+        $data = Parse::CPAN::Meta->load_json_string($content);
     };
     if ($@) {
-        $log->errorf("Can't parse meta: %s", $@);
+        $log->errorf("Can't parse META.json: %s", $@);
+        return undef;
+    } else {
+        return $data;
+    }
+}
+
+sub _parse_meta_yml {
+    require Parse::CPAN::Meta;
+
+    my $content = shift;
+
+    my $data;
+    eval {
+        $data = Parse::CPAN::Meta->load_yaml_string($content);
+    };
+    if ($@) {
+        $log->errorf("Can't parse META.yml: %s", $@);
         return undef;
     } else {
         return $data;
@@ -826,10 +843,10 @@ sub _update_index {
                                 #$log->tracef("content=[[%s]]", $content);
                                 my $content = $zip->contents($member);
                                 if ($type eq 'META.yml') {
-                                    $meta = _parse_meta($content);
+                                    $meta = _parse_meta_yml($content);
                                     if (_check_meta($meta)) { return } else { undef $meta } # from eval
                                 } elsif ($type eq 'META.json') {
-                                    $meta = _parse_meta($content);
+                                    $meta = _parse_meta_json($content);
                                     if (_check_meta($meta)) { return } else { undef $meta } # from eval
                                 }
                             }
@@ -840,7 +857,7 @@ sub _update_index {
                         my $tar = Archive::Tar->new;
                         $tar->read($path);
                         my @members = $tar->list_files;
-                        $has_metajson   = (grep {m!^/([^/]+)?META\.json$!} @members) ? 1:0;
+                        $has_metajson   = (grep {m!/([^/]+)?META\.json$!} @members) ? 1:0;
                         $has_metayml    = (grep {m!/([^/]+)?META\.yml$!} @members) ? 1:0;
                         $has_makefilepl = (grep {m!/([^/]+)?Makefile\.PL$!} @members) ? 1:0;
                         $has_buildpl    = (grep {m!/([^/]+)?Build\.PL$!} @members) ? 1:0;
@@ -853,11 +870,11 @@ sub _update_index {
                                 my $content = $obj->get_content;
                                 #$log->trace("[[$content]]");
                                 if ($type eq 'META.yml') {
-                                    $meta = _parse_meta($content);
+                                    $meta = _parse_meta_yml($content);
                                     $found_meta++;
                                     if (_check_meta($meta)) { return } else { undef $meta } # from eval
                                 } elsif ($type eq 'META.json') {
-                                    $meta = _parse_meta($content);
+                                    $meta = _parse_meta_json($content);
                                     $found_meta++;
                                     if (_check_meta($meta)) { return } else { undef $meta } # from eval
                                 }
