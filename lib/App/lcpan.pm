@@ -474,36 +474,17 @@ sub _connect_db {
     $dbh;
 }
 
-sub _parse_json {
-    my $content = shift;
-
-    state $json = do {
-        require JSON;
-        JSON->new;
-    };
-    my $data;
-    eval {
-        $data = $json->decode($content);
-    };
-    if ($@) {
-        $log->errorf("Can't parse JSON: %s", $@);
-        return undef;
-    } else {
-        return $data;
-    }
-}
-
-sub _parse_yaml {
-    require YAML::XS;
+sub _parse_meta {
+    require Parse::CPAN::Meta;
 
     my $content = shift;
 
     my $data;
     eval {
-        $data = YAML::XS::Load($content);
+        $data = Parse::CPAN::Meta::Load($content);
     };
     if ($@) {
-        $log->errorf("Can't parse YAML: %s", $@);
+        $log->errorf("Can't parse meta: %s", $@);
         return undef;
     } else {
         return $data;
@@ -845,10 +826,10 @@ sub _update_index {
                                 #$log->tracef("content=[[%s]]", $content);
                                 my $content = $zip->contents($member);
                                 if ($type eq 'META.yml') {
-                                    $meta = _parse_yaml($content);
+                                    $meta = _parse_meta($content);
                                     if (_check_meta($meta)) { return } else { undef $meta } # from eval
                                 } elsif ($type eq 'META.json') {
-                                    $meta = _parse_json($content);
+                                    $meta = _parse_meta($content);
                                     if (_check_meta($meta)) { return } else { undef $meta } # from eval
                                 }
                             }
@@ -872,11 +853,11 @@ sub _update_index {
                                 my $content = $obj->get_content;
                                 #$log->trace("[[$content]]");
                                 if ($type eq 'META.yml') {
-                                    $meta = _parse_yaml($content);
+                                    $meta = _parse_meta($content);
                                     $found_meta++;
                                     if (_check_meta($meta)) { return } else { undef $meta } # from eval
                                 } elsif ($type eq 'META.json') {
-                                    $meta = _parse_json($content);
+                                    $meta = _parse_meta($content);
                                     $found_meta++;
                                     if (_check_meta($meta)) { return } else { undef $meta } # from eval
                                 }
