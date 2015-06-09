@@ -1,5 +1,14 @@
 Revision history for App-lcpan
 
+0.37    2015-06-09 (PERLANCAR)
+
+        - [dist] Add missing prereq to PerlIO::gzip.
+
+        - [Bugfix] Fix way to use Parse::CPAN::Meta.
+
+        - Replace YAML::XS with core module Parse::CPAN::Meta (thanks ether).
+
+
 0.36    2015-05-20 (PERLANCAR)
 
 	- [Bugfix] Search for META.json, META.yml, Build.PL, Makefile.PL at
