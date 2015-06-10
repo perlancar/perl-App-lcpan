@@ -24,7 +24,7 @@ $res = Perinci::CmdLine::Util::Config::get_args_from_config(
     config => $config,
     args   => \%args,
     subcommand_name => 'update-index',
-    meta   => $App::lcpan::SPEC{update_local_cpan_index},
+    meta   => $App::lcpan::SPEC{update},
 );
 die "Can't set lcpan function argument from config: $res->[0] - $res->[1]\n"
     unless $res->[0] == 200;
