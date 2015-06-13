@@ -149,6 +149,15 @@ our %dist_args = (
     },
 );
 
+our %rel_args = (
+    release => {
+        schema => 'str*',
+        req => 1,
+        pos => 0,
+        completion => \&_complete_rel,
+    },
+);
+
 $SPEC{':package'} = {
     v => 1.1,
     summary => 'Manage local CPAN mirror',
@@ -1253,6 +1262,44 @@ sub _complete_cpanid {
     my @res;
     while (my ($cpanid) = $sth->fetchrow_array) {
         push @res, $cpanid;
+    }
+
+    \@res;
+};
+
+sub _complete_rel {
+    my %args = @_;
+
+    my $word = $args{word} // '';
+
+    # only run under pericmd
+    my $cmdline = $args{cmdline} or return undef;
+    my $r = $args{r};
+
+    # force read config file, because by default it is turned off when in
+    # completion
+    $r->{read_config} = 1;
+    my $res = $cmdline->parse_argv($r);
+    _set_args_default($res->[2]);
+
+    my $dbh;
+    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}) };
+
+    # if we can't connect (probably because database is not yet setup), bail
+    if ($@) {
+        $log->tracef("[comp] can't connect to db, bailing: %s", $@);
+        return undef;
+    }
+
+    my $sth = $dbh->prepare(
+        "SELECT name FROM file WHERE name LIKE ? ORDER BY name");
+    $sth->execute($word . '%');
+
+    # XXX follow Complete::OPT_CI
+
+    my @res;
+    while (my ($rel) = $sth->fetchrow_array) { #
+        push @res, $rel;
     }
 
     \@res;
