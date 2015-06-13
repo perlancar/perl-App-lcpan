@@ -1,5 +1,10 @@
 Revision history for App-lcpan
 
+0.39    2015-06-13 (PERLANCAR)
+
+	- Add subcommands for convenience: extract-mod, extract-rel.
+
+
 0.38    2015-06-10 (PERLANCAR)
 
 	- [Bugfix] Update referenced function name in lcpanm.
