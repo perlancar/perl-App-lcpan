@@ -87,9 +87,11 @@ can take a while to get (e.g. disk-space).
 B<List modules:>
 
  % lcpan modules
- % lcpan modules SOMEQUERY --detail
- % lcpan modules --author PERLANCAR ;# modules by some author only
- % lcpan modules --dist libwww-perl ;# from certain dist only
+ % lcpan mods SOMEQUERY --detail                ;# mods is alias for 'modules'
+ % lcpan mods --author PERLANCAR                ;# modules by some author only
+ % lcpan mods --dist libwww-perl                ;# from certain dist only
+ % lcpan mods --namespace Getopt                ;# from certain namespace
+ % lcpan mods --namespace Getopt --sort -rdeps  ;# list "popular" modules first (sort by number of reverse deps)
 
 B<List namespaces:>
 

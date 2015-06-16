@@ -1386,6 +1386,12 @@ $SPEC{modules} = {
             schema => 'str*',
             tags => ['category:filtering'],
         },
+        sort => {
+            summary => 'Sort the result',
+            schema => ['str*', in=>[map {($_,"-$_")} qw/name author rdeps/]],
+            default => 'name',
+            tags => ['category:ordering'],
+        },
     },
     result => {
         description => <<'_',
@@ -1408,6 +1414,31 @@ sub modules {
     my $author = uc($args{author} // '');
 
     my $dbh = _connect_db('ro', $cpan, $index_name);
+
+    my $order = do {
+        my $sort = $args{sort} // '';
+        my $is_desc = $sort =~ s/^-//;
+        my $order;
+        if ($sort eq 'name') { $order = 'name' }
+        if ($sort eq 'author') { $order = 'author' }
+        elsif ($sort eq 'rdeps') { $order = 'rdeps' }
+        $order .= " DESC" if $is_desc;
+        $order;
+    };
+
+    my @cols = (
+        'name',
+        ['cpanid', 'author'],
+        'version',
+        ['(SELECT name FROM dist WHERE dist.file_id=module.file_id)', 'dist'],
+        ['(SELECT abstract FROM dist WHERE dist.file_id=module.file_id)', 'abstract', 1], # only used for searching
+    );
+
+    if ($order =~ /rdeps/) {
+        push @cols, (
+            ['(SELECT COUNT(DISTINCT dist_id) FROM dep WHERE module_id=module.id)', 'rdeps'],
+        );
+    }
 
     my @bind;
     my @where;
@@ -1435,15 +1466,10 @@ sub modules {
     } elsif (defined $args{latest}) {
         push @where, "NOT(SELECT is_latest FROM dist d WHERE d.file_id=module.file_id)";
     }
-    my $sql = "SELECT
-  name,
-  version,
-  cpanid author,
-  (SELECT name FROM dist WHERE dist.file_id=module.file_id) dist,
-  (SELECT abstract FROM dist WHERE dist.file_id=module.file_id) abstract
-FROM module".
+    my $sql = "SELECT ".join(", ", map {ref($_) ? "$_->[0] AS $_->[1]" : $_} @cols).
+        " FROM module".
         (@where ? " WHERE ".join(" AND ", @where) : "").
-            " ORDER BY name";
+        " ORDER BY ".$order;
 
     my @res;
     my $sth = $dbh->prepare($sql);
@@ -1453,7 +1479,7 @@ FROM module".
         push @res, $detail ? $row : $row->{name};
     }
     my $resmeta = {};
-    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/name author version dist abstract/]]}}
+    $resmeta->{format_options} = {any=>{table_column_orders=>[[map {ref($_) ? $_->[1] : $_} grep {!ref($_) || !$_->[2]} @cols]]}}
         if $detail;
     [200, "OK", \@res, $resmeta];
 }
