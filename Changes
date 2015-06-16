@@ -1,5 +1,16 @@
 Revision history for App-lcpan
 
+0.40    2015-06-16 (PERLANCAR)
+
+	- Add subcommand 'mods' as alias for 'modules' (for consistency, the
+          term 'mods' and not 'module'/'modules' is used in all other subcommand
+          names).
+
+        - mods: Add option --sort which allows sorting by name, author, as well
+          as rdeps (number of reverse dependencies). This means we can show
+          "popular" modules first.
+
+
 0.39    2015-06-13 (PERLANCAR)
 
 	- Add subcommands for convenience: extract-mod, extract-rel.
