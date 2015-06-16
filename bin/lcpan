@@ -230,6 +230,12 @@ the C<--cpan> option everytime:
 
 In C<$cpan/index.db>.
 
+=head2 How do I see the SQL statements/queries being issued while running lcpan?
+
+You can try using L<Log::Any::DBI::Query>, e.g.:
+
+ % PERL5OPT=-MLog::Any::DBI::Query TRACE=1 lcpan ...
+
 =head2 How do I reindex from scratch (without downloading the mirror)?
 
 Delete the C<index.db> and run C<lcpan update --noupdate-files> again.
