@@ -1419,9 +1419,9 @@ sub modules {
         my $sort = $args{sort} // '';
         my $is_desc = $sort =~ s/^-//;
         my $order;
-        if ($sort eq 'name') { $order = 'name' }
         if ($sort eq 'author') { $order = 'author' }
         elsif ($sort eq 'rdeps') { $order = 'rdeps' }
+        else { $order = 'name' }
         $order .= " DESC" if $is_desc;
         $order;
     };
