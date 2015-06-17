@@ -1,5 +1,14 @@
 Revision history for App-lcpan
 
+0.41    2015-06-17 (PERLANCAR)
+
+	- [Bugfix] authorrdeps: Fix completion for --user-author-{is,isnt}.
+
+	- [Bugfix] modules: Forgot to give default SQL order.
+
+	- Add FAQ item about seeing SQL queries.
+
+
 0.40    2015-06-16 (PERLANCAR)
 
 	- Add subcommand 'mods' as alias for 'modules' (for consistency, the
