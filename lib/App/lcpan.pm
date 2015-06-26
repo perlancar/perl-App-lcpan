@@ -1459,7 +1459,7 @@ sub modules {
     if ($args{namespace}) {
         return [400, "Invalid namespace, please use Word or Word(::Sub)+"]
             unless $args{namespace} =~ /\A\w+(::\w+)*\z/;
-        push @where, "(name='$args{namespace}' OR name LIKE '$args{namespace}%')";
+        push @where, "(name='$args{namespace}' OR name LIKE '$args{namespace}::%')";
     }
     if ($args{latest}) {
         push @where, "(SELECT is_latest FROM dist d WHERE d.file_id=module.file_id)";
