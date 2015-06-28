@@ -86,8 +86,8 @@ can take a while to get (e.g. disk-space).
 
 B<List modules:>
 
- % lcpan modules
- % lcpan mods SOMEQUERY --detail                ;# mods is alias for 'modules'
+ % lcpan modules                                ;# list all mods
+ % lcpan mods <SOMEQUERY>... --detail           ;# show matching mods only (mods is alias for 'modules')
  % lcpan mods Win32                             ;# list mods containing 'Win32' in their name/abstract
  % lcpan mods 'Win32%'                          ;# perform SQL LIKE query (mods whose name/abstract begins with 'Win32')
  % lcpan mods --exact-match Module1 Module2 --detail  ;# show detail for several mods
@@ -98,25 +98,31 @@ B<List modules:>
 
 B<List namespaces:>
 
+ % lcpan namespaces                             ;# list all namespaces
+ % lcpan namespaces <SOMEQUERY>... --detail     ;# show matching namespaces only
+ % lcpan namespaces --exact-match Win32 MacOSX --detail  ;# show detail for several namespaces
  % lcpan namespaces -l1 --detail --sort -num_modules ;# list top-level namespaces sorted by number of packages
 
 B<List distributions:>
 
- % lcpan dists
- % lcpan dists SOMEQUERY --detail
- % lcpan dists --author PERLANCAR ;# from certain author only
+ % lcpan dists                                  ;# list all dists
+ % lcpan dists --latest                         ;# list all latest dists
+ % lcpan dists <SOMEQUERY>... --detail          ;# show matching dists only
+ % lcpan dists --exact-match Dist1 Dist2 --detail  ;# show detail for several dists
+ % lcpan dists --author PERLANCAR               ;# dists from certain author only
 
 B<List authors:>
 
- % lcpan authors
- % lcpan authors SOMEQUERY --detail
+ % lcpan authors                                ;# list all authors
+ % lcpan authors <SOMEQUERY>... --detail        ;# list matching authors only
+ % lcpan authors --exact-match PERLANCAR KENTNL --detail  ;# show detail for several authors
 
 B<List releases (tarballs):>
 
- % lcpan releases
- % lcpan releases SOMEQUERY --detail
- % lcpan releases --author PERLANCAR ;# from certain authors only
- % lcpan releases --author PERLANCAR ;# from certain authors only
+ % lcpan releases                               ;# list all releases
+ % lcpan rels <SOMEQUERY>... --detail           ;# rels is alias for 'releases'
+ % lcpan rels --exact-match Foo-1.23.tar.gz Bar-2.34.tar.gz --detail  ;# show detail for several rels
+ % lcpan rels --author PERLANCAR                ;# rels from certain authors only
 
 B<Show dependencies and reverse dependencies>:
 

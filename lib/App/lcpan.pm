@@ -92,6 +92,11 @@ our %query_multi_args = (
     detail => {
         schema => 'bool',
     },
+    exact_match => {
+        summary => 'Match query with exact module names',
+        schema => 'bool',
+        default => 0,
+    },
 );
 
 our %fauthor_args = (
@@ -1323,7 +1328,7 @@ $SPEC{authors} = {
     summary => 'List authors',
     args => {
         %common_args,
-        %query_args,
+        %query_multi_args,
     },
     result => {
         description => <<'_',
@@ -1354,16 +1359,28 @@ sub authors {
     my $cpan = $args{cpan};
     my $index_name = $args{index_name};
     my $detail = $args{detail};
-    my $q = $args{query} // ''; # sqlite is case-insensitive by default, yay
-    $q = '%'.$q.'%' unless $q =~ /%/;
 
     my $dbh = _connect_db('ro', $cpan, $index_name);
 
     my @bind;
     my @where;
-    if (length($q)) {
-        push @where, "(cpanid LIKE ? OR fullname LIKE ? OR email like ?)";
-        push @bind, $q, $q, $q;
+    {
+        my @q_where;
+        for my $q0 (@{ $args{query} // [] }) {
+            if ($args{exact_match}) {
+                push @q_where, "(cpanid=?)";
+                push @bind, uc($q0);
+            } else {
+                my $q = uc($q0 =~ /%/ ? $q0 : '%'.$q0.'%');
+                push @q_where, "(cpanid LIKE ? OR fullname LIKE ? OR email like ?)";
+                push @bind, $q, $q, $q;
+            }
+        }
+        if (@q_where > 1) {
+            push @where, "(".join(" OR ", @q_where).")";
+        } elsif (@q_where == 1) {
+            push @where, @q_where;
+        }
     }
     my $sql = "SELECT
   cpanid id,
@@ -1404,11 +1421,6 @@ $SPEC{modules} = {
             schema => ['str*', in=>[map {($_,"-$_")} qw/name author rdeps/]],
             default => 'name',
             tags => ['category:ordering'],
-        },
-        exact_match => {
-            summary => 'Match query with exact module names',
-            schema => 'bool',
-            default => 0,
         },
     },
     result => {
@@ -1461,10 +1473,15 @@ sub modules {
     {
         my @q_where;
         for my $q0 (@{ $args{query} // [] }) {
-            my $q = $args{exact_match} || $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
             #push @q_where, "(name LIKE ? OR dist LIKE ?)"; # rather slow
-            push @q_where, "(name LIKE ? OR abstract LIKE ?)";
-            push @bind, $q, $q;
+            if ($args{exact_match}) {
+                push @q_where, "(name=?)";
+                push @bind, $q0;
+            } else {
+                my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
+                push @q_where, "(name LIKE ? OR abstract LIKE ?)";
+                push @bind, $q, $q;
+            }
         }
         if (@q_where > 1) {
             push @where, "(".join(" OR ", @q_where).")";
@@ -1517,7 +1534,7 @@ $SPEC{dists} = {
     summary => 'List distributions',
     args => {
         %common_args,
-        %query_args,
+        %query_multi_args,
         %fauthor_args,
         %flatest_args,
         has_makefilepl => {
@@ -1576,17 +1593,29 @@ sub dists {
     my $cpan = $args{cpan};
     my $index_name = $args{index_name};
     my $detail = $args{detail};
-    my $q = $args{query} // '';
-    $q = '%'.$q.'%' unless $q =~ /%/;
     my $author = uc($args{author} // '');
 
     my $dbh = _connect_db('ro', $cpan, $index_name);
 
     my @bind;
     my @where;
-    if (length($q)) {
-        push @where, "(d.name LIKE ? OR abstract LIKE ?)";
-        push @bind, $q, $q;
+    {
+        my @q_where;
+        for my $q0 (@{ $args{query} // [] }) {
+            if ($args{exact_match}) {
+                push @q_where, "(d.name=?)";
+                push @bind, $q0;
+            } else {
+                my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
+                push @q_where, "(d.name LIKE ? OR abstract LIKE ?)";
+                push @bind, $q, $q;
+            }
+        }
+        if (@q_where > 1) {
+            push @where, "(".join(" OR ", @q_where).")";
+        } elsif (@q_where == 1) {
+            push @where, @q_where;
+        }
     }
     if ($author) {
         push @where, "(author=?)";
@@ -1655,7 +1684,7 @@ $SPEC{'releases'} = {
     args => {
         %common_args,
         %fauthor_args,
-        %query_args,
+        %query_multi_args,
         has_metajson   => {schema=>'bool'},
         has_metayml    => {schema=>'bool'},
         has_makefilepl => {schema=>'bool'},
@@ -1681,17 +1710,29 @@ sub releases {
     my $cpan = $args{cpan};
     my $index_name = $args{index_name};
     my $detail = $args{detail};
-    my $q = $args{query} // ''; # sqlite is case-insensitive by default, yay
-    $q = '%'.$q.'%' unless $q =~ /%/;
     my $author = uc($args{author} // '');
 
     my $dbh = _connect_db('ro', $cpan, $index_name);
 
     my @bind;
     my @where;
-    if (length($q)) {
-        push @where, "(f1.name LIKE ?)";
-        push @bind, $q;
+    {
+        my @q_where;
+        for my $q0 (@{ $args{query} // [] }) {
+            if ($args{exact_match}) {
+                push @q_where, "(f1.name=?)";
+                push @bind, $q0;
+            } else {
+                my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
+                push @q_where, "(f1.name LIKE ?)";
+                push @bind, $q;
+            }
+        }
+        if (@q_where > 1) {
+            push @where, "(".join(" OR ", @q_where).")";
+        } elsif (@q_where == 1) {
+            push @where, @q_where;
+        }
     }
     if ($author) {
         push @where, "(f1.cpanid=?)";
@@ -2147,7 +2188,7 @@ $SPEC{namespaces} = {
     summary => 'List namespaces',
     args => {
         %common_args,
-        %query_args,
+        %query_multi_args,
         from_level => {
             schema => ['int*', min=>0],
             tags => ['category:filtering'],
@@ -2163,6 +2204,7 @@ $SPEC{namespaces} = {
         },
         sort => {
             schema => ['str*', in=>[qw/name -name num_modules -num_modules/]],
+            default => 'name',
             tags => ['category:sorting'],
         },
     },
@@ -2174,16 +2216,28 @@ sub namespaces {
     my $cpan = $args{cpan};
     my $index_name = $args{index_name};
     my $detail = $args{detail};
-    my $q = $args{query} // ''; # sqlite is case-insensitive by default, yay
-    $q = '%'.$q.'%' unless $q =~ /%/;
 
     my $dbh = _connect_db('ro', $cpan, $index_name);
 
     my @bind;
     my @where;
-    if (length($q)) {
-        push @where, "(name LIKE ?)";
-        push @bind, $q;
+    {
+        my @q_where;
+        for my $q0 (@{ $args{query} // [] }) {
+            if ($args{exact_match}) {
+                push @q_where, "(name=?)";
+                push @bind, $q0;
+            } else {
+                my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
+                push @q_where, "(name LIKE ?)";
+                push @bind, $q;
+            }
+        }
+        if (@q_where > 1) {
+            push @where, "(".join(" OR ", @q_where).")";
+        } elsif (@q_where == 1) {
+            push @where, @q_where;
+        }
     }
     if (defined $args{from_level}) {
         push @where, "(num_sep >= ?)";
