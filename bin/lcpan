@@ -88,9 +88,12 @@ B<List modules:>
 
  % lcpan modules
  % lcpan mods SOMEQUERY --detail                ;# mods is alias for 'modules'
- % lcpan mods --author PERLANCAR                ;# modules by some author only
- % lcpan mods --dist libwww-perl                ;# from certain dist only
- % lcpan mods --namespace Getopt                ;# from certain namespace
+ % lcpan mods Win32                             ;# list mods containing 'Win32' in their name/abstract
+ % lcpan mods 'Win32%'                          ;# perform SQL LIKE query (mods whose name/abstract begins with 'Win32')
+ % lcpan mods --exact-match Module1 Module2 --detail  ;# show detail for several mods
+ % lcpan mods --author PERLANCAR                ;# mods by some author only
+ % lcpan mods --dist libwww-perl                ;# mods from certain dist only
+ % lcpan mods --namespace Getopt                ;# mods from certain namespace
  % lcpan mods --namespace Getopt --sort -rdeps  ;# list "popular" modules first (sort by number of reverse deps)
 
 B<List namespaces:>

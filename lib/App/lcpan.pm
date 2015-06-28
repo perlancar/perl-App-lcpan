@@ -81,6 +81,19 @@ our %query_args = (
     },
 );
 
+our %query_multi_args = (
+    query => {
+        summary => 'Search query',
+        schema => ['array*', of=>'str*'],
+        cmdline_aliases => {q=>{}},
+        pos => 0,
+        greedy => 1,
+    },
+    detail => {
+        schema => 'bool',
+    },
+);
+
 our %fauthor_args = (
     author => {
         summary => 'Filter by author',
@@ -1377,7 +1390,7 @@ $SPEC{modules} = {
     summary => 'List modules/packages',
     args => {
         %common_args,
-        %query_args,
+        %query_multi_args,
         %fauthor_args,
         %fdist_args,
         %flatest_args,
@@ -1391,6 +1404,11 @@ $SPEC{modules} = {
             schema => ['str*', in=>[map {($_,"-$_")} qw/name author rdeps/]],
             default => 'name',
             tags => ['category:ordering'],
+        },
+        exact_match => {
+            summary => 'Match query with exact module names',
+            schema => 'bool',
+            default => 0,
         },
     },
     result => {
@@ -1409,8 +1427,6 @@ sub modules {
     my $cpan = $args{cpan};
     my $index_name = $args{index_name};
     my $detail = $args{detail};
-    my $q = $args{query} // ''; # sqlite is case-insensitive by default, yay
-    $q = '%'.$q.'%' unless $q =~ /%/;
     my $author = uc($args{author} // '');
 
     my $dbh = _connect_db('ro', $cpan, $index_name);
@@ -1442,10 +1458,19 @@ sub modules {
 
     my @bind;
     my @where;
-    if (length($q)) {
-        #push @where, "(name LIKE ? OR dist LIKE ?)"; # rather slow
-        push @where, "(name LIKE ? OR abstract LIKE ?)";
-        push @bind, $q, $q;
+    {
+        my @q_where;
+        for my $q0 (@{ $args{query} // [] }) {
+            my $q = $args{exact_match} || $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
+            #push @q_where, "(name LIKE ? OR dist LIKE ?)"; # rather slow
+            push @q_where, "(name LIKE ? OR abstract LIKE ?)";
+            push @bind, $q, $q;
+        }
+        if (@q_where > 1) {
+            push @where, "(".join(" OR ", @q_where).")";
+        } elsif (@q_where == 1) {
+            push @where, @q_where;
+        }
     }
     if ($author) {
         push @where, "(author=?)";
