@@ -1,5 +1,19 @@
 Revision history for App-lcpan
 
+0.42    2015-06-28 (PERLANCAR)
+
+        - Add subcommand 'rels' as alias for 'releases' (for consistency, the
+          term 'rels' and not 'release'/'releases' is used in all other
+          subcommand names).
+
+        - mods, dists, authors, rels, namespaces: Accept multiple queries, add
+          option --exact-match. This way, you can use the subcommand to list
+          several things of certain names.
+
+        - [Bugfix] Fix namespace matching (previously --namespace Win32 would
+          also match Win32API).
+
+
 0.41    2015-06-17 (PERLANCAR)
 
 	- [Bugfix] authorrdeps: Fix completion for --user-author-{is,isnt}.
