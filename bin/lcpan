@@ -89,8 +89,10 @@ B<List modules:>
  % lcpan modules                                ;# list all mods
  % lcpan mods <SOMEQUERY>... --detail           ;# show matching mods only (mods is alias for 'modules')
  % lcpan mods Win32                             ;# list mods containing 'Win32' in their name/abstract
+ % lcpan mods Win32 API                         ;# list mods containing 'Win32' and 'API' in their name/abstract
+ % lcpan mods Win32 API --or                    ;# list mods containing 'Win32' *or* 'API' in their name/abstract
  % lcpan mods 'Win32%'                          ;# perform SQL LIKE query (mods whose name/abstract begins with 'Win32')
- % lcpan mods --exact-match Module1 Module2 --detail  ;# show detail for several mods
+ % lcpan mods --or --exact-match Module1 Module2 --detail  ;# show detail for several mods
  % lcpan mods --author PERLANCAR                ;# mods by some author only
  % lcpan mods --dist libwww-perl                ;# mods from certain dist only
  % lcpan mods --namespace Getopt                ;# mods from certain namespace
@@ -100,7 +102,7 @@ B<List namespaces:>
 
  % lcpan namespaces                             ;# list all namespaces
  % lcpan namespaces <SOMEQUERY>... --detail     ;# show matching namespaces only
- % lcpan namespaces --exact-match Win32 MacOSX --detail  ;# show detail for several namespaces
+ % lcpan namespaces --or --exact-match Win32 MacOSX --detail  ;# show detail for several namespaces
  % lcpan namespaces -l1 --detail --sort -num_modules ;# list top-level namespaces sorted by number of packages
 
 B<List distributions:>
@@ -108,20 +110,20 @@ B<List distributions:>
  % lcpan dists                                  ;# list all dists
  % lcpan dists --latest                         ;# list all latest dists
  % lcpan dists <SOMEQUERY>... --detail          ;# show matching dists only
- % lcpan dists --exact-match Dist1 Dist2 --detail  ;# show detail for several dists
+ % lcpan dists --or --exact-match Dist1 Dist2 --detail  ;# show detail for several dists
  % lcpan dists --author PERLANCAR               ;# dists from certain author only
 
 B<List authors:>
 
  % lcpan authors                                ;# list all authors
  % lcpan authors <SOMEQUERY>... --detail        ;# list matching authors only
- % lcpan authors --exact-match PERLANCAR KENTNL --detail  ;# show detail for several authors
+ % lcpan authors --or --exact-match PERLANCAR KENTNL --detail  ;# show detail for several authors
 
 B<List releases (tarballs):>
 
  % lcpan releases                               ;# list all releases
  % lcpan rels <SOMEQUERY>... --detail           ;# rels is alias for 'releases'
- % lcpan rels --exact-match Foo-1.23.tar.gz Bar-2.34.tar.gz --detail  ;# show detail for several rels
+ % lcpan rels --or --exact-match Foo-1.23.tar.gz Bar-2.34.tar.gz --detail  ;# show detail for several rels
  % lcpan rels --author PERLANCAR                ;# rels from certain authors only
 
 B<Show dependencies and reverse dependencies>:

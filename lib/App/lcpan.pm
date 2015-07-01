@@ -97,6 +97,10 @@ our %query_multi_args = (
         schema => 'bool',
         default => 0,
     },
+    or => {
+        summary => 'When there are more than one query, perform OR instead of AND logic',
+        schema  => ['bool', is=>1],
+    },
 );
 
 our %fauthor_args = (
@@ -1377,7 +1381,7 @@ sub authors {
             }
         }
         if (@q_where > 1) {
-            push @where, "(".join(" OR ", @q_where).")";
+            push @where, "(".join(($args{or} ? " OR " : " AND "), @q_where).")";
         } elsif (@q_where == 1) {
             push @where, @q_where;
         }
@@ -1484,7 +1488,7 @@ sub modules {
             }
         }
         if (@q_where > 1) {
-            push @where, "(".join(" OR ", @q_where).")";
+            push @where, "(".join(($args{or} ? " OR " : " AND "), @q_where).")";
         } elsif (@q_where == 1) {
             push @where, @q_where;
         }
@@ -1612,7 +1616,7 @@ sub dists {
             }
         }
         if (@q_where > 1) {
-            push @where, "(".join(" OR ", @q_where).")";
+            push @where, "(".join(($args{or} ? " OR " : " AND "), @q_where).")";
         } elsif (@q_where == 1) {
             push @where, @q_where;
         }
@@ -1729,7 +1733,7 @@ sub releases {
             }
         }
         if (@q_where > 1) {
-            push @where, "(".join(" OR ", @q_where).")";
+            push @where, "(".join(($args{or} ? " OR " : " AND "), @q_where).")";
         } elsif (@q_where == 1) {
             push @where, @q_where;
         }
@@ -2234,7 +2238,7 @@ sub namespaces {
             }
         }
         if (@q_where > 1) {
-            push @where, "(".join(" OR ", @q_where).")";
+            push @where, "(".join(($args{or} ? " OR " : " AND "), @q_where).")";
         } elsif (@q_where == 1) {
             push @where, @q_where;
         }
