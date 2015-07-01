@@ -713,6 +713,7 @@ sub _update_index {
 
         my %file_ids_in_table;
         my $sth = $dbh->prepare("SELECT name,id FROM file");
+        $sth->execute;
         while (my ($name, $id) = $sth->fetchrow_array) {
             $file_ids_in_table{$name} = $id;
         }
@@ -766,8 +767,8 @@ sub _update_index {
                 push @old_filenames, $fname;
             }
             last CLEANUP unless @old_file_ids;
-            $log->tracef("  Deleting old files records: %s", \@old_filenames);
-            $dbh->do("DELETE FROM dep WHERE file_id IN (".join(",",@old_file_ids)."))");
+            $log->tracef("  Deleting old dep records");
+            $dbh->do("DELETE FROM dep WHERE file_id IN (".join(",",@old_file_ids).")");
             {
                 my $sth = $dbh->prepare("SELECT name FROM module WHERE file_id IN (".join(",",@old_file_ids).")");
                 $sth->execute;
@@ -785,6 +786,7 @@ sub _update_index {
                 }
                 $dbh->do("DELETE FROM namespace WHERE num_modules <= 0");
 
+                $log->tracef("  Deleting old module records");
                 $dbh->do("DELETE FROM module WHERE file_id IN (".join(",",@old_file_ids).")");
             }
             {
@@ -793,8 +795,11 @@ sub _update_index {
                 while (my @row = $sth->fetchrow_array) {
                     $changed_dists{$row[0]}++;
                 }
+                $log->tracef("  Deleting old dist records");
                 $dbh->do("DELETE FROM dist WHERE file_id IN (".join(",",@old_file_ids).")");
             }
+            $log->tracef("  Deleting old file records (%d): %s", ~~@old_filenames, \@old_filenames);
+            $dbh->do("DELETE FROM file WHERE id IN (".join(",",@old_file_ids).")");
         }
 
         $dbh->commit;
