@@ -1,5 +1,11 @@
 Revision history for App-lcpan
 
+0.44    2015-07-02 (PERLANCAR)
+
+	- [Bugfix] Fix deleting old file records (forgot to $sth->execute,
+	  forgot to delete records in file table).
+
+
 0.43    2015-07-01 (PERLANCAR)
 
         - modst, dists, authors, rels, namespaces: Change multiple query to have
