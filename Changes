@@ -1,5 +1,11 @@
 Revision history for App-lcpan
 
+0.43    2015-07-01 (PERLANCAR)
+
+        - modst, dists, authors, rels, namespaces: Change multiple query to have
+          AND logic instead of OR, and provide --or switch.
+
+
 0.42    2015-06-28 (PERLANCAR)
 
         - Add subcommand 'rels' as alias for 'releases' (for consistency, the
