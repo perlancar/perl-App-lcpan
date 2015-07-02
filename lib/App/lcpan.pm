@@ -612,6 +612,8 @@ sub _check_meta {
 }
 
 sub _update_index {
+    use experimental 'smartmatch';
+
     require DBI;
     require File::Slurp::Tiny;
     require File::Temp;
@@ -826,6 +828,11 @@ sub _update_index {
 
       FILE:
         for my $file (@files) {
+            if ($args{skip_index_files} && $file->{name} ~~ @{ $args{skip_index_files} }) {
+                $log->infof("Skipped file %s (skip_index_files)", $file->{name});
+                next FILE;
+            }
+
             # commit after every 500 files
             if ($i % 500 == 499) {
                 $log->tracef("COMMIT");
@@ -839,7 +846,7 @@ sub _update_index {
             }
             $i++;
 
-            $log->tracef("[#%i] Processing file %s ...", $i, $file->{name});
+            $log->infof("[#%i] Processing file %s ...", $i, $file->{name});
             my $status;
             my $path = _relpath($file->{name}, $cpan, $file->{cpanid});
 
@@ -1093,6 +1100,21 @@ _
         force_update_index => {
             summary => 'Update the index even though there is no change in files',
             schema => ['bool', is=>1],
+        },
+        skip_index_files => {
+            summary => 'Skip one or more files from being indexed',
+            'x.name.is_plural' => 1,
+            'summary.alt.plurality.singular' => 'Skip a file from being indexed',
+            schema => ['array*', of=>'str*'],
+            cmdline_aliases => {
+                F => {
+                    summary => 'Alias for --skip-index-file',
+                    code => sub {
+                        $_[0]{skip_index_files} //= [];
+                        push @{ $_[0]{skip_index_files} }, $_[1];
+                    },
+                },
+            },
         },
     },
 };
