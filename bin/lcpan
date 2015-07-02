@@ -255,7 +255,7 @@ Run C<lcpan reset> (or delete C<index.db>) and run C<lcpan update
 =head2 Indexing error: Out of memory!
 
 Could happen when there is a corrupt archive or an archive that is too big. To
-see which file is the culprit, try running L<lcpan update --noupdate-files> with
+see which file is the culprit, try running C<lcpan update --noupdate-files> with
 C<--verbose> (or even C<--debug> or C<--trace>). Then, you can skip the file by
 using C<-F> or adding this entry to your C<lcpan.conf>:
 
