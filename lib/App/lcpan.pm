@@ -2269,7 +2269,6 @@ $SPEC{namespaces} = {
         },
         level => {
             schema => ['int*', min=>0],
-            cmdline_aliases => {l=>{}},
             tags => ['category:filtering'],
         },
         sort => {
