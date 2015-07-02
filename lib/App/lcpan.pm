@@ -78,6 +78,7 @@ our %query_args = (
     },
     detail => {
         schema => 'bool',
+        cmdline_aliases => {l=>{}},
     },
 );
 
@@ -91,6 +92,7 @@ our %query_multi_args = (
     },
     detail => {
         schema => 'bool',
+        cmdline_aliases => {l=>{}},
     },
     exact_match => {
         summary => 'Match query with exact module names',
