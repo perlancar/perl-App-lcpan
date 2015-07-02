@@ -1052,7 +1052,8 @@ remote CPAN mirror, then update the index.
 
 _
     args_rels => {
-        choose_one => [qw/update_index force_update_index/],
+        # it should be: update_index=0 conflicts with force_update_index
+        #choose_one => [qw/update_index force_update_index/],
     },
     args => {
         %common_args,
