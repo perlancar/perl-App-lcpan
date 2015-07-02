@@ -1,6 +1,14 @@
 Revision history for App-lcpan
 
-0.45    2015-07-02 (PERLANCAR) (unreleased)
+0.46    2015-07-02 (PERLANCAR)
+
+        - [ux] Add alias -l for --detail (like in ls).
+
+        - [ux] namespaces: Remove alias -l for --level, because we want -l to
+          mean --detail in all subcommands (like in ls)
+
+
+0.45    2015-07-02 (PERLANCAR)
 
         - Add subcommand: reset.
 
