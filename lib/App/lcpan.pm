@@ -1051,6 +1051,9 @@ This subcommand first create/update the mirror files by downloading from a
 remote CPAN mirror, then update the index.
 
 _
+    args_rels => {
+        choose_one => [qw/update_index force_update_index/],
+    },
     args => {
         %common_args,
         max_file_size => {
@@ -1086,6 +1089,10 @@ _
             schema => 'bool',
             default => 1,
         },
+        force_update_index => {
+            summary => 'Update the index even though there is no change in files',
+            schema => ['bool', is=>1],
+        },
     },
 };
 sub update {
@@ -1102,12 +1109,12 @@ sub update {
     }
     my @st2 = stat($packages_path);
 
-    if (!$args{update_index}) {
+    if (!$args{update_index} && !$args{force_update_index}) {
         $log->infof("Skipped updating index (option)");
-    } elsif ($args{update_files} &&
+    } elsif (!$args{force_update_index} && $args{update_files} &&
                  @st1 && @st2 && $st1[9] == $st2[9] && $st1[7] == $st2[7]) {
         $log->infof("%s doesn't change mtime/size, skipping updating index",
-                $packages_path);
+                    $packages_path);
         return [304, "Files did not change, index not updated"];
     } else {
         _update_index(%args);
