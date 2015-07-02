@@ -249,7 +249,8 @@ You can try using L<Log::Any::DBI::Query>, e.g.:
 
 =head2 How do I reindex from scratch (without downloading the mirror)?
 
-Delete the C<index.db> and run C<lcpan update --noupdate-files> again.
+Run C<lcpan reset> (or delete C<index.db>) and run C<lcpan update
+--noupdate-files> again.
 
 =head2 How do I download the mirror without updating the indexing?
 

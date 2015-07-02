@@ -650,10 +650,7 @@ sub _update_index {
         my ($indexer_version) = $dbh->selectrow_array("SELECT value FROM meta WHERE name='indexer_version'");
         if ($indexer_version && $indexer_version <= 0.35) {
             $log->infof("Reindexing from scratch, deleting previous index content ...");
-            $dbh->do("DELETE FROM dep");
-            $dbh->do("DELETE FROM module");
-            $dbh->do("DELETE FROM dist");
-            $dbh->do("DELETE FROM file");
+            _reset($dbh);
         }
 
         # i screwed up and mixed num_sep and has_child columns in v0.32, so we
@@ -1143,6 +1140,40 @@ sub update {
         _update_index(%args);
     }
     [200, "OK"];
+}
+
+sub _reset {
+    my $dbh = shift;
+    $dbh->do("DELETE FROM dep");
+    $dbh->do("DELETE FROM namespace");
+    $dbh->do("DELETE FROM module");
+    $dbh->do("DELETE FROM dist");
+    $dbh->do("DELETE FROM file");
+    $dbh->do("DELETE FROM author");
+}
+
+$SPEC{'reset'} = {
+    v => 1.1,
+    summary => 'Reset (empty) the database index',
+    args => {
+        %common_args,
+    },
+};
+sub reset {
+    require IO::Prompt::I18N;
+
+    my %args = @_;
+    _set_args_default(\%args);
+    my $cpan = $args{cpan};
+    my $index_name = $args{index_name};
+
+    return [200, "Cancelled"]
+        unless IO::Prompt::I18N::confirm("Confirm reset index", {default=>0});
+
+    my $dbh = _connect_db('rw', $cpan, $index_name);
+
+    _reset($dbh);
+    [200, "Reset"];
 }
 
 $SPEC{'stats'} = {
