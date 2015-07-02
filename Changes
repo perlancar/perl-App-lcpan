@@ -1,5 +1,16 @@
 Revision history for App-lcpan
 
+0.45    2015-07-02 (PERLANCAR) (unreleased)
+
+        - Add subcommand: reset.
+
+        - update: Add options --skip-index-file (-F), --force-update-index.
+
+        - Don't assume an empty indexer_version in meta table to mean reindex
+          from scratch. It might be that the current version fails/crashes in
+          the middle while indexing.
+
+
 0.44    2015-07-02 (PERLANCAR)
 
 	- [Bugfix] Fix deleting old file records (forgot to $sth->execute,
