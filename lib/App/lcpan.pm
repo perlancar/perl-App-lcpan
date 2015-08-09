@@ -1893,7 +1893,7 @@ sub _get_prereqs {
   rel,
   version
 FROM dep dp
-WHERE dp.dist_id IN (".join(",",@dist_ids).")
+WHERE dp.dist_id IN (".join(",",grep {defined} @dist_ids).")
 ORDER BY module".($level > 1 ? " DESC" : ""));
     $sth->execute;
     my @res;
