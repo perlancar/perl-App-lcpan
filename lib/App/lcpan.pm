@@ -9,7 +9,6 @@ use warnings;
 use Log::Any::IfLOG '$log';
 
 use Function::Fallback::CoreOrPP qw(clone);
-use POSIX ();
 
 use Exporter;
 our @ISA = qw(Exporter);
@@ -200,6 +199,8 @@ sub _set_args_default {
 }
 
 sub _fmt_time {
+    require POSIX;
+
     my $epoch = shift;
     return '' unless defined($epoch);
     POSIX::strftime("%Y-%m-%dT%H:%M:%SZ", gmtime($epoch));
@@ -614,8 +615,6 @@ sub _check_meta {
 }
 
 sub _update_index {
-    use experimental 'smartmatch';
-
     require DBI;
     require File::Slurp::Tiny;
     require File::Temp;
@@ -827,7 +826,7 @@ sub _update_index {
 
       FILE:
         for my $file (@files) {
-            if ($args{skip_index_files} && $file->{name} ~~ @{ $args{skip_index_files} }) {
+            if ($args{skip_index_files} && grep {$_ eq $file->{name}} @{ $args{skip_index_files} }) {
                 $log->infof("Skipped file %s (skip_index_files)", $file->{name});
                 next FILE;
             }
@@ -1951,8 +1950,6 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
 }
 
 sub _get_revdeps {
-    use experimental 'smartmatch';
-
     my ($mods, $dbh, $memory_by_dist_name, $memory_by_mod_id,
         $level, $max_level, $filters, $phase, $rel) = @_;
 
