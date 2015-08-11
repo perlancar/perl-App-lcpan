@@ -2,8 +2,8 @@ Revision history for App-lcpan
 
 0.48    2015-08-11 (PERLANCAR)
 
-	- Save about 10ms of startup time (74ms -> 64ms) by replacing
-	  Module:List with PERLANCAR::Module::List.
+	- Save about 10ms of startup time (74ms -> 64ms) when doing completion,
+	  by replacing Module:List with PERLANCAR::Module::List.
 
 	- [Bugfix] Avoid SQL error when there are nulls in IN(...) clause.
 
