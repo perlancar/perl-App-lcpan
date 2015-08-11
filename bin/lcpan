@@ -7,11 +7,12 @@ use 5.010;
 use strict;
 use warnings;
 
-use Module::List qw(list_modules);
+use PERLANCAR::Module::List;
 use Perinci::CmdLine::Any;
 
 my $prefix = '/App/lcpan/';
-my $mods = list_modules("App::lcpan::Cmd::", {list_modules=>1});
+my $mods = PERLANCAR::Module::List::list_modules(
+    "App::lcpan::Cmd::", {list_modules=>1});
 my $subcommands = {};
 for my $mod (keys %$mods) {
     (my $sc_name = $mod) =~ s/App::lcpan::Cmd:://;
