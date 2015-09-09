@@ -1258,7 +1258,7 @@ sub _complete_mod {
         "SELECT name FROM module WHERE name LIKE ? ORDER BY name");
     $sth->execute($word . '%');
 
-    # XXX follow Complete::OPT_CI
+    # XXX follow Complete::Setting::OPT_CI
 
     my @res;
     while (my ($mod) = $sth->fetchrow_array) {
@@ -1302,7 +1302,7 @@ sub _complete_dist {
         "SELECT name FROM dist WHERE name LIKE ? ORDER BY name");
     $sth->execute($word . '%');
 
-    # XXX follow Complete::OPT_CI
+    # XXX follow Complete::Setting::OPT_CI
 
     my @res;
     while (my ($dist) = $sth->fetchrow_array) {
@@ -1346,7 +1346,7 @@ sub _complete_cpanid {
         "SELECT cpanid FROM author WHERE cpanid LIKE ? ORDER BY cpanid");
     $sth->execute($word . '%');
 
-    # XXX follow Complete::OPT_CI
+    # XXX follow Complete::Setting::OPT_CI
 
     my @res;
     while (my ($cpanid) = $sth->fetchrow_array) {
@@ -1384,7 +1384,7 @@ sub _complete_rel {
         "SELECT name FROM file WHERE name LIKE ? ORDER BY name");
     $sth->execute($word . '%');
 
-    # XXX follow Complete::OPT_CI
+    # XXX follow Complete::Setting::OPT_CI
 
     my @res;
     while (my ($rel) = $sth->fetchrow_array) { #
