@@ -1,5 +1,12 @@
 Revision history for App-lcpan
 
+0.52    2015-09-09 (PERLANCAR)
+
+	- No functional changes.
+
+	- [dist] Remove prereq: Complete because it is not directly used.
+
+
 0.51    2015-09-03 (PERLANCAR)
 
 	- No functional changes.
