@@ -55,8 +55,8 @@ _
             my $args = $res->[2];
             _set_args_default($args);
 
-            require Complete::Util;
-            Complete::Util::complete_file(
+            require Complete::File;
+            Complete::File::complete_file(
                 word => $word,
                 starting_path => $args->{cpan},
                 filter => sub {
