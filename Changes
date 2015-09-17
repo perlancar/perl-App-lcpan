@@ -1,5 +1,13 @@
 Revision history for App-lcpan
 
+0.53    2015-09-17 (PERLANCAR)
+
+	- No functional changes.
+
+	- Adjust to Complete::Util 0.36 (complete_file() split to
+	  Complete-File).
+
+
 0.52    2015-09-09 (PERLANCAR)
 
 	- No functional changes.
