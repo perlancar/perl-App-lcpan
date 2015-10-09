@@ -181,6 +181,14 @@ our %rel_args = (
     },
 );
 
+our %overwrite_arg = (
+    overwrite => {
+        summary => 'Whether to overwrite existing file',
+        schema => ['bool*', is=>1],
+        cmdline_aliases => {o=>{}},
+    },
+);
+
 $SPEC{':package'} = {
     v => 1.1,
     summary => 'Manage local CPAN mirror',
