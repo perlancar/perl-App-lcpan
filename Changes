@@ -1,5 +1,10 @@
 Revision history for App-lcpan
 
+0.54    2015-10-09 (PERLANCAR)
+
+	- Add convenience commands: copy-rel & copy-mod.
+
+
 0.53    2015-09-17 (PERLANCAR)
 
 	- No functional changes.
