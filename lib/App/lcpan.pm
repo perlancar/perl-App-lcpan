@@ -1877,6 +1877,10 @@ sub _get_prereqs {
         if (ref($mod0) eq 'HASH') {
             $mod = $mod0->{mod};
             $dist_id = $mod0->{dist_id};
+            if (!$dist_id) {
+                warn "module '$mod' does not have dist ID";
+                next;
+            }
         } else {
             $mod = $mod0;
             ($dist_id) = $dbh->selectrow_array("SELECT id FROM dist WHERE is_latest AND file_id=(SELECT file_id FROM module WHERE name=?)", {}, $mod)
