@@ -1945,7 +1945,8 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
         for my $s (@{$subres->[2]}) {
             for my $i (0..@res-1) {
                 my $r = $res[$i];
-                if ($s->{dependant_dist_id} == $r->{module_dist_id}) {
+                if (defined($s->{dependant_dist_id}) && defined($r->{module_dist_id}) &&
+                        $s->{dependant_dist_id} == $r->{module_dist_id}) {
                     splice @res, $i+1, 0, $s;
                     next SUBRES_TO_INSERT;
                 }
