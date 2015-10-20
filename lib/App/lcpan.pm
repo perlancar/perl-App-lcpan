@@ -1922,8 +1922,8 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
             next;
         }
 
-        #say "include_core=$include_core, is_core($row->{module}, $row->{version}, $plver)=", Module::CoreList::More->is_still_core($row->{module}, $row->{version}, version->parse($plver)->numify);
-        next if !$include_core && Module::CoreList::More->is_still_core($row->{module}, $row->{version}, version->parse($plver)->numify);
+        $row->{is_core} = Module::CoreList::More->is_still_core($row->{module}, $row->{version}, version->parse($plver)->numify);
+        next if !$include_core && $row->{is_core};
         next unless defined $row->{module}; # BUG? we can encounter case where module is undef
         if (defined $memory_by_mod_name->{$row->{module}}) {
             if (Version::Util::version_gt($row->{version}, $memory_by_mod_name->{$row->{module}})) {
@@ -2120,6 +2120,11 @@ our %deps_args = (
         default => "$^V",
         cmdline_aliases => {V=>{}},
     },
+    with_xs_or_pp => {
+        summary => 'Check each dependency as XS/PP',
+        schema  => ['bool*', is=>1],
+        tags => ['category:filter'],
+    },
 );
 
 $SPEC{'deps'} = {
@@ -2147,6 +2152,7 @@ _
     },
 };
 sub deps {
+    require Module::XSOrPP;
     my %args = @_;
 
     _set_args_default(\%args);
@@ -2158,22 +2164,33 @@ sub deps {
     my $plver   = $args{perl_version} // "$^V";
     my $level   = $args{level} // 1;
     my $include_core = $args{include_core} // 0;
+    my $with_xs_or_pp = $args{with_xs_or_pp};
 
     my $dbh     = _connect_db('ro', $cpan, $index_name);
 
     my $res = _get_prereqs($mods, $dbh, {}, {}, 1, $level, $phase, $rel, $include_core, $plver);
 
     return $res unless $res->[0] == 200;
+    my @cols;
+    push @cols, (qw/module/);
+    push @cols, "dist" if @$mods > 1;
+    push @cols, (qw/author version/);
+    push @cols, "is_core" if $include_core;
+    push @cols, "xs_or_pp" if $with_xs_or_pp;
     for (@{$res->[2]}) {
+        if ($with_xs_or_pp) {
+            $_->{xs_or_pp} = Module::XSOrPP::xs_or_pp($_->{module});
+        }
         $_->{module} = ("  " x ($_->{level}-1)) . $_->{module};
         delete $_->{level};
         delete $_->{dist} unless @$mods > 1;
         delete $_->{dependant_dist_id};
         delete $_->{module_dist_id};
+        delete $_->{is_core} unless $include_core;
     }
 
     my $resmeta = {};
-    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/dist module author version/]]}};
+    $resmeta->{format_options} = {any=>{table_column_orders=>[\@cols]}};
     $res->[3] = $resmeta;
     $res;
 }
