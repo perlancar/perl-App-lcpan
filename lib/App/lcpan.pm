@@ -1202,6 +1202,7 @@ sub stats {
     my $stat = {};
 
     ($stat->{num_authors}) = $dbh->selectrow_array("SELECT COUNT(*) FROM author");
+    ($stat->{num_authors_with_releases}) = $dbh->selectrow_array("SELECT COUNT(DISTINCT cpanid) FROM file");
     ($stat->{num_modules}) = $dbh->selectrow_array("SELECT COUNT(*) FROM module");
     ($stat->{num_namespaces}) = $dbh->selectrow_array("SELECT COUNT(*) FROM namespace");
     ($stat->{num_dists}) = $dbh->selectrow_array("SELECT COUNT(DISTINCT name) FROM dist");
