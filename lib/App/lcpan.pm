@@ -1423,6 +1423,7 @@ _
             summary => 'List all authors',
             argv    => [],
             test    => 0,
+            'x.doc.show_result' => 0,
         },
         {
             summary => 'Find CPAN IDs which start with something',
@@ -1647,22 +1648,26 @@ _
             summary => 'List all distributions',
             argv    => ['--cpan', '/cpan'],
             test    => 0,
+            'x.doc.show_result' => 0,
         },
         {
             summary => 'List all distributions (latest version only)',
             argv    => ['--cpan', '/cpan', '--latest'],
             test    => 0,
+            'x.doc.show_result' => 0,
         },
         {
             summary => 'Grep by distribution name, return detailed record',
             argv    => ['--cpan', '/cpan', 'data-table'],
             test    => 0,
+            'x.doc.show_result' => 0,
         },
         {
             summary   => 'Filter by author, return JSON',
             src       => '[[prog]] --cpan /cpan --author perlancar --json',
             src_plang => 'bash',
             test      => 0,
+            'x.doc.show_result' => 0,
         },
     ],
 };
