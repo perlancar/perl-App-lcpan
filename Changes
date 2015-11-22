@@ -1,5 +1,12 @@
 Revision history for App-lcpan
 
+0.57    2015-11-22 (PERLANCAR)
+
+	- No functional changes.
+
+	- [doc] Don't show large results in example.
+
+
 0.56    2015-11-21 (PERLANCAR)
 
 	- stats: Add num_authors_with_releases.
