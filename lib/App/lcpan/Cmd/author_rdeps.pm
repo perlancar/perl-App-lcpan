@@ -1,4 +1,4 @@
-package App::lcpan::Cmd::authorrdeps;
+package App::lcpan::Cmd::author_rdeps;
 
 # DATE
 # VERSION

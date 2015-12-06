@@ -1,4 +1,4 @@
-package App::lcpan::Cmd::authormods;
+package App::lcpan::Cmd::author_mods;
 
 # DATE
 # VERSION

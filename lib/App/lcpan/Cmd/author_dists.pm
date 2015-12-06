@@ -1,4 +1,4 @@
-package App::lcpan::Cmd::authorrels;
+package App::lcpan::Cmd::author_dists;
 
 # DATE
 # VERSION
@@ -13,12 +13,11 @@ our %SPEC;
 
 $SPEC{'handle_cmd'} = {
     v => 1.1,
-    summary => 'List releases of an author',
+    summary => 'List distributions of an author',
     args => {
         %App::lcpan::common_args,
         %App::lcpan::author_args,
         %App::lcpan::flatest_args,
-        %App::lcpan::full_path_args,
         detail => {
             schema => 'bool',
         },
@@ -27,7 +26,7 @@ $SPEC{'handle_cmd'} = {
 sub handle_cmd {
     my %args = @_;
 
-    App::lcpan::releases(%args);
+    App::lcpan::dists(%args);
 }
 
 1;

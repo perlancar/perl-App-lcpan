@@ -152,9 +152,9 @@ B<Some other utilities>:
  Text::ANSITable::ColorTheme::Default
  Text::ANSITable::StyleSet::AltRow
 
- % lcpan authormods PERLANCAR   ;# list an author's modules
- % lcpan authordists PERLANCAR  ;# list an author's dists
- % lcpan authorrels PERLANCAR   ;# list an author's releases
+ % lcpan author-mods PERLANCAR   ;# list an author's modules
+ % lcpan author-dists PERLANCAR  ;# list an author's dists
+ % lcpan author-rels PERLANCAR   ;# list an author's releases
 
  # who are authors with the most number of releases?
  % lcpan authors-by-rel-count
@@ -166,7 +166,7 @@ B<Some other utilities>:
  % lcpan authors-by-mod-count
 
  # show all other authors' distributions using one of your modules
- % lcpan authorrdeps PERLANCAR --user-author-isnt PERLANCAR
+ % lcpan author-rdeps PERLANCAR --user-author-isnt PERLANCAR
 
  # show your old releases (which you should probably delete from CPAN?)
  % lcpan releases --author PERLANCAR --nolatest
@@ -195,15 +195,15 @@ TODO
 
 =head2 Install all modules from a certain CPAN author
 
- % lcpan authormods PERLANCAR | cpanm -n
+ % lcpan author-mods PERLANCAR | cpanm -n
 
 or (if you want to install from local CPAN mirror):
 
- % lcpan authormods PERLANCAR | lcpanm -n
+ % lcpan author-mods PERLANCAR | lcpanm -n
 
 or (specify release files directly):
 
- % lcpan authorrels --latest PERLANCAR | cpanm -n
+ % lcpan author-rels --latest PERLANCAR | cpanm -n
 
 =head2 Update all modules on your system, from local CPAN mirror
 
@@ -214,9 +214,9 @@ or (specify release files directly):
 
 =head2 Count your CPAN modules, dists, and releases
 
- % lcpan authormods  PERLANCAR | wc -l
- % lcpan authordists PERLANCAR | wc -l
- % lcpan authorrels  PERLANCAR | wc -l
+ % lcpan author-mods  PERLANCAR | wc -l
+ % lcpan author-dists PERLANCAR | wc -l
+ % lcpan author-rels  PERLANCAR | wc -l
 
 =head2 More complex queries
 
