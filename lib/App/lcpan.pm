@@ -128,6 +128,15 @@ our %flatest_args = (
     },
 );
 
+our %sort_modules_args = (
+    sort => {
+        summary => 'Sort the result',
+        schema => ['str*', in=>[map {($_,"-$_")} qw/name author rdeps/]],
+        default => 'name',
+        tags => ['category:ordering'],
+    },
+);
+
 our %full_path_args = (
     full_path => {
         schema => ['bool*' => is=>1],
@@ -1497,12 +1506,7 @@ $SPEC{modules} = {
             schema => 'str*',
             tags => ['category:filtering'],
         },
-        sort => {
-            summary => 'Sort the result',
-            schema => ['str*', in=>[map {($_,"-$_")} qw/name author rdeps/]],
-            default => 'name',
-            tags => ['category:ordering'],
-        },
+        %sort_modules_args,
     },
     result => {
         description => <<'_',
