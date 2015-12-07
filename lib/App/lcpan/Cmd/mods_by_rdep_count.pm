@@ -36,7 +36,7 @@ sub handle_cmd {
     my @binds;
     if ($args{author}) {
         push @where, "(author=?)";
-        push @binds, $args{author};
+        push @binds, uc($args{author});
     }
     if ($args{phase} && $args{phase} ne 'ALL') {
         push @where, "(phase=?)";
