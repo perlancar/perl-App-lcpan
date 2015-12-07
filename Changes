@@ -1,5 +1,17 @@
 Revision history for App-lcpan
 
+0.58    2015-12-07 (PERLANCAR)
+
+	- mods-by-rdep-count: [ux] Allow lowercase names in author
+	  argument.
+
+	- [Incompatible change] Rename subcommands author{rdeps,mods,rels,dists}
+	  to author-{rdeps,mods,rels,dists} to be more consistent. It's
+	  recommended that you first uninstall the old version (e.g. using
+	  'pm-uninstall' or 'pmuninst') before installing this version, to clean
+	  up old names.
+
+
 0.57    2015-11-22 (PERLANCAR)
 
 	- No functional changes.
