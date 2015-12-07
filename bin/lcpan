@@ -46,11 +46,11 @@ $cli->run;
 
 A mini CPAN mirror will be downloaded in your C<~/cpan> directory. This will
 take a while (it downloads +- 4GB of files, as of this writing; subsequent
-update will of course take shorter time.)
+updates will of course take shorter time.)
 
 A SQLite database is also created/updated in C<~/cpan/index.db> which contains
 information about authors, modules/packages, distributions. This database is
-used for quickly answer various queries.
+used to answer various queries.
 
 You can run the above command e.g. daily to keep your mirror up-to-date.
 
