@@ -11,8 +11,15 @@ use PERLANCAR::Module::List;
 use Perinci::CmdLine::Any;
 
 my $prefix = '/App/lcpan/';
-my $mods = PERLANCAR::Module::List::list_modules(
-    "App::lcpan::Cmd::", {list_modules=>1});
+my $mods = do {
+    # if we are called during building by dzil, don't include subcommands
+    # installed outside our dist. otherwise we'll be documenting and depending
+    # on extraneous subcommands.
+    local @INC = ("lib") if $ENV{DZIL};
+
+    PERLANCAR::Module::List::list_modules(
+        "App::lcpan::Cmd::", {list_modules=>1});
+};
 my $subcommands = {};
 for my $mod (keys %$mods) {
     (my $sc_name = $mod) =~ s/App::lcpan::Cmd:://;
