@@ -1,5 +1,14 @@
 Revision history for App-lcpan
 
+0.59    2015-12-07 (PERLANCAR)
+
+        - No functional changes.
+
+        - [Build] [Bugfix] Don't include subcommand modules outside of our dist
+          when building with dzil, because we'll document and depend on
+          extraneous subcommands/modules [CT].
+
+
 0.58    2015-12-07 (PERLANCAR)
 
 	- mods-by-rdep-count: [ux] Allow lowercase names in author
