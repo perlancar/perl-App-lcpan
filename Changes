@@ -1,5 +1,19 @@
 Revision history for App-lcpan
 
+0.60    2015-12-25 (PERLANCAR) (It's *this* Christmas!)
+
+	- Replace --exact-match with the more general --query-type to be
+	  able to search certain fields only or exact match on certain
+	  fields only.
+
+	- deps: Add option --flatten when doing recursive.
+
+	- [internal] Replace 'format_options' result metadata with the simpler
+	  'table.fields'.
+
+	- Bump prereq version Log::Any::IfLOG to 0.07.
+
+
 0.59    2015-12-07 (PERLANCAR)
 
         - No functional changes.
