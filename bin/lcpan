@@ -138,6 +138,7 @@ B<Show dependencies and reverse dependencies>:
 
  % lcpan deps Text::ANSITable    ;# which modules does Text::ANSITable depend on?
  % lcpan deps Text::ANSITable -R ;# recursive
+ % lcpan deps Text::ANSITable -R --flatten ;# recursive & flatten result
  % lcpan deps Task::BeLike::CSSON --phase build
  % lcpan deps Text::ANSITable --phase ALL --rel ALL
 

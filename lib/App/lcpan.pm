@@ -1876,7 +1876,7 @@ sub _get_prereqs {
     require Version::Util;
 
     my ($mods, $dbh, $memory_by_mod_name, $memory_by_dist_id,
-        $level, $max_level, $phase, $rel, $include_core, $plver) = @_;
+        $level, $max_level, $phase, $rel, $include_core, $plver, $flatten) = @_;
 
     $log->tracef("Finding dependencies for module(s) %s (level=%i) ...", $mods, $level);
 
@@ -1918,11 +1918,11 @@ WHERE dp.dist_id IN (".join(",",grep {defined} @dist_ids).")
 ORDER BY module".($level > 1 ? " DESC" : ""));
     $sth->execute;
     my @res;
+  MOD:
     while (my $row = $sth->fetchrow_hashref) {
         next unless $row->{module};
         next unless $phase eq 'ALL' || $row->{phase} eq $phase;
         next unless $rel   eq 'ALL' || $row->{rel}   eq $rel;
-        next if exists $memory_by_mod_name->{$row->{module}};
 
         # some dists, e.g. XML-SimpleObject-LibXML (0.60) have garbled prereqs,
         # e.g. they write PREREQ_PM => { mod1, mod2 } when it should've been
@@ -1930,6 +1930,15 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
         unless (eval { version->parse($row->{version}); 1 }) {
             $log->info("Invalid version $row->{version} (in dependency to $row->{module}), skipped");
             next;
+        }
+
+        if (exists $memory_by_mod_name->{$row->{module}}) {
+            if ($flatten) {
+                $memory_by_mod_name->{$row->{module}} = $row->{version}
+                    if version->parse($row->{version}) > version->parse($memory_by_mod_name->{$row->{module}});
+            } else {
+                next MOD;
+            }
         }
 
         $row->{is_core} = Module::CoreList::More->is_still_core($row->{module}, $row->{version}, version->parse($plver)->numify);
@@ -1952,20 +1961,29 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
         my $subres = _get_prereqs([map { {mod=>$_->{module}, dist_id=>$_->{module_dist_id}} } @res], $dbh,
                                   $memory_by_mod_name,
                                   $memory_by_dist_id,
-                                  $level+1, $max_level, $phase, $rel, $include_core, $plver);
+                                  $level+1, $max_level, $phase, $rel, $include_core, $plver, $flatten);
         return $subres if $subres->[0] != 200;
-        # insert to res in appropriate places
-      SUBRES_TO_INSERT:
-        for my $s (@{$subres->[2]}) {
-            for my $i (0..@res-1) {
-                my $r = $res[$i];
-                if (defined($s->{dependant_dist_id}) && defined($r->{module_dist_id}) &&
-                        $s->{dependant_dist_id} == $r->{module_dist_id}) {
-                    splice @res, $i+1, 0, $s;
-                    next SUBRES_TO_INSERT;
-                }
+        if ($flatten) {
+            my %deps; # key = module name
+            for my $s (@{$subres->[2]}, @res) {
+                $s->{version} = $memory_by_mod_name->{$s->{module}};
+                $deps{ $s->{module} } = $s;
             }
-            return [500, "Bug? Can't insert subres (module=$s->{module}, dist_id=$s->{module_dist_id})"];
+            @res = map {$deps{$_}} sort keys %deps;
+        } else {
+            # insert to res in appropriate places
+          SUBRES_TO_INSERT:
+            for my $s (@{$subres->[2]}) {
+                for my $i (0..@res-1) {
+                    my $r = $res[$i];
+                    if (defined($s->{dependant_dist_id}) && defined($r->{module_dist_id}) &&
+                            $s->{dependant_dist_id} == $r->{module_dist_id}) {
+                        splice @res, $i+1, 0, $s;
+                        next SUBRES_TO_INSERT;
+                    }
+                }
+                return [500, "Bug? Can't insert subres (module=$s->{module}, dist_id=$s->{module_dist_id})"];
+            }
         }
     }
 
@@ -2117,6 +2135,43 @@ our %deps_args = (
             },
         },
     },
+    flatten => {
+        summary => 'Instead of showing tree-like information, flatten it',
+        schema => 'bool',
+        description => <<'_',
+
+When recursing, the default is to show the final result in a tree-like table,
+i.e. indented according to levels, e.g.:
+
+    % lcpan deps -R MyModule
+    | module            | author  | version |
+    |-------------------|---------|---------|
+    | Foo               | AUTHOR1 | 0.01    |
+    |   Bar             | AUTHOR2 | 0.23    |
+    |   Baz             | AUTHOR3 | 1.15    |
+    | Qux               | AUTHOR2 | 0       |
+
+To be brief, if `Qux` happens to also depends on `Bar`, it will not be shown in
+the result. Thus we don't know the actual `Bar` version that is needed by the
+dependency tree of `MyModule`. For example, if `Qux` happens to depends on `Bar`
+version 0.45 then `MyModule` indirectly requires `Bar` 0.45.
+
+To list all the direct and indirect dependencies on a single flat list, with
+versions already resolved to the largest version required, use the `flatten`
+option:
+
+    % lcpan deps -R --flatten MyModule
+    | module            | author  | version |
+    |-------------------|---------|---------|
+    | Foo               | AUTHOR1 | 0.01    |
+    | Bar               | AUTHOR2 | 0.45    |
+    | Baz               | AUTHOR3 | 1.15    |
+    | Qux               | AUTHOR2 | 0       |
+
+Note that `Bar`'s required version is already 0.45 in the above example.
+
+_
+    },
     include_core => {
         summary => 'Include Perl core modules',
         'summary.alt.bool.not' => 'Exclude Perl core modules',
@@ -2136,6 +2191,10 @@ our %deps_args = (
         tags => ['category:filter'],
     },
 );
+
+our $deps_args_rels = {
+    dep_any => [flatten => ['level']],
+};
 
 $SPEC{'deps'} = {
     v => 1.1,
@@ -2160,6 +2219,7 @@ _
         %mods_args,
         %deps_args,
     },
+    args_rels => $deps_args_rels,
 };
 sub deps {
     require Module::XSOrPP;
@@ -2178,7 +2238,8 @@ sub deps {
 
     my $dbh     = _connect_db('ro', $cpan, $index_name);
 
-    my $res = _get_prereqs($mods, $dbh, {}, {}, 1, $level, $phase, $rel, $include_core, $plver);
+    my $res = _get_prereqs($mods, $dbh, {}, {}, 1, $level, $phase, $rel,
+                           $include_core, $plver, $args{flatten});
 
     return $res unless $res->[0] == 200;
     my @cols;
@@ -2191,7 +2252,8 @@ sub deps {
         if ($with_xs_or_pp) {
             $_->{xs_or_pp} = Module::XSOrPP::xs_or_pp($_->{module});
         }
-        $_->{module} = ("  " x ($_->{level}-1)) . $_->{module};
+        $_->{module} = ("  " x ($_->{level}-1)) . $_->{module}
+            unless $args{flatten};
         delete $_->{level};
         delete $_->{dist} unless @$mods > 1;
         delete $_->{dependant_dist_id};
