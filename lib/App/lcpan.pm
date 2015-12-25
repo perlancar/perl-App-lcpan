@@ -93,11 +93,6 @@ our %query_multi_args = (
         schema => 'bool',
         cmdline_aliases => {l=>{}},
     },
-    exact_match => {
-        summary => 'Match query with exact module names',
-        schema => 'bool',
-        default => 0,
-    },
     or => {
         summary => 'When there are more than one query, perform OR instead of AND logic',
         schema  => ['bool', is=>1],
@@ -1418,6 +1413,10 @@ $SPEC{authors} = {
     args => {
         %common_args,
         %query_multi_args,
+        query_type => {
+            schema => ['str*', in=>[qw/any cpanid exact-cpanid fullname email exact-email/]],
+            default => 'any',
+        },
     },
     result => {
         description => <<'_',
@@ -1449,6 +1448,7 @@ sub authors {
     my $cpan = $args{cpan};
     my $index_name = $args{index_name};
     my $detail = $args{detail};
+    my $qt = $args{query_type} // 'any';
 
     my $dbh = _connect_db('ro', $cpan, $index_name);
 
@@ -1457,13 +1457,28 @@ sub authors {
     {
         my @q_where;
         for my $q0 (@{ $args{query} // [] }) {
-            if ($args{exact_match}) {
-                push @q_where, "(cpanid=?)";
-                push @bind, uc($q0);
-            } else {
+            if ($qt eq 'any') {
                 my $q = uc($q0 =~ /%/ ? $q0 : '%'.$q0.'%');
                 push @q_where, "(cpanid LIKE ? OR fullname LIKE ? OR email like ?)";
                 push @bind, $q, $q, $q;
+            } elsif ($qt eq 'cpanid') {
+                my $q = uc($q0 =~ /%/ ? $q0 : '%'.$q0.'%');
+                push @q_where, "(cpanid LIKE ?)";
+                push @bind, $q;
+            } elsif ($qt eq 'exact-cpanid') {
+                push @q_where, "(cpanid=?)";
+                push @bind, uc($q0);
+            } elsif ($qt eq 'fullname') {
+                my $q = uc($q0 =~ /%/ ? $q0 : '%'.$q0.'%');
+                push @q_where, "(fullname LIKE ?)";
+                push @bind, $q;
+            } elsif ($qt eq 'email') {
+                my $q = uc($q0 =~ /%/ ? $q0 : '%'.$q0.'%');
+                push @q_where, "(email LIKE ?)";
+                push @bind, $q;
+            } elsif ($qt eq 'exact-email') {
+                push @q_where, "(LOWER(email)=?)";
+                push @bind, lc($q0);
             }
         }
         if (@q_where > 1) {
@@ -1498,6 +1513,10 @@ $SPEC{modules} = {
     args => {
         %common_args,
         %query_multi_args,
+        query_type => {
+            schema => ['str*', in=>[qw/any name exact-name abstract/]],
+            default => 'any',
+        },
         %fauthor_args,
         %fdist_args,
         %flatest_args,
@@ -1525,6 +1544,7 @@ sub modules {
     my $index_name = $args{index_name};
     my $detail = $args{detail};
     my $author = uc($args{author} // '');
+    my $qt = $args{query_type} // 'any';
 
     my $dbh = _connect_db('ro', $cpan, $index_name);
 
@@ -1559,13 +1579,21 @@ sub modules {
         my @q_where;
         for my $q0 (@{ $args{query} // [] }) {
             #push @q_where, "(name LIKE ? OR dist LIKE ?)"; # rather slow
-            if ($args{exact_match}) {
-                push @q_where, "(name=?)";
-                push @bind, $q0;
-            } else {
+            if ($qt eq 'any') {
                 my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
                 push @q_where, "(name LIKE ? OR abstract LIKE ?)";
                 push @bind, $q, $q;
+            } elsif ($qt eq 'name') {
+                my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
+                push @q_where, "(name LIKE ?)";
+                push @bind, $q;
+            } elsif ($qt eq 'exact-name') {
+                push @q_where, "(name=?)";
+                push @bind, $q0;
+            } elsif ($qt eq 'abstract') {
+                my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
+                push @q_where, "(abstract LIKE ?)";
+                push @bind, $q;
             }
         }
         if (@q_where > 1) {
@@ -1620,6 +1648,10 @@ $SPEC{dists} = {
     args => {
         %common_args,
         %query_multi_args,
+        query_type => {
+            schema => ['str*', in=>[qw/any name exact-name abstract/]],
+            default => 'any',
+        },
         %fauthor_args,
         %flatest_args,
         has_makefilepl => {
@@ -1683,6 +1715,7 @@ sub dists {
     my $index_name = $args{index_name};
     my $detail = $args{detail};
     my $author = uc($args{author} // '');
+    my $qt = $args{query_type} // 'any';
 
     my $dbh = _connect_db('ro', $cpan, $index_name);
 
@@ -1691,13 +1724,21 @@ sub dists {
     {
         my @q_where;
         for my $q0 (@{ $args{query} // [] }) {
-            if ($args{exact_match}) {
-                push @q_where, "(d.name=?)";
-                push @bind, $q0;
-            } else {
+            if ($qt eq 'any') {
                 my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
                 push @q_where, "(d.name LIKE ? OR abstract LIKE ?)";
                 push @bind, $q, $q;
+            } elsif ($qt eq 'name') {
+                my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
+                push @q_where, "(d.name LIKE ?)";
+                push @bind, $q;
+            } elsif ($qt eq 'exact-name') {
+                push @q_where, "(d.name=?)";
+                push @bind, $q0;
+            } elsif ($qt eq 'abstract') {
+                my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
+                push @q_where, "(abstract LIKE ?)";
+                push @bind, $q;
             }
         }
         if (@q_where > 1) {
@@ -1774,6 +1815,10 @@ $SPEC{'releases'} = {
         %common_args,
         %fauthor_args,
         %query_multi_args,
+        query_type => {
+            schema => ['str*', in=>[qw/any name exact-name/]],
+            default => 'any',
+        },
         has_metajson   => {schema=>'bool'},
         has_metayml    => {schema=>'bool'},
         has_makefilepl => {schema=>'bool'},
@@ -1800,6 +1845,7 @@ sub releases {
     my $index_name = $args{index_name};
     my $detail = $args{detail};
     my $author = uc($args{author} // '');
+    my $qt = $args{query_type} // 'any';
 
     my $dbh = _connect_db('ro', $cpan, $index_name);
 
@@ -1808,13 +1854,13 @@ sub releases {
     {
         my @q_where;
         for my $q0 (@{ $args{query} // [] }) {
-            if ($args{exact_match}) {
-                push @q_where, "(f1.name=?)";
-                push @bind, $q0;
-            } else {
+            if ($qt eq 'any' || $qt eq 'name') {
                 my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
                 push @q_where, "(f1.name LIKE ?)";
                 push @bind, $q;
+            } elsif ($qt eq 'exact-name') {
+                push @q_where, "(f1.name=?)";
+                push @bind, $q0;
             }
         }
         if (@q_where > 1) {
@@ -2360,6 +2406,10 @@ $SPEC{namespaces} = {
     args => {
         %common_args,
         %query_multi_args,
+        query_type => {
+            schema => ['str*', in=>[qw/any name exact-name/]],
+            default => 'any',
+        },
         from_level => {
             schema => ['int*', min=>0],
             tags => ['category:filtering'],
@@ -2386,6 +2436,7 @@ sub namespaces {
     my $cpan = $args{cpan};
     my $index_name = $args{index_name};
     my $detail = $args{detail};
+    my $qt = $args{query_type} // 'any';
 
     my $dbh = _connect_db('ro', $cpan, $index_name);
 
@@ -2394,13 +2445,13 @@ sub namespaces {
     {
         my @q_where;
         for my $q0 (@{ $args{query} // [] }) {
-            if ($args{exact_match}) {
-                push @q_where, "(name=?)";
-                push @bind, $q0;
-            } else {
+            if ($qt eq 'any' || $qt eq 'name') {
                 my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
                 push @q_where, "(name LIKE ?)";
                 push @bind, $q;
+            } elsif ($qt eq 'exact-name') {
+                push @q_where, "(name=?)";
+                push @bind, $q0;
             }
         }
         if (@q_where > 1) {

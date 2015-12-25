@@ -100,7 +100,7 @@ B<List modules:>
  % lcpan mods Win32 API                         ;# list mods containing 'Win32' and 'API' in their name/abstract
  % lcpan mods Win32 API --or                    ;# list mods containing 'Win32' *or* 'API' in their name/abstract
  % lcpan mods 'Win32%'                          ;# perform SQL LIKE query (mods whose name/abstract begins with 'Win32')
- % lcpan mods --or --exact-match Module1 Module2 --detail  ;# show detail for several mods
+ % lcpan mods --or --query-type exact-name Module1 Module2 --detail  ;# show detail for several mods
  % lcpan mods --author PERLANCAR                ;# mods by some author only
  % lcpan mods --dist libwww-perl                ;# mods from certain dist only
  % lcpan mods --namespace Getopt                ;# mods from certain namespace
