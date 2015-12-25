@@ -67,7 +67,7 @@ ORDER BY dep_count DESC
         push @res, $row;
     }
     my $resmeta = {};
-    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/name author dep_count/]]}};
+    $resmeta->{'table.fields'} = [qw/name author dep_count/];
     [200, "OK", \@res, $resmeta];
 }
 

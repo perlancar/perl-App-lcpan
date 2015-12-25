@@ -1487,7 +1487,7 @@ FROM author".
         push @res, $detail ? $row : $row->{id};
     }
     my $resmeta = {};
-    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/id name email/]]}}
+    $resmeta->{'table.fields'} = [qw/id name email/]
         if $detail;
     [200, "OK", \@res, $resmeta];
 }
@@ -1606,7 +1606,7 @@ sub modules {
         push @res, $detail ? $row : $row->{name};
     }
     my $resmeta = {};
-    $resmeta->{format_options} = {any=>{table_column_orders=>[[map {ref($_) ? $_->[1] : $_} grep {!ref($_) || !$_->[2]} @cols]]}}
+    $resmeta->{'table.fields'} = [map {ref($_) ? $_->[1] : $_} grep {!ref($_) || !$_->[2]} @cols]
         if $detail;
     [200, "OK", \@res, $resmeta];
 }
@@ -1762,7 +1762,7 @@ LEFT JOIN file f ON d.file_id=f.id
         push @res, $detail ? $row : $row->{name};
     }
     my $resmeta = {};
-    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/name author version file abstract/]]}}
+    $resmeta->{'table.fields'} = [qw/name author version file abstract/]
         if $detail;
     [200, "OK", \@res, $resmeta];
 }
@@ -1866,7 +1866,7 @@ LEFT JOIN dist d ON f1.id=d.file_id
         push @res, $detail ? $row : $row->{name};
     }
     my $resmeta = {};
-    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/name author has_metayml has_metajson has_makefilepl has_buildpl status/]]}}
+    $resmeta->{'table.fields'} = [qw/name author has_metayml has_metajson has_makefilepl has_buildpl status/]
         if $detail;
     [200, "OK", \@res, $resmeta];
 }
@@ -2200,7 +2200,7 @@ sub deps {
     }
 
     my $resmeta = {};
-    $resmeta->{format_options} = {any=>{table_column_orders=>[\@cols]}};
+    $resmeta->{'table.fields'} = \@cols;
     $res->[3] = $resmeta;
     $res;
 }
@@ -2287,7 +2287,7 @@ sub rdeps {
     }
 
     my $resmeta = {};
-    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/module dist author dist_version req_version/]]}};
+    $resmeta->{'table.fields'} = [qw/module dist author dist_version req_version/];
     $res->[3] = $resmeta;
     $res;
 }
@@ -2379,7 +2379,7 @@ ORDER BY $order";
         push @res, $detail ? $row : $row->{name};
     }
     my $resmeta = {};
-    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/name num_modules/]]}}
+    $resmeta->{'table.fields'} = [qw/name num_modules/]
         if $detail;
     [200, "OK", \@res, $resmeta];
 }

@@ -57,7 +57,7 @@ ORDER BY name DESC");
         push @res, $detail ? $row : $row->{name};
     }
     my $resmeta = {};
-    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/name version dist dist_version/]]}}
+    $resmeta->{'table.fields'} = [qw/name version dist dist_version/]
         if $detail;
     [200, "OK", \@res, $resmeta];
 }

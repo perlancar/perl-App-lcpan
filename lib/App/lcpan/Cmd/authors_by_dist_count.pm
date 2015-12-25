@@ -42,7 +42,7 @@ ORDER BY dist_count DESC
         push @res, $row;
     }
     my $resmeta = {};
-    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/author dist_count/]]}};
+    $resmeta->{'table.fields'} = [qw/author dist_count/];
     [200, "OK", \@res, $resmeta];
 }
 

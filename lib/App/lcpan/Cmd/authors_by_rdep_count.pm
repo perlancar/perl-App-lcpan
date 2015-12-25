@@ -60,7 +60,7 @@ ORDER BY rdep_count DESC
         push @res, $row;
     }
     my $resmeta = {};
-    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/id rdep_count/]]}};
+    $resmeta->{'table.fields'} = [qw/id rdep_count/];
     [200, "OK", \@res, $resmeta];
 }
 

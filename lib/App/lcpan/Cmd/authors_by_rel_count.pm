@@ -42,7 +42,7 @@ ORDER BY rel_count DESC
         push @res, $row;
     }
     my $resmeta = {};
-    $resmeta->{format_options} = {any=>{table_column_orders=>[[qw/author rel_count/]]}};
+    $resmeta->{'table.fields'} = [qw/author rel_count/];
     [200, "OK", \@res, $resmeta];
 }
 
