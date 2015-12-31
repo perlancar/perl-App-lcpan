@@ -1,5 +1,14 @@
 Revision history for App-lcpan
 
+0.61    2015-12-31 (PERLANCAR)
+
+        - No functional changes.
+
+        - [build] Rebuild with updated PWR:DumpPerinciCmdLineScript (0.04) which
+          lets us avoid extraneous subcommands from being included in the
+          bin/lcpan's POD.
+
+
 0.60    2015-12-25 (PERLANCAR) (It's *this* Christmas!)
 
 	- Replace --exact-match with the more general --query-type to be
