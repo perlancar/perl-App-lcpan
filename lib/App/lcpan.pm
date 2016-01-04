@@ -1520,9 +1520,10 @@ $SPEC{modules} = {
         %fauthor_args,
         %fdist_args,
         %flatest_args,
-        namespace => {
-            summary => 'Select modules belonging to certain namespace',
-            schema => 'str*',
+        namespaces => {
+            'x.name.is_plural' => 1,
+            summary => 'Select modules belonging to certain namespace(s)',
+            schema => ['array*', of=>'str*'],
             tags => ['category:filtering'],
         },
         %sort_modules_args,
@@ -1611,10 +1612,14 @@ sub modules {
         push @where, "(dist=?)";
         push @bind, $args{dist};
     }
-    if ($args{namespace}) {
-        return [400, "Invalid namespace, please use Word or Word(::Sub)+"]
-            unless $args{namespace} =~ /\A\w+(::\w+)*\z/;
-        push @where, "(name='$args{namespace}' OR name LIKE '$args{namespace}::%')";
+    if ($args{namespaces} && @{ $args{namespaces} }) {
+        my @ns_where;
+        for my $ns (@{ $args{namespaces} }) {
+            return [400, "Invalid namespace '$ns', please use Word or Word(::Sub)+"]
+                unless $ns =~ /\A\w+(::\w+)*\z/;
+            push @ns_where, "(name='$ns' OR name LIKE '$ns\::%')";
+        }
+        push @where, "(".join(" OR ", @ns_where).")";
     }
     if ($args{latest}) {
         push @where, "(SELECT is_latest FROM dist d WHERE d.file_id=module.file_id)";
