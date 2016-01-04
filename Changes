@@ -1,5 +1,10 @@
 Revision history for App-lcpan
 
+0.62    2016-01-04 (PERLANCAR)
+
+	- mods: Allow specifying multiple namespaces.
+
+
 0.61    2015-12-31 (PERLANCAR)
 
         - No functional changes.
