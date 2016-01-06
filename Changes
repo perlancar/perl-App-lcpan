@@ -1,5 +1,13 @@
 Revision history for App-lcpan
 
+0.63    2016-01-06 (PERLANCAR)
+
+	- [Bugfix] Propagate error from _update_index().
+
+	- Add safety code to bail out when indexer_version is newer than
+	  current version, remove old code.
+
+
 0.62    2016-01-04 (PERLANCAR)
 
 	- mods: Allow specifying multiple namespaces.
