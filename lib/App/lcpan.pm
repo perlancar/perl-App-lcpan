@@ -659,17 +659,15 @@ sub _update_index {
     {
         no strict 'refs';
         my $our_version = ${__PACKAGE__.'::VERSION'};
-        last unless defined $our_version;
 
         my ($indexer_version) = $dbh->selectrow_array("SELECT value FROM meta WHERE name='indexer_version'");
-        if ($indexer_version) {
-            if (version->parse($indexer_version) > version->parse($our_version)) {
-                return [412, "Database is indexed by version newer than current software's version, bailing out"];
-            }
-            if (version->parse($indexer_version) <= version->parse("0.35")) {
-                $log->infof("Reindexing from scratch, deleting previous index content ...");
-                _reset($dbh);
-            }
+        last unless $indexer_version;
+        if ($our_version && version->parse($indexer_version) > version->parse($our_version)) {
+            return [412, "Database is indexed by version ($indexer_version) newer than current software's version ($our_version), bailing out"];
+        }
+        if (version->parse($indexer_version) <= version->parse("0.35")) {
+            $log->infof("Reindexing from scratch, deleting previous index content ...");
+            _reset($dbh);
         }
     }
 
@@ -1136,7 +1134,7 @@ sub update {
     if (!$args{update_files}) {
         $log->infof("Skipped updating files (option)");
     } else {
-        _update_files(%args);
+        _update_files(%args); # it only returns 200 or dies
     }
     my @st2 = stat($packages_path);
 
