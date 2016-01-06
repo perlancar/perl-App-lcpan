@@ -1148,7 +1148,8 @@ sub update {
                     $packages_path);
         return [304, "Files did not change, index not updated"];
     } else {
-        _update_index(%args);
+        my $res = _update_index(%args);
+        return $res unless $res->[0] == 200;
     }
     [200, "OK"];
 }
