@@ -658,20 +658,18 @@ sub _update_index {
     # incorrect) version of us did the reindexing
     {
         no strict 'refs';
-        last unless defined ${__PACKAGE__.'::VERSION'};
+        my $our_version = ${__PACKAGE__.'::VERSION'};
+        last unless defined $our_version;
 
         my ($indexer_version) = $dbh->selectrow_array("SELECT value FROM meta WHERE name='indexer_version'");
-        if ($indexer_version && $indexer_version <= 0.35) {
-            $log->infof("Reindexing from scratch, deleting previous index content ...");
-            _reset($dbh);
-        }
-
-        # i screwed up and mixed num_sep and has_child columns in v0.32, so we
-        # need to set the table again
-        if (defined($indexer_version) && $indexer_version <= 0.32) {
-            $log->infof("Emptying and re-filling namespace ...");
-            $dbh->do("DELETE FROM namespace");
-            _fill_namespace($dbh);
+        if ($indexer_version) {
+            if (version->parse($indexer_version) > version->parse($our_version)) {
+                return [412, "Database is indexed by version newer than current software's version, bailing out"];
+            }
+            if (version->parse($indexer_version) <= version->parse("0.35")) {
+                $log->infof("Reindexing from scratch, deleting previous index content ...");
+                _reset($dbh);
+            }
         }
     }
 
