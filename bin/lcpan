@@ -52,8 +52,8 @@ $cli->run;
  % lcpan update
 
 A mini CPAN mirror will be downloaded in your C<~/cpan> directory. This will
-take a while (it downloads +- 4GB of files, as of this writing; subsequent
-updates will of course take shorter time.)
+take a while (it downloads ~6.4GB of files, as of 2016-01-15; subsequent updates
+will of course take shorter time.)
 
 A SQLite database is also created/updated in C<~/cpan/index.db> which contains
 information about authors, modules/packages, distributions. This database is
