@@ -43,7 +43,7 @@ WHERE module.name IN ($mods_s)");
     my $res;
     if (@$mods == 1) {
         $sth->execute;
-        ($res) = $sth->fetchrow_array;
+        (undef, $res) = $sth->fetchrow_array;
     } else {
         $sth->execute;
         $res = {};
