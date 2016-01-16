@@ -1,8 +1,14 @@
 Revision history for App-lcpan
 
-0.64    2016-01-16 (PERLANCAR) (unreleased)
+0.64    2016-01-16 (PERLANCAR)
 
         - Adjust so we can be used like a daemon.
+
+        - [Bugfix] mod2dist: Used wrong database result field.
+
+        - [Bugfix] releases: Used wrong result field.
+
+        - [doc] Update information about mini CPAN current size.
 
 
 0.63    2016-01-06 (PERLANCAR)
