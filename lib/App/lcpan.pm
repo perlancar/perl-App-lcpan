@@ -1910,7 +1910,7 @@ LEFT JOIN dist d ON f1.id=d.file_id
     my $sth = $dbh->prepare($sql);
     $sth->execute(@bind);
     while (my $row = $sth->fetchrow_hashref) {
-        if ($args{full_path}) { $row->{name} = _relpath($row->{name}, $cpan, $row->{cpanid}) }
+        if ($args{full_path}) { $row->{name} = _relpath($row->{name}, $state->{cpan}, $row->{author}) }
         push @res, $detail ? $row : $row->{name};
     }
     my $resmeta = {};
