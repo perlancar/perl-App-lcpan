@@ -24,12 +24,10 @@ $SPEC{'handle_cmd'} = {
 sub handle_cmd {
     my %args = @_;
 
-    App::lcpan::_set_args_default(\%args);
-    my $cpan = $args{cpan};
-    my $index_name = $args{index_name};
-    my $mod = $args{module};
+    my $state = App::lcpan::_init(\%args, 'ro');
+    my $dbh = $state->{dbh};
 
-    my $dbh = App::lcpan::_connect_db('ro', $cpan, $index_name);
+    my $mod = $args{module};
 
     my $row = $dbh->selectrow_hashref("SELECT
   file.cpanid cpanid,
@@ -42,7 +40,8 @@ ORDER BY version_numified DESC
     my $rel;
     if ($row) {
         if ($args{full_path}) {
-            $rel = App::lcpan::_relpath($row->{name}, $cpan, $row->{cpanid});
+            $rel = App::lcpan::_relpath(
+                $row->{name}, $state->{cpan}, $row->{cpanid});
         } else {
             $rel = $row->{name};
         }

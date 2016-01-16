@@ -7,6 +7,8 @@ use 5.010;
 use strict;
 use warnings;
 
+use Function::Fallback::CoreOrPP qw(clone_list);
+
 require App::lcpan;
 
 our %SPEC;
@@ -16,8 +18,8 @@ $SPEC{'handle_cmd'} = {
     summary => 'List authors ranked by number of distributions using one of his/her modules',
     args => {
         %App::lcpan::common_args,
-        %App::lcpan::deps_phase_arg,
-        %App::lcpan::deps_rel_arg,
+        clone_list(%App::lcpan::deps_phase_arg),
+        clone_list(%App::lcpan::deps_rel_arg),
     },
 };
 delete $SPEC{'handle_cmd'}{args}{phase}{default};
@@ -25,11 +27,8 @@ delete $SPEC{'handle_cmd'}{args}{rel}{default};
 sub handle_cmd {
     my %args = @_;
 
-    App::lcpan::_set_args_default(\%args);
-    my $cpan = $args{cpan};
-    my $index_name = $args{index_name};
-
-    my $dbh = App::lcpan::_connect_db('ro', $cpan, $index_name);
+    my $state = App::lcpan::_init(\%args, 'ro');
+    my $dbh = $state->{dbh};
 
     my @where;
     my @binds;

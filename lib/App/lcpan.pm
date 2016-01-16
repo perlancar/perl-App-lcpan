@@ -135,6 +135,7 @@ our %sort_modules_args = (
 our %full_path_args = (
     full_path => {
         schema => ['bool*' => is=>1],
+        tags => ['expose-fs-path'],
     },
 );
 
@@ -518,6 +519,25 @@ sub _connect_db {
                            {RaiseError=>1});
     _create_schema($dbh);
     $dbh;
+}
+
+# all subcommands (except special ones like 'update') call this first. lcpan can
+# be used in daemon mode or CLI, and this routine handles both case. in daemon
+# mode, we set $App::lcpan::state (containing database handle, etc) and reuse
+# it. in CLI, there is no reuse between invocation.
+sub _init {
+    my ($args, $mode) = @_;
+
+    unless ($App::lcpan::state) {
+        _set_args_default($args);
+        my $state = {
+            dbh => _connect_db($mode, $args->{cpan}, $args->{index_name}),
+            cpan => $args->{cpan},
+            index_name => $args->{index_name},
+        };
+        $App::lcpan::state = $state;
+    }
+    $App::lcpan::state;
 }
 
 sub _parse_meta_json {
@@ -1123,6 +1143,7 @@ _
             },
         },
     },
+    tags => ['write-to-db', 'write-to-fs'],
 };
 sub update {
     my %args = @_;
@@ -1168,19 +1189,18 @@ $SPEC{'reset'} = {
     args => {
         %common_args,
     },
+    tags => ['write-to-db'],
 };
 sub reset {
     require IO::Prompt::I18N;
 
     my %args = @_;
-    _set_args_default(\%args);
-    my $cpan = $args{cpan};
-    my $index_name = $args{index_name};
+
+    my $state = _init(\%args, 'rw');
+    my $dbh = $state->{dbh};
 
     return [200, "Cancelled"]
         unless IO::Prompt::I18N::confirm("Confirm reset index", {default=>0});
-
-    my $dbh = _connect_db('rw', $cpan, $index_name);
 
     _reset($dbh);
     [200, "Reset"];
@@ -1195,10 +1215,9 @@ $SPEC{'stats'} = {
 };
 sub stats {
     my %args = @_;
-    _set_args_default(\%args);
-    my $cpan = $args{cpan};
-    my $index_name = $args{index_name};
-    my $dbh = _connect_db('ro', $cpan, $index_name);
+
+    my $state = _init(\%args, 'ro');
+    my $dbh = $state->{dbh};
 
     my $stat = {};
 
@@ -1232,7 +1251,7 @@ FROM file");
         $stat->{indexer_version} = $ver;
     }
     {
-        my @st = stat "$cpan/modules/02packages.details.txt.gz";
+        my @st = stat "$state->{cpan}/modules/02packages.details.txt.gz";
         $stat->{mirror_mtime} = _fmt_time(@st ? $st[9] : undef);
         $stat->{raw_mirror_mtime} = $st[9];
     }
@@ -1441,13 +1460,11 @@ _
 sub authors {
     my %args = @_;
 
-    _set_args_default(\%args);
-    my $cpan = $args{cpan};
-    my $index_name = $args{index_name};
+    my $state = _init(\%args, 'ro');
+    my $dbh = $state->{dbh};
+
     my $detail = $args{detail};
     my $qt = $args{query_type} // 'any';
-
-    my $dbh = _connect_db('ro', $cpan, $index_name);
 
     my @bind;
     my @where;
@@ -1537,14 +1554,12 @@ _
 sub modules {
     my %args = @_;
 
-    _set_args_default(\%args);
-    my $cpan = $args{cpan};
-    my $index_name = $args{index_name};
+    my $state = _init(\%args, 'ro');
+    my $dbh = $state->{dbh};
+
     my $detail = $args{detail};
     my $author = uc($args{author} // '');
     my $qt = $args{query_type} // 'any';
-
-    my $dbh = _connect_db('ro', $cpan, $index_name);
 
     my $order = do {
         my $sort = $args{sort} // '';
@@ -1712,14 +1727,12 @@ _
 sub dists {
     my %args = @_;
 
-    _set_args_default(\%args);
-    my $cpan = $args{cpan};
-    my $index_name = $args{index_name};
+    my $state = _init(\%args, 'ro');
+    my $dbh = $state->{dbh};
+
     my $detail = $args{detail};
     my $author = uc($args{author} // '');
     my $qt = $args{query_type} // 'any';
-
-    my $dbh = _connect_db('ro', $cpan, $index_name);
 
     my @bind;
     my @where;
@@ -1842,14 +1855,12 @@ _
 sub releases {
     my %args = @_;
 
-    _set_args_default(\%args);
-    my $cpan = $args{cpan};
-    my $index_name = $args{index_name};
+    my $state = _init(\%args, 'ro');
+    my $dbh = $state->{dbh};
+
     my $detail = $args{detail};
     my $author = uc($args{author} // '');
     my $qt = $args{query_type} // 'any';
-
-    my $dbh = _connect_db('ro', $cpan, $index_name);
 
     my @bind;
     my @where;
@@ -2273,9 +2284,9 @@ sub deps {
     require Module::XSOrPP;
     my %args = @_;
 
-    _set_args_default(\%args);
-    my $cpan = $args{cpan};
-    my $index_name = $args{index_name};
+    my $state = _init(\%args, 'ro');
+    my $dbh = $state->{dbh};
+
     my $mods    = $args{modules};
     my $phase   = $args{phase} // 'runtime';
     my $rel     = $args{rel} // 'requires';
@@ -2283,8 +2294,6 @@ sub deps {
     my $level   = $args{level} // 1;
     my $include_core = $args{include_core} // 0;
     my $with_xs_or_pp = $args{with_xs_or_pp};
-
-    my $dbh     = _connect_db('ro', $cpan, $index_name);
 
     my $res = _get_prereqs($mods, $dbh, {}, {}, 1, $level, $phase, $rel,
                            $include_core, $plver, $args{flatten});
@@ -2369,15 +2378,13 @@ $SPEC{'rdeps'} = {
 sub rdeps {
     my %args = @_;
 
-    _set_args_default(\%args);
-    my $cpan = $args{cpan};
-    my $index_name = $args{index_name};
+    my $state = _init(\%args, 'ro');
+    my $dbh = $state->{dbh};
+
     my $mods    = $args{modules};
     my $level   = $args{level} // 1;
     my $author =  $args{author} ? [map {uc} @{$args{author}}] : undef;
     my $author_isnt = $args{author_isnt} ? [map {uc} @{$args{author_isnt}}] : undef;
-
-    my $dbh     = _connect_db('ro', $cpan, $index_name);
 
     my $filters = {
         author => $author,
@@ -2434,13 +2441,11 @@ $SPEC{namespaces} = {
 sub namespaces {
     my %args = @_;
 
-    _set_args_default(\%args);
-    my $cpan = $args{cpan};
-    my $index_name = $args{index_name};
+    my $state = _init(\%args, 'ro');
+    my $dbh = $state->{dbh};
+
     my $detail = $args{detail};
     my $qt = $args{query_type} // 'any';
-
-    my $dbh = _connect_db('ro', $cpan, $index_name);
 
     my @bind;
     my @where;

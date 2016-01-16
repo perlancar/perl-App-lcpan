@@ -18,18 +18,17 @@ $SPEC{'handle_cmd'} = {
         %App::lcpan::common_args,
         %App::lcpan::rel_args,
     },
+    tags => ['write-to-fs'],
 };
 sub handle_cmd {
     require Archive::Extract;
 
     my %args = @_;
 
-    App::lcpan::_set_args_default(\%args);
-    my $cpan = $args{cpan};
-    my $index_name = $args{index_name};
-    my $rel = $args{release};
+    my $state = App::lcpan::_init(\%args, 'ro');
+    my $dbh = $state->{dbh};
 
-    my $dbh = App::lcpan::_connect_db('ro', $cpan, $index_name);
+    my $rel = $args{release};
 
     my $row = $dbh->selectrow_hashref("SELECT
   cpanid,
@@ -40,7 +39,8 @@ WHERE name=?
 
     return [404, "No such release"] unless $row;
 
-    my $path = App::lcpan::_relpath($row->{name}, $cpan, $row->{cpanid});
+    my $path = App::lcpan::_relpath(
+        $row->{name}, $state->{cpan}, $row->{cpanid});
 
     my $ae = Archive::Extract->new(archive => $path);
     $ae->extract or return [500, "Can't extract: " . $ae->error];

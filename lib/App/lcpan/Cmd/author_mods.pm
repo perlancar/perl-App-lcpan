@@ -21,6 +21,7 @@ $SPEC{'handle_cmd'} = {
             schema => 'bool',
         },
     },
+    tags => [],
 };
 sub handle_cmd {
     my %args = @_;

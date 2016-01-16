@@ -1,5 +1,10 @@
 Revision history for App-lcpan
 
+0.64    2016-01-16 (PERLANCAR) (unreleased)
+
+        - Adjust so we can be used like a daemon.
+
+
 0.63    2016-01-06 (PERLANCAR)
 
 	- [Bugfix] Propagate error from _update_index().

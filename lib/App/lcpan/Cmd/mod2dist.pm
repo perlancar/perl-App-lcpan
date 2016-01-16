@@ -22,12 +22,10 @@ $SPEC{'handle_cmd'} = {
 sub handle_cmd {
     my %args = @_;
 
-    App::lcpan::_set_args_default(\%args);
-    my $cpan = $args{cpan};
-    my $index_name = $args{index_name};
-    my $mods = $args{modules};
+    my $state = App::lcpan::_init(\%args, 'ro');
+    my $dbh = $state->{dbh};
 
-    my $dbh = App::lcpan::_connect_db('ro', $cpan, $index_name);
+    my $mods = $args{modules};
 
     my $mods_s = join(",", map {$dbh->quote($_)} @$mods);
 

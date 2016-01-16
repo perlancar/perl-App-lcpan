@@ -19,18 +19,17 @@ $SPEC{'handle_cmd'} = {
         %App::lcpan::mod_args,
         %App::lcpan::overwrite_arg,
     },
+    tags => ['write-to-fs'],
 };
 sub handle_cmd {
     require File::Copy;
 
     my %args = @_;
 
-    App::lcpan::_set_args_default(\%args);
-    my $cpan = $args{cpan};
-    my $index_name = $args{index_name};
-    my $mod = $args{module};
+    my $state = App::lcpan::_init(\%args, 'ro');
+    my $dbh = $state->{dbh};
 
-    my $dbh = App::lcpan::_connect_db('ro', $cpan, $index_name);
+    my $mod = $args{module};
 
     my $row = $dbh->selectrow_hashref("SELECT
   file.cpanid cpanid,
@@ -43,7 +42,8 @@ ORDER BY version_numified DESC
 
     return [404, "No release for module '$mod'"] unless $row;
 
-    my $srcpath = App::lcpan::_relpath($row->{name}, $cpan, $row->{cpanid});
+    my $srcpath = App::lcpan::_relpath(
+        $row->{name}, $state->{cpan}, $row->{cpanid});
     my $targetpath = $row->{name};
 
     if ((-f $targetpath) && !$args{overwrite}) {

@@ -25,13 +25,11 @@ $SPEC{'handle_cmd'} = {
 sub handle_cmd {
     my %args = @_;
 
-    App::lcpan::_set_args_default(\%args);
-    my $cpan = $args{cpan};
-    my $index_name = $args{index_name};
+    my $state = App::lcpan::_init(\%args, 'ro');
+    my $dbh = $state->{dbh};
+
     my $dist = $args{dist};
     my $detail = $args{detail};
-
-    my $dbh = App::lcpan::_connect_db('ro', $cpan, $index_name);
 
     my $sth = $dbh->prepare("SELECT
   module.name name,
