@@ -1303,6 +1303,50 @@ sub _complete_mod {
     \@res;
 };
 
+sub _complete_ns {
+    my %args = @_;
+
+    my $word = $args{word} // '';
+
+    # only run under pericmd
+    my $cmdline = $args{cmdline} or return undef;
+    my $r = $args{r};
+
+    # force read config file, because by default it is turned off when in
+    # completion
+    $r->{read_config} = 1;
+    my $res = $cmdline->parse_argv($r);
+    _set_args_default($res->[2]);
+
+    my $dbh;
+    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}) };
+
+    # if we can't connect (probably because database is not yet setup), bail
+    if ($@) {
+        $log->tracef("[comp] can't connect to db, bailing: %s", $@);
+        return undef;
+    }
+
+    my $sth = $dbh->prepare(
+        "SELECT name FROM namespace WHERE name LIKE ? ORDER BY name");
+    $sth->execute($word . '%');
+
+    # XXX follow Complete::Common::OPT_CI
+
+    my @res;
+    while (my ($ns) = $sth->fetchrow_array) {
+        # only complete one level deeper at a time
+        if ($ns =~ /:\z/) {
+            next unless $ns =~ /\A\Q$word\E:*\w+\z/i;
+        } else {
+            next unless $ns =~ /\A\Q$word\E\w*(::\w+)?\z/i;
+        }
+        push @res, $ns;
+    }
+
+    \@res;
+};
+
 sub _complete_dist {
     my %args = @_;
 
@@ -1539,6 +1583,7 @@ $SPEC{modules} = {
             summary => 'Select modules belonging to certain namespace(s)',
             schema => ['array*', of=>'str*'],
             tags => ['category:filtering'],
+            element_completion => \&_complete_ns,
         },
         %sort_modules_args,
     },
