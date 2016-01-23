@@ -1,5 +1,17 @@
 Revision history for App-lcpan
 
+0.65    2016-01-23 (PERLANCAR)
+
+	- [Bugfix] deps: Dependency to unindexed modules was not shown.
+
+	- Use authors/00whois.xml (produced by e.g. OrePAN) when
+	  authors/01mailrc.txt.gz does not exist.
+
+	- [doc] Update mini CPAN current size.
+
+	- mods: Complete namespace.
+
+
 0.64    2016-01-16 (PERLANCAR)
 
         - Adjust so we can be used like a daemon.
