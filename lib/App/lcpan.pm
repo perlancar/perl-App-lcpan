@@ -692,10 +692,14 @@ sub _update_index {
     }
 
     # parse 01mailrc.txt.gz and insert the parse result to 'author' table
+  PARSE_MAILRC:
     {
         my $path = "$cpan/authors/01mailrc.txt.gz";
         $log->infof("Parsing %s ...", $path);
-        open my($fh), "<:gzip", $path or die "Can't open $path (<:gzip): $!";
+        open my($fh), "<:gzip", $path or do {
+            $log->infof("%s does not exist, skipped", $path);
+            last PARSE_MAILRC;
+        };
 
         # i would like to use INSERT OR IGNORE, but rows affected returned by
         # execute() is always 1?
@@ -720,6 +724,37 @@ sub _update_index {
         $dbh->commit;
     }
 
+    # some darkpans (e.g. produced by OrePAN) has authors/00whois.xml instead
+  PARSE_WHOIS:
+    {
+        my $path = "$cpan/authors/00whois.xml";
+        $log->infof("Parsing %s ...", $path);
+        open my($fh), "<", $path or do {
+            $log->infof("%s does not exist, skipped", $path);
+            last PARSE_WHOIS;
+        };
+
+        # currently we don't bother to use a real xml parser and just use regex
+        # instead
+        my $content = do { local $/; ~~<$fh> };
+
+        # i would like to use INSERT OR IGNORE, but rows affected returned by
+        # execute() is always 1?
+
+        my $sth_ins_auth = $dbh->prepare("INSERT INTO author (cpanid,fullname,email) VALUES (?,?,NULL)");
+        my $sth_sel_auth = $dbh->prepare("SELECT cpanid FROM author WHERE cpanid=?");
+
+        $dbh->begin_work;
+        while ($content =~ m!<id>(\w+)</id>!g) {
+            my ($cpanid) = ($1);
+            $sth_sel_auth->execute($cpanid);
+            next if $sth_sel_auth->fetchrow_arrayref;
+            $sth_ins_auth->execute($cpanid, $cpanid);
+            $log->tracef("  new author: %s", $cpanid);
+        }
+        $dbh->commit;
+    }
+
     # these hashes maintain the dist names that are changed so we can refresh
     # the 'is_latest' field later at the end of indexing process
     my %changed_dists;
@@ -727,6 +762,7 @@ sub _update_index {
     # parse 02packages.details.txt.gz and insert the parse result to 'file' and
     # 'module' tables. we haven't parsed distribution names yet because that
     # will need information from META.{json,yaml} inside release files.
+  PARSE_PACKAGES:
     {
         my $path = "$cpan/modules/02packages.details.txt.gz";
         $log->infof("Parsing %s ...", $path);
