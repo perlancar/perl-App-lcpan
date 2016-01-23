@@ -2028,7 +2028,7 @@ sub _get_prereqs {
             $mod = $mod0->{mod};
             $dist_id = $mod0->{dist_id};
             if (!$dist_id) {
-                warn "module '$mod' does not have dist ID";
+                $log->warnf("module '$mod' is not indexed (does not have dist ID), skipped");
                 next;
             }
         } else {
@@ -2047,7 +2047,10 @@ sub _get_prereqs {
     my $sth = $dbh->prepare("SELECT
   dp.dist_id dependant_dist_id,
   (SELECT name   FROM dist   WHERE id=dp.dist_id) AS dist,
-  (SELECT name   FROM module WHERE id=dp.module_id) AS module,
+  CASE
+     WHEN module_name IS NOT NULL THEN module_name
+     ELSE (SELECT name   FROM module WHERE id=dp.module_id)
+  END AS module,
   (SELECT cpanid FROM module WHERE id=dp.module_id) AS author,
   (SELECT id     FROM dist   WHERE is_latest AND file_id=(SELECT file_id FROM module WHERE id=dp.module_id)) AS module_dist_id,
   phase,
