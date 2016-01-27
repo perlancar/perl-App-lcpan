@@ -46,6 +46,8 @@ ORDER BY version_numified DESC
         $row->{name}, $state->{cpan}, $row->{cpanid});
     my $targetpath = $row->{name};
 
+    (-f $srcpath) or return [404, "File not found: $srcpath"];
+
     if ((-f $targetpath) && !$args{overwrite}) {
         return [412, "Refusing to overwrite existing file '$targetpath'"];
     }

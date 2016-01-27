@@ -44,6 +44,8 @@ ORDER BY version_numified DESC
     my $path = App::lcpan::_relpath(
         $row->{name}, $state->{cpan}, $row->{cpanid});
 
+    (-f $path) or return [404, "File not found: $path"];
+
     my $ae = Archive::Extract->new(archive => $path);
     $ae->extract or return [500, "Can't extract: " . $ae->error];
 
