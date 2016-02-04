@@ -2319,7 +2319,7 @@ _
         summary => 'Include Perl core modules',
         'summary.alt.bool.not' => 'Exclude Perl core modules',
         schema  => 'bool',
-        default => 0,
+        default => 1,
         tags => ['category:filter'],
     },
     perl_version => {
