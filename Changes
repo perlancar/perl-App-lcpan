@@ -1,5 +1,17 @@
 Revision history for App-lcpan
 
+0.66    2016-02-07 (PERLANCAR)
+
+        - [Bugfix] file should be indexed by (cpanid,name) not (name) because
+          PAUSE allows two authors to have the same filename.
+
+        - Bump database schema version to v7 due to the above fix.
+
+        - [Incompatible change] deps: Change default --include-core to 1.
+
+        - copy_*, extract_*: Check that release file exists.
+
+
 0.65    2016-01-23 (PERLANCAR)
 
 	- [Bugfix] deps: Dependency to unindexed modules was not shown.
