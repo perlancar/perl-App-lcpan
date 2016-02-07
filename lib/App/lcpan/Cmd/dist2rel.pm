@@ -40,10 +40,11 @@ ORDER BY version_numified DESC", {}, $dist);
 
     if ($row) {
         if ($args{full_path}) {
-            $rel = App::lcpan::_relpath(
+            $rel = App::lcpan::_fullpath(
                 $row->{name}, $state->{cpan}, $row->{cpanid});
         } else {
-            $rel = $row->{name};
+            $rel = App::lcpan::_relpath(
+                $row->{name}, $row->{cpanid});
         }
     }
     [200, "OK", $rel];

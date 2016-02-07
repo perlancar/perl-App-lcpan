@@ -225,10 +225,17 @@ sub _numify_ver {
     $v ? $v->numify : undef;
 }
 
-sub _relpath {
+sub _fullpath {
     my ($filename, $cpan, $cpanid) = @_;
     $cpanid = uc($cpanid); # just to be safe
     "$cpan/authors/id/".substr($cpanid, 0, 1)."/".
+        substr($cpanid, 0, 2)."/$cpanid/$filename";
+}
+
+sub _relpath {
+    my ($filename, $cpanid) = @_;
+    $cpanid = uc($cpanid); # just to be safe
+    substr($cpanid, 0, 1)."/".
         substr($cpanid, 0, 2)."/$cpanid/$filename";
 }
 
@@ -279,7 +286,7 @@ sub _set_namespace {
 }
 
 our $db_schema_spec = {
-    latest_v => 6,
+    latest_v => 7,
 
     install => [
         'CREATE TABLE author (
@@ -305,7 +312,7 @@ our $db_schema_spec = {
              has_makefilepl INTEGER,
              has_buildpl INTEGER
         )',
-        'CREATE UNIQUE INDEX ix_file__name ON file(name)',
+        'CREATE UNIQUE INDEX ix_file__cpanid__name ON file(cpanid,name)',
 
         'CREATE TABLE module (
              id INTEGER NOT NULL PRIMARY KEY,
@@ -428,6 +435,14 @@ our $db_schema_spec = {
         )',
         'CREATE UNIQUE INDEX ix_namespace__name ON namespace(name)',
         \&_fill_namespace,
+    ],
+
+    upgrade_to_v7 => [
+        # actually PAUSE allows two authors to have the same filename. although
+        # directory is still ignored, so a single author still cannot have
+        # dir1/File-1.0.tar.gz and dir2/File-1.0.tar.gz.
+        'DROP INDEX ix_file__name',
+        'CREATE UNIQUE INDEX ix_file__cpanid__name ON file(cpanid,name)',
     ],
 
     # for testing
@@ -648,7 +663,6 @@ sub _check_meta {
 
 sub _update_index {
     require DBI;
-    require File::Slurp::Tiny;
     require File::Temp;
     require IO::Compress::Gzip;
 
@@ -768,21 +782,21 @@ sub _update_index {
         $log->infof("Parsing %s ...", $path);
         open my($fh), "<:gzip", $path or die "Can't open $path (<:gzip): $!";
 
-        my $sth_sel_file = $dbh->prepare("SELECT id FROM file WHERE name=?");
+        my $sth_sel_file = $dbh->prepare("SELECT id FROM file WHERE name=? AND cpanid=?");
         my $sth_ins_file = $dbh->prepare("INSERT INTO file (name,cpanid) VALUES (?,?)");
         my $sth_ins_mod  = $dbh->prepare("INSERT INTO module (name,file_id,cpanid,version,version_numified) VALUES (?,?,?,?,?)");
         my $sth_upd_mod  = $dbh->prepare("UPDATE module SET file_id=?,cpanid=?,version=?,version_numified=? WHERE name=?"); # sqlite currently does not have upsert
 
         $dbh->begin_work;
 
-        my %file_ids_in_table;
-        my $sth = $dbh->prepare("SELECT name,id FROM file");
+        my %file_ids_in_table; # key="cpanid|filename"
+        my $sth = $dbh->prepare("SELECT cpanid,name,id FROM file");
         $sth->execute;
-        while (my ($name, $id) = $sth->fetchrow_array) {
-            $file_ids_in_table{$name} = $id;
+        while (my ($cpanid, $name, $id) = $sth->fetchrow_array) {
+            $file_ids_in_table{"$cpanid|$name"} = $id;
         }
 
-        my %file_ids_in_02packages; # key=filename, val=id (or undef if already exists in db)
+        my %file_ids_in_02packages; # key="cpanid|filename", val=id (or undef if already exists in db)
         my $line = 0;
         while (<$fh>) {
             $line++;
@@ -796,16 +810,16 @@ sub _update_index {
                 next;
             };
             my $file_id;
-            if (exists $file_ids_in_02packages{$file}) {
-                $file_id = $file_ids_in_02packages{$file};
+            if (exists $file_ids_in_02packages{"$author|$file"}) {
+                $file_id = $file_ids_in_02packages{"$author|$file"};
             } else {
                 $sth_sel_file->execute($file);
                 unless ($sth_sel_file->fetchrow_arrayref) {
                     $sth_ins_file->execute($file, $author);
                     $file_id = $dbh->last_insert_id("","","","");
-                    $log->tracef("  New file: %s", $file);
+                    $log->tracef("  New file: %s (author %s)", $file, $author);
                 }
-                $file_ids_in_02packages{$file} = $file_id;
+                $file_ids_in_02packages{"$author|$file"} = $file_id;
             }
             next unless $file_id;
 
@@ -824,11 +838,11 @@ sub _update_index {
       CLEANUP:
         {
             my @old_file_ids;
-            my @old_filenames;
-            for my $fname (sort keys %file_ids_in_table) {
-                next if exists $file_ids_in_02packages{$fname};
-                push @old_file_ids, $file_ids_in_table{$fname};
-                push @old_filenames, $fname;
+            my @old_file_entries; # ("author|filename", ...)
+            for my $k (sort keys %file_ids_in_table) {
+                next if exists $file_ids_in_02packages{$k};
+                push @old_file_ids, $file_ids_in_table{$k};
+                push @old_file_entries, $k;
             }
             last CLEANUP unless @old_file_ids;
             $log->tracef("  Deleting old dep records");
@@ -862,7 +876,7 @@ sub _update_index {
                 $log->tracef("  Deleting old dist records");
                 $dbh->do("DELETE FROM dist WHERE file_id IN (".join(",",@old_file_ids).")");
             }
-            $log->tracef("  Deleting old file records (%d): %s", ~~@old_filenames, \@old_filenames);
+            $log->tracef("  Deleting old file records (%d): %s", ~~@old_file_entries, \@old_file_entries);
             $dbh->do("DELETE FROM file WHERE id IN (".join(",",@old_file_ids).")");
         }
 
@@ -910,7 +924,7 @@ sub _update_index {
 
             $log->infof("[#%i] Processing file %s ...", $i, $file->{name});
             my $status;
-            my $path = _relpath($file->{name}, $cpan, $file->{cpanid});
+            my $path = _fullpath($file->{name}, $cpan, $file->{cpanid});
 
             unless (-f $path) {
                 $log->errorf("File %s doesn't exist, skipped", $path);
@@ -2002,7 +2016,9 @@ LEFT JOIN dist d ON f1.id=d.file_id
     my $sth = $dbh->prepare($sql);
     $sth->execute(@bind);
     while (my $row = $sth->fetchrow_hashref) {
-        if ($args{full_path}) { $row->{name} = _relpath($row->{name}, $state->{cpan}, $row->{author}) }
+        $row->{name} = $args{full_path} ?
+            _fullpath($row->{name}, $state->{cpan}, $row->{author}) :
+            _relpath($row->{name}, $row->{author});
         push @res, $detail ? $row : $row->{name};
     }
     my $resmeta = {};

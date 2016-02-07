@@ -42,7 +42,7 @@ ORDER BY version_numified DESC
 
     return [404, "No release for module '$mod'"] unless $row;
 
-    my $srcpath = App::lcpan::_relpath(
+    my $srcpath = App::lcpan::_fullpath(
         $row->{name}, $state->{cpan}, $row->{cpanid});
     my $targetpath = $row->{name};
 

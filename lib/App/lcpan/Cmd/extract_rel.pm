@@ -39,7 +39,7 @@ WHERE name=?
 
     return [404, "No such release"] unless $row;
 
-    my $path = App::lcpan::_relpath(
+    my $path = App::lcpan::_fullpath(
         $row->{name}, $state->{cpan}, $row->{cpanid});
 
     (-f $path) or return [404, "File not found: $path"];
