@@ -1,5 +1,19 @@
 Revision history for App-lcpan
 
+0.66    2016-02-08 (PERLANCAR) (unreleased)
+
+        - Bump database schema version to v8. We are now indexing more stuffs:
+          mtime/size of files, content of files (files inside release files)
+          along with their mtime/uncompressed size, scripts. We also parse PODs
+          of module/script files inside each release files, so we now record the
+          abstract of each module/script, and mentions/references of modules &
+          scripts in POD of modules/scripts.
+
+        - This version forces a full reindex.
+
+        - New subcommands: contents,
+
+
 0.66    2016-02-07 (PERLANCAR)
 
         - [Bugfix] file should be indexed by (cpanid,name) not (name) because

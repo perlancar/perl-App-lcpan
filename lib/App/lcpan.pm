@@ -9,6 +9,7 @@ use warnings;
 use Log::Any::IfLOG '$log';
 
 use Function::Fallback::CoreOrPP qw(clone);
+use List::Util qw(first);
 
 use Exporter;
 our @ISA = qw(Exporter);
@@ -300,12 +301,26 @@ our $db_schema_spec = {
              name TEXT NOT NULL,
              cpanid VARCHAR(20) NOT NULL REFERENCES author(cpanid),
 
-             -- processing status: ok (meta has been extracted and parsed),
-             -- nofile (file does not exist in mirror), unsupported (file
-             -- type is not supported, e.g. rar, non archive), metaerr
-             -- (META.json/META.yml has some error), nometa (no
-             -- META.json/META.yml found), err (other error).
-             status TEXT,
+             mtime INT,
+             size INT,
+
+             -- file status: ok (archive type is known, content can be listed,
+             -- and at least some files can be extracted), nofile (file does not
+             -- exist in mirror), unsupported (archive type is not supported,
+             -- e.g. rar, pm.gz)
+
+             file_status TEXT,
+
+             -- META.* processing status: ok (meta has been extracted and
+             -- parsed), metaerr (META.json/META.yml has some error), nometa (no
+             -- META.json/META.yml found).
+
+             meta_status TEXT,
+
+             -- POD processing status: ok (POD has been extracted and
+             -- parsed/indexed), NULL (has not been processed yet).
+
+             pod_status TEXT,
 
              has_metajson INTEGER,
              has_metayml INTEGER,
@@ -314,17 +329,58 @@ our $db_schema_spec = {
         )',
         'CREATE UNIQUE INDEX ix_file__cpanid__name ON file(cpanid,name)',
 
+        # files inside the release archive file
+        'CREATE TABLE content (
+             id INTEGER NOT NULL PRIMARY KEY,
+             file_id INTEGER NOT NULL REFERENCES file(id),
+             path TEXT NOT NULL,
+
+             mtime INT,
+             size INT, -- uncompressed size
+
+             -- POD processing status: ok (POD has been parsed and indexed),
+             -- error (POD cannot be parsed for some reason), none (we think
+             -- this content does not have POD and thus skipped), NULL (has not
+             -- been indexed/looked at)
+             pod_status TEXT
+        )',
+        'CREATE UNIQUE INDEX ix_content__file_id__path ON content(file_id, path)',
+
         'CREATE TABLE module (
              id INTEGER NOT NULL PRIMARY KEY,
              name VARCHAR(255) NOT NULL,
              cpanid VARCHAR(20) NOT NULL REFERENCES author(cpanid), -- [cache]
              file_id INTEGER NOT NULL,
              version VARCHAR(20),
-             version_numified DECIMAL
+             version_numified DECIMAL,
+             content_id INTEGER REFERENCES content(id),
+             abstract TEXT,
          )',
         'CREATE UNIQUE INDEX ix_module__name ON module(name)',
         'CREATE INDEX ix_module__file_id ON module(file_id)',
         'CREATE INDEX ix_module__cpanid ON module(cpanid)',
+
+        'CREATE TABLE script (
+             id INTEGER NOT NULL PRIMARY KEY,
+             file_id INTEGER NOT NULL REFERENCES file(id), -- [cache]
+             name TEXT NOT NULL,
+             content_id INT REFERENCES content(id)
+        )',
+        'CREATE UNIQUE INDEX ix_script__file_id__name ON script(file_id, name)',
+        'CREATE INDEX ix_script__name ON script(name)',
+
+        'CREATE TABLE module_pod_mention (
+             id INTEGER NOT NULL PRIMARY KEY,
+             source_content_id INT NOT NULL REFERENCES content(id),
+             module_id INTEGER, -- if module is known (listed in module table), only its id will be recorded here
+             module_name TEXT   -- if module is unknown (unlisted in module table), only the name will be recorded here
+        )',
+
+        'CREATE TABLE script_pod_mention (
+             id INTEGER NOT NULL PRIMARY KEY,
+             source_content_id INT NOT NULL REFERENCES content(id),
+             script_id INT NOT NULL REFERENCES script(id)
+        )',
 
         'CREATE TABLE namespace (
             name VARCHAR(255) NOT NULL,
@@ -443,6 +499,91 @@ our $db_schema_spec = {
         # dir1/File-1.0.tar.gz and dir2/File-1.0.tar.gz.
         'DROP INDEX ix_file__name',
         'CREATE UNIQUE INDEX ix_file__cpanid__name ON file(cpanid,name)',
+    ],
+
+    upgrade_to_v8 => [
+        # empty all data, we're now indexing the contents of each release
+        # because we want to index more (scripts, module mentions in POD, etc)
+        \&_reset,
+
+        # we are deleting a column
+        'DROP TABLE file',
+        'CREATE TABLE file (
+             id INTEGER NOT NULL PRIMARY KEY,
+             name TEXT NOT NULL,
+             cpanid VARCHAR(20) NOT NULL REFERENCES author(cpanid),
+
+             mtime INT,
+             size INT,
+
+             -- file status: ok (archive type is known, content can be listed,
+             -- and at least some files can be extracted), nofile (file does not
+             -- exist in mirror), unsupported (archive type is not supported,
+             -- e.g. rar, pm.gz)
+
+             file_status TEXT,
+
+             -- META.* processing status: ok (meta has been extracted and
+             -- parsed), metaerr (META.json/META.yml has some error), nometa (no
+             -- META.json/META.yml found).
+
+             meta_status TEXT,
+
+             -- POD processing status: ok (POD has been extracted and
+             -- parsed/indexed), NULL (has not been processed yet).
+
+             pod_status TEXT,
+
+             has_metajson INTEGER,
+             has_metayml INTEGER,
+             has_makefilepl INTEGER,
+             has_buildpl INTEGER
+        )',
+
+        'CREATE TABLE content (
+             id INTEGER NOT NULL PRIMARY KEY,
+             file_id INTEGER NOT NULL REFERENCES file(id),
+             path TEXT NOT NULL,
+
+             mtime INT,
+             size INT, -- uncompressed size
+
+             -- POD processing status: ok (POD has been parsed and indexed),
+             -- error (POD cannot be parsed for some reason), none (we think
+             -- this content does not have POD and thus skipped), NULL (has not
+             -- been indexed/looked at)
+
+             pod_status TEXT
+        )',
+        'CREATE UNIQUE INDEX ix_content__file_id__path ON content(file_id, path)',
+
+        'ALTER TABLE module ADD COLUMN content_id INTEGER REFERENCES content(id)',
+        'ALTER TABLE module ADD COLUMN abstract TEXT',
+
+        'CREATE TABLE script (
+             id INTEGER NOT NULL PRIMARY KEY,
+             file_id INTEGER NOT NULL REFERENCES file(id), -- [cache]
+             name TEXT NOT NULL,
+             abstract TEXT,
+             content_id INT REFERENCES content(id)
+        )',
+        'CREATE UNIQUE INDEX ix_script__file_id__name ON script(file_id, name)',
+        'CREATE INDEX ix_script__name ON script(name)',
+
+        # list which modules are mentioned in POD
+        'CREATE TABLE module_pod_mention (
+             id INTEGER NOT NULL PRIMARY KEY,
+             source_content_id INT NOT NULL REFERENCES content(id),
+             module_id INTEGER, -- if module is known (listed in module table), only its id will be recorded here
+             module_name TEXT   -- if module is unknown (unlisted in module table), only the name will be recorded here
+        )',
+
+        # list which scripts are mentioned in POD
+        'CREATE TABLE script_pod_mention (
+             id INTEGER NOT NULL PRIMARY KEY,
+             source_content_id INT NOT NULL REFERENCES content(id),
+             script_id INT NOT NULL REFERENCES script(id)
+        )',
     ],
 
     # for testing
@@ -783,7 +924,7 @@ sub _update_index {
         open my($fh), "<:gzip", $path or die "Can't open $path (<:gzip): $!";
 
         my $sth_sel_file = $dbh->prepare("SELECT id FROM file WHERE name=? AND cpanid=?");
-        my $sth_ins_file = $dbh->prepare("INSERT INTO file (name,cpanid) VALUES (?,?)");
+        my $sth_ins_file = $dbh->prepare("INSERT INTO file (name,cpanid,mtime,size) VALUES (?,?,?,?)");
         my $sth_ins_mod  = $dbh->prepare("INSERT INTO module (name,file_id,cpanid,version,version_numified) VALUES (?,?,?,?,?)");
         my $sth_upd_mod  = $dbh->prepare("UPDATE module SET file_id=?,cpanid=?,version=?,version_numified=? WHERE name=?"); # sqlite currently does not have upsert
 
@@ -813,9 +954,11 @@ sub _update_index {
             if (exists $file_ids_in_02packages{"$author|$file"}) {
                 $file_id = $file_ids_in_02packages{"$author|$file"};
             } else {
-                $sth_sel_file->execute($file);
+                $sth_sel_file->execute($file, $author);
+                my $path = _fullpath($file, $cpan, $author);
+                my @stat = stat $path;
                 unless ($sth_sel_file->fetchrow_arrayref) {
-                    $sth_ins_file->execute($file, $author);
+                    $sth_ins_file->execute($file, $author, @stat ? $stat[9] : undef, @stat ? $stat[7] : undef);
                     $file_id = $dbh->last_insert_id("","","","");
                     $log->tracef("  New file: %s (author %s)", $file, $author);
                 }
@@ -845,8 +988,10 @@ sub _update_index {
                 push @old_file_entries, $k;
             }
             last CLEANUP unless @old_file_ids;
+
             $log->tracef("  Deleting old dep records");
             $dbh->do("DELETE FROM dep WHERE file_id IN (".join(",",@old_file_ids).")");
+
             {
                 my $sth = $dbh->prepare("SELECT name FROM module WHERE file_id IN (".join(",",@old_file_ids).")");
                 $sth->execute;
@@ -867,6 +1012,7 @@ sub _update_index {
                 $log->tracef("  Deleting old module records");
                 $dbh->do("DELETE FROM module WHERE file_id IN (".join(",",@old_file_ids).")");
             }
+
             {
                 my $sth = $dbh->prepare("SELECT name FROM dist WHERE file_id IN (".join(",",@old_file_ids).")");
                 $sth->execute;
@@ -876,6 +1022,19 @@ sub _update_index {
                 $log->tracef("  Deleting old dist records");
                 $dbh->do("DELETE FROM dist WHERE file_id IN (".join(",",@old_file_ids).")");
             }
+
+            $log->tracef("  Deleting old module_pod_mention records");
+            $dbh->do("DELETE FROM module_pod_mention WHERE source_content_id IN (SELECT id FROM content WHERE file_id IN (".join(",",@old_file_ids)."))");
+
+            $log->tracef("  Deleting old script_pod_mention records");
+            $dbh->do("DELETE FROM script_pod_mention WHERE source_content_id IN (SELECT id FROM content WHERE file_id IN (".join(",",@old_file_ids)."))");
+
+            $log->tracef("  Deleting old script records");
+            $dbh->do("DELETE FROM script WHERE file_id IN (".join(",",@old_file_ids).")");
+
+            $log->tracef("  Deleting old content records");
+            $dbh->do("DELETE FROM content WHERE file_id IN (".join(",",@old_file_ids).")");
+
             $log->tracef("  Deleting old file records (%d): %s", ~~@old_file_entries, \@old_file_entries);
             $dbh->do("DELETE FROM file WHERE id IN (".join(",",@old_file_ids).")");
         }
@@ -883,7 +1042,9 @@ sub _update_index {
         $dbh->commit;
     }
 
-    # for each new file, try to extract its CPAN META or Makefile.PL/Build.PL
+    # for each new file, list its content, try to extract its CPAN META or
+    # Makefile.PL/Build.PL (dependencies information), parse its PODs
+    # (module/script abstracts, 'mentions' information)
     {
         my $sth = $dbh->prepare("SELECT * FROM file WHERE status IS NULL");
         $sth->execute;
@@ -894,6 +1055,7 @@ sub _update_index {
 
         my $sth_set_file_status = $dbh->prepare("UPDATE file SET status=? WHERE id=?");
         my $sth_set_file_status_etc = $dbh->prepare("UPDATE file SET status=?,has_metajson=?,has_metayml=?,has_makefilepl=?,has_buildpl=? WHERE id=?");
+        my $sth_ins_content = $dbh->prepare("INSERT INTO content (file_id,path,mtime,size) VALUES (?,?,?,?)");
         my $sth_ins_dist = $dbh->prepare("INSERT OR REPLACE INTO dist (name,cpanid,abstract,file_id,version,version_numified) VALUES (?,?,?,?,?,?)");
         my $sth_upd_dist = $dbh->prepare("UPDATE dist SET cpanid=?,abstract=?,file_id=?,version=?,version_numified=? WHERE id=?");
         my $sth_ins_dep = $dbh->prepare("INSERT OR REPLACE INTO dep (file_id,dist_id,module_id,module_name,phase,rel, version,version_numified) VALUES (?,?,?,?,?,?, ?,?)");
@@ -904,7 +1066,7 @@ sub _update_index {
 
       FILE:
         for my $file (@files) {
-            if ($args{skip_index_files} && grep {$_ eq $file->{name}} @{ $args{skip_index_files} }) {
+            if ($args{skip_index_files} && first {$_ eq $file->{name}} @{ $args{skip_index_files} }) {
                 $log->infof("Skipped file %s (skip_index_files)", $file->{name});
                 next FILE;
             }
@@ -942,6 +1104,7 @@ sub _update_index {
                     next FILE;
                 }
 
+                my @members;
               L1:
                 eval {
                     if ($path =~ /\.zip$/i) {
@@ -949,11 +1112,16 @@ sub _update_index {
                         my $zip = Archive::Zip->new;
                         $zip->read($path) == Archive::Zip::AZ_OK()
                             or die "Can't read zip file";
-                        my @members = $zip->members;
-                        $has_metajson   = (grep {m!^[/\\]?(?:[^/\\]+[/\\])?META\.json$!} @members) ? 1:0;
-                        $has_metayml    = (grep {m!^[/\\]?(?:[^/\\]+[/\\])?META\.yml$!} @members) ? 1:0;
-                        $has_makefilepl = (grep {m!^[/\\]?(?:[^/\\]+[/\\])?Makefile\.PL$!} @members) ? 1:0;
-                        $has_buildpl    = (grep {m!^[/\\]?(?:[^/\\]+[/\\])?Build\.PL$!} @members) ? 1:0;
+                        @members = $zip->members;
+                        for my $member (@members) {
+                            # skip directory/symlinks
+                            next if $member->{isSymbolicLink} || $member->{fileName} =~ m!/\z!;
+                            $sth_ins_content->execute($file->{id}, $member->{fileName}, $member->{lastModFileDateTime}, $member->{uncompressedSize});
+                        }
+                        $has_metajson   = (first {m!^[/\\]?(?:[^/\\]+[/\\])?META\.json$!} @members) ? 1:0;
+                        $has_metayml    = (first {m!^[/\\]?(?:[^/\\]+[/\\])?META\.yml$!} @members) ? 1:0;
+                        $has_makefilepl = (first {m!^[/\\]?(?:[^/\\]+[/\\])?Makefile\.PL$!} @members) ? 1:0;
+                        $has_buildpl    = (first {m!^[/\\]?(?:[^/\\]+[/\\])?Build\.PL$!} @members) ? 1:0;
 
                         for my $member (@members) {
                             if ($member->fileName =~ m!(?:/|\\)(META\.yml|META\.json)$!) {
@@ -975,17 +1143,23 @@ sub _update_index {
                         require Archive::Tar;
                         my $tar = Archive::Tar->new;
                         $tar->read($path);
-                        my @members = $tar->list_files;
-                        $has_metajson   = (grep {m!/([^/]+)?META\.json$!} @members) ? 1:0;
-                        $has_metayml    = (grep {m!/([^/]+)?META\.yml$!} @members) ? 1:0;
-                        $has_makefilepl = (grep {m!/([^/]+)?Makefile\.PL$!} @members) ? 1:0;
-                        $has_buildpl    = (grep {m!/([^/]+)?Build\.PL$!} @members) ? 1:0;
+                        @members = $tar->list_files(["name","mode","mtime","size"]);
+                        for my $member (@members) {
+                            # skip non-regular files
+                            next if $member->{mode} > 0777;
+                            next if $member->{name} =~ m!/\z!;
+                            $sth_ins_content->execute($file->{id}, $member->{name}, $member->{mtime}, $member->{size});
+                        }
+                        $has_metajson   = (first {$_->{name} =~ m!/([^/]+)?META\.json$!} @members) ? 1:0;
+                        $has_metayml    = (first {$_->{name} =~ m!/([^/]+)?META\.yml$!} @members) ? 1:0;
+                        $has_makefilepl = (first {$_->{name} =~ m!/([^/]+)?Makefile\.PL$!} @members) ? 1:0;
+                        $has_buildpl    = (first {$_->{name} =~ m!/([^/]+)?Build\.PL$!} @members) ? 1:0;
 
                         for my $member (@members) {
-                            if ($member =~ m!/(META\.yml|META\.json)$!) {
-                                $log->tracef("  found %s", $member);
+                            if ($member->{name} =~ m!/(META\.yml|META\.json)$!) {
+                                $log->tracef("  found %s", $member->{name});
                                 my $type = $1;
-                                my ($obj) = $tar->get_files($member);
+                                my ($obj) = $tar->get_files($member->{name});
                                 my $content = $obj->get_content;
                                 #$log->trace("[[$content]]");
                                 if ($type eq 'META.yml') {
@@ -1007,6 +1181,12 @@ sub _update_index {
                     $sth_set_file_status->execute("err", $file->{id});
                     next FILE;
                 }
+
+                # list scripts
+                # XXX
+
+                # parse PODs
+                # XXX
             } # GET_META
 
             unless ($meta) {
@@ -1227,8 +1407,12 @@ sub _reset {
     my $dbh = shift;
     $dbh->do("DELETE FROM dep");
     $dbh->do("DELETE FROM namespace");
+    $dbh->do("DELETE FROM module_pod_mention");
     $dbh->do("DELETE FROM module");
+    $dbh->do("DELETE FROM script_pod_mention");
+    $dbh->do("DELETE FROM script");
     $dbh->do("DELETE FROM dist");
+    $dbh->do("DELETE FROM content");
     $dbh->do("DELETE FROM file");
     $dbh->do("DELETE FROM author");
 }
