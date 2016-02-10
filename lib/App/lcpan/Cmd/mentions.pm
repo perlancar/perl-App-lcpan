@@ -98,7 +98,6 @@ LEFT JOIN module ON module.id=mention.module_id".
     my $sth = $dbh->prepare($sql);
     $sth->execute(@bind);
     while (my $row = $sth->fetchrow_hashref) {
-        use DD; dd $row;
         if (defined($mentioned_module) || $type =~ /module/) {
             delete $row->{script};
             delete $row->{script_author};
