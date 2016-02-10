@@ -1769,6 +1769,10 @@ sub stats {
 FROM file");
     ($stat->{schema_version}) = $dbh->selectrow_array("SELECT value FROM meta WHERE name='schema_version'");
 
+    ($stat->{num_scripts}) = $dbh->selectrow_array("SELECT COUNT(DISTINCT name) FROM script");
+    ($stat->{num_content}) = $dbh->selectrow_array("SELECT COUNT(*) FROM content");
+    ($stat->{num_mentions}) = $dbh->selectrow_array("SELECT COUNT(*) FROM mention");
+
     {
         my ($time) = $dbh->selectrow_array("SELECT value FROM meta WHERE name='last_index_time'");
         $stat->{raw_last_index_time} = $time;
