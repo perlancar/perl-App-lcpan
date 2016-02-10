@@ -44,6 +44,23 @@ _
             completion => \&App::lcpan::_complete_script,
             tags => ['category:filtering'],
         },
+        mentioned_author => {
+            summary => 'Filter by author of module/script being mentioned',
+            schema => 'str*',
+            tags => ['category:filtering'],
+        },
+        mentioner_author => {
+            summary => 'Filter by author of module/script being mentioned',
+            schema => 'str*',
+            tags => ['category:filtering'],
+        },
+        #mentioner_authors_arent => {
+        mentioner_author_isnt => {
+            #'x.name.is_plural' => 1,
+            #'x.name.singular' => 'mentioner_author_isnt',
+            schema => ['array*', of=>'str*'],
+            tags => ['category:filtering'],
+        },
         #%App::lcpan::fauthor_args,
     },
 };
@@ -56,14 +73,18 @@ sub handle_cmd {
     my $type = $args{type} // 'any';
     my $mentioned_module = $args{mentioned_module};
     my $mentioned_script = $args{mentioned_script};
+    my $mentioned_author = $args{mentioned_author};
+    my $mentioner_author = $args{mentioner_author};
+    my $mentioner_authors_arent = $args{mentioner_author_isnt}; #$args{mentioner_authors_arent};
 
     my @bind;
     my @where;
+    #my @having;
 
     if ($type eq 'script') {
         push @where, "mention.script_name IS NOT NULL";
     } elsif ($type eq 'module') {
-        push @where, "mention.module_id IS NOT NULL OR mention.module_name IS NOT NULL";
+        push @where, "(mention.module_id IS NOT NULL OR mention.module_name IS NOT NULL)";
     } elsif ($type eq 'known-module') {
         push @where, "mention.module_id IS NOT NULL";
     } elsif ($type eq 'unknown-module') {
@@ -71,13 +92,33 @@ sub handle_cmd {
     }
 
     if (defined $mentioned_module) {
-        push @where, "module.name=? OR mention.module_name=?";
+        push @where, "(module.name=? OR mention.module_name=?)";
         push @bind, $mentioned_module, $mentioned_module;
     }
 
     if (defined $mentioned_script) {
         push @where, "mention.script_name=?";
         push @bind, $mentioned_script;
+    }
+
+    if (defined $mentioned_author) {
+        $mentioned_author = uc($mentioned_author); # just to be sure
+        push @where, "(module_author=? OR script_author=?)";
+        push @bind, $mentioned_author, $mentioned_author;
+    }
+
+    if (defined $mentioner_author) {
+        $mentioner_author = uc($mentioner_author); # just to be sure
+        push @where, "mentioner_author=?";
+        push @bind, $mentioner_author;
+    }
+
+    if (defined($mentioner_authors_arent) && @$mentioner_authors_arent) {
+        for my $author (@$mentioner_authors_arent) {
+            $author = uc($author); # just to be sure
+            push @where, "mentioner_author <> ?";
+            push @bind, $author;
+        }
     }
 
     my $sql = "SELECT
@@ -87,12 +128,13 @@ sub handle_cmd {
   module.cpanid module_author,
   mention.script_name script,
   (SELECT cpanid FROM script WHERE name=mention.script_name LIMIT 1) script_author,
-  file.cpanid release_author
+  file.cpanid mentioner_author
 FROM mention
 LEFT JOIN file ON file.id=mention.source_file_id
 LEFT JOIN content ON content.id=mention.source_content_id
 LEFT JOIN module ON module.id=mention.module_id".
-    (@where ? " WHERE ".join(" AND ", @where) : "");
+    (@where ? " WHERE ".join(" AND ", @where) : "");#.
+    #(@having ? " HAVING ".join(" AND ", @having) : "");
 
     my @res;
     my $sth = $dbh->prepare($sql);
@@ -109,7 +151,7 @@ LEFT JOIN module ON module.id=mention.module_id".
         push @res, $row;
     }
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/module script content_path release release_author/];
+    $resmeta->{'table.fields'} = [qw/module script content_path release mentioner_author/];
 
     if (defined($mentioned_module) || $type =~ /module/) {
         $resmeta->{'table.fields'} =
