@@ -47,11 +47,13 @@ _
         mentioned_author => {
             summary => 'Filter by author of module/script being mentioned',
             schema => 'str*',
+            completion => \&App::lcpan::_complete_cpanid,
             tags => ['category:filtering'],
         },
         mentioner_author => {
             summary => 'Filter by author of module/script being mentioned',
             schema => 'str*',
+            completion => \&App::lcpan::_complete_cpanid,
             tags => ['category:filtering'],
         },
         #mentioner_authors_arent => {
@@ -59,6 +61,7 @@ _
             #'x.name.is_plural' => 1,
             #'x.name.singular' => 'mentioner_author_isnt',
             schema => ['array*', of=>'str*'],
+            element_completion => \&App::lcpan::_complete_cpanid,
             tags => ['category:filtering'],
         },
         #%App::lcpan::fauthor_args,
