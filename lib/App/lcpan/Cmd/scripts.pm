@@ -36,7 +36,7 @@ _
         %App::lcpan::fdist_args,
         %App::lcpan::query_multi_args,
         query_type => {
-            schema => ['str*', in=>[qw/any name exact-name/]],
+            schema => ['str*', in=>[qw/any name exact-name abstract/]],
             default => 'any',
         },
         #%App::lcpan::dist_args,
@@ -59,7 +59,15 @@ sub handle_cmd {
     {
         my @q_where;
         for my $q0 (@{ $args{query} // [] }) {
-            if ($qt eq 'any' || $qt eq 'name') {
+            if ($qt eq 'any') {
+                my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
+                push @q_where, "(script.name LIKE ? OR script.abstract LIKE ?)";
+                push @bind, $q, $q;
+            } elsif ($qt eq 'abstract') {
+                my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
+                push @q_where, "(script.abstract LIKE ?)";
+                push @bind, $q;
+            } elsif ($qt eq 'name') {
                 my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
                 push @q_where, "(script.name LIKE ?)";
                 push @bind, $q;
@@ -86,7 +94,8 @@ sub handle_cmd {
     my $sql = "SELECT
   file.name release,
   script.cpanid cpanid,
-  script.name name
+  script.name name,
+  script.abstract abstract
 FROM script
 LEFT JOIN file ON file.id=script.file_id".
     (@where ? " WHERE ".join(" AND ", @where) : "");
@@ -98,7 +107,7 @@ LEFT JOIN file ON file.id=script.file_id".
         push @res, $detail ? $row : $row->{name};
     }
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/name release cpanid/]
+    $resmeta->{'table.fields'} = [qw/name abstract release cpanid/]
         if $detail;
     [200, "OK", \@res, $resmeta];
 }

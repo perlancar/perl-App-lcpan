@@ -23,6 +23,10 @@ our @EXPORT_OK = qw(
                        rdeps
                );
 
+my @builtin_file_skip_list = (
+    'Perl-ToPerl6-0.031.tar.gz', # 2016-02-10 - too big, causes Archive::Tar to go out of mem
+);
+
 our %SPEC;
 
 our %common_args = (
@@ -75,6 +79,7 @@ our %query_args = (
         schema => 'str*',
         cmdline_aliases => {q=>{}},
         pos => 0,
+        tags => ['category:filtering'],
     },
     detail => {
         schema => 'bool',
@@ -89,6 +94,7 @@ our %query_multi_args = (
         cmdline_aliases => {q=>{}},
         pos => 0,
         greedy => 1,
+        tags => ['category:filtering'],
     },
     detail => {
         schema => 'bool',
@@ -97,6 +103,7 @@ our %query_multi_args = (
     or => {
         summary => 'When there are more than one query, perform OR instead of AND logic',
         schema  => ['bool', is=>1],
+        tags => ['category:filtering'],
     },
 );
 
@@ -106,6 +113,7 @@ our %fauthor_args = (
         schema => 'str*',
         cmdline_aliases => {a=>{}},
         completion => \&_complete_cpanid,
+        tags => ['category:filtering'],
     },
 );
 
@@ -115,12 +123,14 @@ our %fdist_args = (
         schema => 'str*',
         cmdline_aliases => {d=>{}},
         completion => \&_complete_dist,
+        tags => ['category:filtering'],
     },
 );
 
 our %flatest_args = (
     latest => {
         schema => ['bool*'],
+        tags => ['category:filtering'],
     },
 );
 
@@ -311,12 +321,14 @@ our $db_schema_spec = {
              -- reason)
 
              file_status TEXT,
+             file_error TEXT,
 
              -- META.* processing status: ok (meta has been extracted and
              -- parsed), err (META.json/META.yml has some error), nometa (no
              -- META.json/META.yml found).
 
              meta_status TEXT,
+             meta_error TEXT,
 
              -- POD processing status: ok (POD has been extracted and
              -- parsed/indexed).
@@ -335,6 +347,7 @@ our $db_schema_spec = {
              id INTEGER NOT NULL PRIMARY KEY,
              file_id INTEGER NOT NULL REFERENCES file(id),
              path TEXT NOT NULL,
+             package TEXT, -- only the first package declaration will be recorded
              mtime INT,
              size INT -- uncompressed size
         )',
@@ -365,18 +378,17 @@ our $db_schema_spec = {
         'CREATE UNIQUE INDEX ix_script__file_id__name ON script(file_id, name)',
         'CREATE INDEX ix_script__name ON script(name)',
 
-        'CREATE TABLE module_pod_mention (
+        'CREATE TABLE mention (
              id INTEGER NOT NULL PRIMARY KEY,
+             source_file_id INT NOT NULL REFERENCES file(id), -- [cache]
              source_content_id INT NOT NULL REFERENCES content(id),
-             module_id INTEGER, -- if module is known (listed in module table), only its id will be recorded here
-             module_name TEXT   -- if module is unknown (unlisted in module table), only the name will be recorded here
+             module_id INTEGER, -- if mention module and module is known (listed in module table), only its id will be recorded here
+             module_name TEXT,  -- if mention module and module is unknown (unlisted in module table), only the name will be recorded here
+             script_name TEXT   -- if mention script
         )',
-
-        'CREATE TABLE script_pod_mention (
-             id INTEGER NOT NULL PRIMARY KEY,
-             source_content_id INT NOT NULL REFERENCES content(id),
-             script_id INT NOT NULL REFERENCES script(id)
-        )',
+        'CREATE UNIQUE INDEX ix_mention__module_id__source_content_id   ON mention(module_id, source_content_id)',
+        'CREATE UNIQUE INDEX ix_mention__module_name__source_content_id ON mention(module_name, source_content_id)',
+        'CREATE UNIQUE INDEX ix_mention__script_name__source_content_id ON mention(script_name, source_content_id)',
 
         'CREATE TABLE namespace (
             name VARCHAR(255) NOT NULL,
@@ -518,12 +530,14 @@ our $db_schema_spec = {
              -- e.g. rar, pm.gz)
 
              file_status TEXT,
+             file_error TEXT,
 
              -- META.* processing status: ok (meta has been extracted and
              -- parsed), metaerr (META.json/META.yml has some error), nometa (no
              -- META.json/META.yml found).
 
              meta_status TEXT,
+             meta_error TEXT,
 
              -- POD processing status: ok (POD has been extracted and
              -- parsed/indexed), NULL (has not been processed yet).
@@ -540,6 +554,7 @@ our $db_schema_spec = {
              id INTEGER NOT NULL PRIMARY KEY,
              file_id INTEGER NOT NULL REFERENCES file(id),
              path TEXT NOT NULL,
+             package TEXT, -- only the first package declaration will be recorded
              mtime INT,
              size INT -- uncompressed size
         )',
@@ -559,20 +574,17 @@ our $db_schema_spec = {
         'CREATE UNIQUE INDEX ix_script__file_id__name ON script(file_id, name)',
         'CREATE INDEX ix_script__name ON script(name)',
 
-        # list which modules are mentioned in POD
-        'CREATE TABLE module_pod_mention (
+        'CREATE TABLE mention (
              id INTEGER NOT NULL PRIMARY KEY,
+             source_file_id INT NOT NULL REFERENCES file(id), -- [cache]
              source_content_id INT NOT NULL REFERENCES content(id),
-             module_id INTEGER, -- if module is known (listed in module table), only its id will be recorded here
-             module_name TEXT   -- if module is unknown (unlisted in module table), only the name will be recorded here
+             module_id INTEGER, -- if mention module and module is known (listed in module table), only its id will be recorded here
+             module_name TEXT,  -- if mention module and module is unknown (unlisted in module table), only the name will be recorded here
+             script_name TEXT   -- if mention script
         )',
-
-        # list which scripts are mentioned in POD
-        'CREATE TABLE script_pod_mention (
-             id INTEGER NOT NULL PRIMARY KEY,
-             source_content_id INT NOT NULL REFERENCES content(id),
-             script_id INT NOT NULL REFERENCES script(id)
-        )',
+        'CREATE UNIQUE INDEX ix_mention__module_id__source_content_id   ON mention(module_id, source_content_id)',
+        'CREATE UNIQUE INDEX ix_mention__module_name__source_content_id ON mention(module_name, source_content_id)',
+        'CREATE UNIQUE INDEX ix_mention__script_name__source_content_id ON mention(script_name, source_content_id)',
     ],
 
     # for testing
@@ -685,6 +697,19 @@ sub _init {
     $App::lcpan::state;
 }
 
+# return "" if success, or error string
+sub _check_meta {
+    my $meta = shift;
+
+    unless (ref($meta) eq 'HASH') {
+        return "not a hash";
+    }
+    unless (defined $meta->{name}) {
+        return "does not contain name";
+    }
+    "";
+}
+
 sub _parse_meta_json {
     require Parse::CPAN::Meta;
 
@@ -694,12 +719,10 @@ sub _parse_meta_json {
     eval {
         $data = Parse::CPAN::Meta->load_json_string($content);
     };
-    if ($@) {
-        $log->errorf("Can't parse META.json: %s", $@);
-        return undef;
-    } else {
-        return $data;
-    }
+    return ($@, undef) if $@;
+    my $metaerr = _check_meta($data);
+    return ($metaerr, undef) if $metaerr;
+    return ("", $data);
 }
 
 sub _parse_meta_yml {
@@ -711,12 +734,10 @@ sub _parse_meta_yml {
     eval {
         $data = Parse::CPAN::Meta->load_yaml_string($content);
     };
-    if ($@) {
-        $log->errorf("Can't parse META.yml: %s", $@);
-        return undef;
-    } else {
-        return $data;
-    }
+    return ($@, undef) if $@;
+    my $metaerr = _check_meta($data);
+    return ($metaerr, undef) if $metaerr;
+    return ("", $data);
 }
 
 sub _add_prereqs {
@@ -747,54 +768,82 @@ sub _index_pod {
         $sth_sel_script,
         $sth_set_module_abstract,
         $sth_set_script_abstract,
-        $sth_ins_module_pod_mention,
-        $sth_ins_script_pod_mention,
+        $sth_set_content_package,
+
+        $module_ids,
+        $module_file_ids,
+        $script_file_ids,
+        $scripts_re,
+        $sth_ins_mention,
     ) = @_;
 
-    $log->tracef("  Indexing POD of %s", $content_path, $file_name);
+    $log->tracef("  Indexing POD of %s", $content_path);
+
+    my $abstract;
+    if ($ct =~ /^=head1 \s+ NAME\s*\R
+                \s*\R
+                \S+ \s+ - \s+ ([^\r\n]+)
+               /mx) {
+        $abstract = $1;
+    }
 
     my $pkg;
+    my ($module_id, $script_id);
     if ($ct =~ /^\s*package [ \t]+ ([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z0-9_]+)*)\b
                /mx) {
         $pkg = $1;
+        $log->tracef("  found package declaration '%s'", $pkg);
+        $sth_set_content_package->execute($pkg, $content_id);
+
+        if ($type eq 'pm_or_pod') {
+            # set module abstract if pkg refers to a known module
+            $sth_sel_mod->execute($pkg);
+            my $row = $sth_sel_mod->fetchrow_hashref;
+            $sth_sel_mod->finish;
+            if ($row) {
+                $module_id = $row->{id};
+                if ($abstract) {
+                    $log->tracef("  set abstract for module %s: %s", $pkg, $abstract);
+                    $sth_set_module_abstract->execute($abstract, $module_id);
+                }
+            }
+        }
     }
 
-    my ($module_id, $script_id);
-    if ($type eq 'module') {
-        if (!$pkg) {
-            $log->warnf("No package declaration in %s (%s), skipped", $content_path, $file_name);
-            return;
-        }
-        $sth_sel_mod->execute($pkg);
-        my $row = $sth_sel_mod->fetchrow_hashref;
-        $sth_sel_mod->finish;
-        if (!$row) {
-            $log->warnf("Unknown module in package declaration in %s (%s), skipped",
-                        $content_path, $file_name);
-            return;
-        }
-        $module_id = $row->{id};
-    } else { # type=script
+    if (defined $script_name) {
         $sth_sel_script->execute($script_name, $file_id);
         my $row = $sth_sel_script->fetchrow_hashref;
         $sth_sel_script->finish;
         if (!$row) {
+            # shouldn't happen
             $log->warnf("BUG: Unknown script %s in %s (%s), skipped",
                         $script_name, $content_path, $file_name);
             return;
         }
         $script_id = $row->{id};
+        # set script abstract
+        if ($abstract) {
+            $log->tracef("  set abstract for script %s (%s): %s", $script_name, $file_name, $abstract);
+            $sth_set_script_abstract->execute($abstract, $script_id);
+        }
     }
 
-    if ($ct =~ /^=head1 \s+ NAME\s*\R
-                \s*\R
-                \S+ \s+ - \s+ ([^\r\n]+)
-               /mx) {
-        if ($type eq 'module') {
-            $sth_set_module_abstract->execute($module_id);
-        } else { # script
-            $sth_set_script_abstract->execute($script_id);
-        }
+    # list pod mentions
+    {
+        # turns out we cannot reuse Pod::Simple object? we must recreate the
+        # instance for every parse.
+
+        require App::lcpan::PodParser;
+        my $pod_parser = App::lcpan::PodParser->new;
+        $pod_parser->{file_id} = $file_id;
+        $pod_parser->{content_id} = $content_id;
+        $pod_parser->{module_ids} = $module_ids;
+        $pod_parser->{module_file_ids} = $module_file_ids;
+        $pod_parser->{script_file_ids} = $script_file_ids;
+        $pod_parser->{scripts_re} = $scripts_re;
+        $pod_parser->{sth_ins_mention} = $sth_ins_mention;
+
+        $pod_parser->parse_string_document($ct);
     }
 }
 
@@ -836,21 +885,6 @@ sub _update_files {
              {}, 'last_mirror_time', time());
 
     [200];
-}
-
-# return 1 if success
-sub _check_meta {
-    my $meta = shift;
-
-    unless (ref($meta) eq 'HASH') {
-        $log->infof("  meta is not a hash");
-        return 0;
-    }
-    unless (defined $meta->{name}) {
-        $log->errorf("  meta does not contain name");
-        return 0;
-    }
-    1;
 }
 
 sub _update_index {
@@ -1074,11 +1108,8 @@ sub _update_index {
                 $dbh->do("DELETE FROM dist WHERE file_id IN (".join(",",@old_file_ids).")");
             }
 
-            $log->tracef("  Deleting old module_pod_mention records");
-            $dbh->do("DELETE FROM module_pod_mention WHERE source_content_id IN (SELECT id FROM content WHERE file_id IN (".join(",",@old_file_ids)."))");
-
-            $log->tracef("  Deleting old script_pod_mention records");
-            $dbh->do("DELETE FROM script_pod_mention WHERE source_content_id IN (SELECT id FROM content WHERE file_id IN (".join(",",@old_file_ids)."))");
+            $log->tracef("  Deleting old mention records");
+            $dbh->do("DELETE FROM mention WHERE source_file_id IN (".join(",",@old_file_ids).")");
 
             $log->tracef("  Deleting old script records");
             $dbh->do("DELETE FROM script WHERE file_id IN (".join(",",@old_file_ids).")");
@@ -1093,8 +1124,20 @@ sub _update_index {
         $dbh->commit;
     }
 
+    my @passes;
+    #if ($args{skip_file_indexing_pass_1}) {
+    #    $log->info("Will be skipping file indexing pass 1");
+    #} else {
+        push @passes, 1;
+    #}
+    #if ($args{skip_file_indexing_pass_2}) {
+    #    $log->info("Will be skipping file indexing pass 2");
+    #} else {
+        push @passes, 2;
+    #}
+
   PROCESS_FILES:
-    for my $pass (1..2) {
+    for my $pass (@passes) {
         # we're processing files in two passes. the first pass will: insert
         # content, scripts, extract meta, insert dep information, set
         # file_status and meta_status. the second pass will: extract PODs and
@@ -1103,7 +1146,10 @@ sub _update_index {
         # we're doing it in two passes because we want to collect all known
         # scripts first to be able to detect links to scripts in POD.
 
-        my $sth = $dbh->prepare("SELECT * FROM file WHERE file_status IS NULL OR meta_status IS NULL OR pod_status IS NULL");
+        my $sth = $dbh->prepare(
+            $pass == 1 ?
+                "SELECT * FROM file WHERE file_status IS NULL OR meta_status IS NULL ORDER BY name" :
+                "SELECT * FROM file WHERE pod_status IS NULL ORDER BY name");
         $sth->execute;
 
         my @files;
@@ -1111,11 +1157,11 @@ sub _update_index {
             push @files, $row;
         }
 
-        my $sth_set_file_status = $dbh->prepare("UPDATE file SET file_status=? WHERE id=?");
+        my $sth_set_file_status = $dbh->prepare("UPDATE file SET file_status=?,file_error=? WHERE id=?");
         my $sth_ins_content = $dbh->prepare("INSERT INTO content (file_id,path,mtime,size) VALUES (?,?,?,?)");
         my $sth_ins_script = $dbh->prepare("INSERT INTO script (name, cpanid, content_id, file_id) VALUES (?,?,?,?)");
 
-        my $sth_set_meta_status = $dbh->prepare("UPDATE file SET meta_status=? WHERE id=?");
+        my $sth_set_meta_status = $dbh->prepare("UPDATE file SET meta_status=?,meta_error=? WHERE id=?");
         my $sth_set_meta_info = $dbh->prepare("UPDATE file SET has_metajson=?,has_metayml=?,has_makefilepl=?,has_buildpl=? WHERE id=?");
         my $sth_ins_dist = $dbh->prepare("INSERT OR REPLACE INTO dist (name,cpanid,abstract,file_id,version,version_numified) VALUES (?,?,?,?,?,?)");
         my $sth_upd_dist = $dbh->prepare("UPDATE dist SET cpanid=?,abstract=?,file_id=?,version=?,version_numified=? WHERE id=?");
@@ -1128,14 +1174,52 @@ sub _update_index {
         my $sth_sel_content = $dbh->prepare("SELECT * FROM content WHERE file_id=?");
         my $sth_set_module_abstract = $dbh->prepare("UPDATE module SET abstract=? WHERE id=?");
         my $sth_set_script_abstract = $dbh->prepare("UPDATE script SET abstract=? WHERE id=?");
-        my $sth_ins_module_pod_mention = $dbh->prepare("INSERT INTO module_pod_mention (source_content_id,module_id,module_name) VALUES (?,?,?)");
-        my $sth_ins_script_pod_mention = $dbh->prepare("INSERT INTO script_pod_mention (source_content_id,script_id) VALUES (?,?)");
+        my $sth_ins_mention = $dbh->prepare("INSERT OR IGNORE INTO mention (source_content_id,source_file_id,module_id,module_name,script_name) VALUES (?,?,?,?,?)");
+        my $sth_set_content_package = $dbh->prepare("UPDATE content SET package=? WHERE id=?");
+
+        my $module_ids; # hash, key=module name, value=module id
+        my $module_file_ids; # hash, key=module name, value=file id
+        my $script_file_ids; # hash, key=script name, value=[file id, ...]
+        my $scripts_re;
+        if ($pass == 2) {
+            # prepare the names of all scripts & modules, for quick reference
+            $module_ids = {};
+            $module_file_ids = {};
+            $script_file_ids = {};
+            my $sth = $dbh->prepare("SELECT id,file_id,name FROM module");
+            $sth->execute;
+            while (my $row = $sth->fetchrow_hashref) {
+                $module_ids->{$row->{name}} = $row->{id};
+                $module_file_ids->{$row->{name}} = $row->{file_id};
+            }
+
+            my %script_names;
+            $sth = $dbh->prepare("SELECT name,file_id FROM script");
+            $sth->execute;
+            while (my $row = $sth->fetchrow_hashref) {
+                $script_names{ $row->{name} }++;
+                $script_file_ids->{$row->{name}} //= [];
+                push @{ $script_file_ids->{$row->{name}} }, $row->{file_id};
+            }
+            my @script_names = sort {length($b) <=> length($a) || $a cmp $b}
+                keys %script_names;
+            $scripts_re = "\\A(?:" . join("|", map {quotemeta} @script_names) . ")\\z";
+            $scripts_re = qr/$scripts_re/;
+            $log->tracef("TMP: script_re = %s", $scripts_re);
+            $log->tracef("TMP: scripts_names = %s", \%script_names);
+        }
 
         my $i = 0;
         my $after_begin;
 
       FILE:
         for my $file (@files) {
+
+            if (first {$_ eq $file->{name}} @builtin_file_skip_list) {
+                $log->infof("Skipped file %s (built-in file skip list)", $file->{name});
+                next FILE;
+            }
+
             if ($args{skip_index_files} && first {$_ eq $file->{name}} @{ $args{skip_index_files} }) {
                 $log->infof("Skipped file %s (skip_index_files)", $file->{name});
                 next FILE;
@@ -1154,23 +1238,27 @@ sub _update_index {
             }
             $i++;
 
-            $log->infof("[pass %d/2][#%i/%d] Processing file %s ...",
-                        $pass, $i, ~~@files, $file->{name});
-
             my $path = _fullpath($file->{name}, $cpan, $file->{cpanid});
+
+            $log->infof("[pass %d/2][#%i/%d] Processing file %s ...",
+                        $pass, $i, ~~@files, $path);
 
             if (!$file->{file_status}) {
                 unless (-f $path) {
                     $log->errorf("File %s doesn't exist, skipped", $path);
-                    $sth_set_file_status->execute("nofile", $file->{id});
+                    $sth_set_file_status->execute("nofile", undef, $file->{id});
+                    $sth_set_meta_status->execute("nometa", undef, $file->{id});
                     next FILE;
                 }
                 if ($path !~ /(.+)\.(tar|tar\.gz|tar\.bz2|tar\.Z|tgz|tbz2?|zip)$/i) {
                     $log->errorf("Doesn't support file type: %s, skipped", $file->{name});
-                    $sth_set_file_status->execute("unsupported", $file->{id});
+                    $sth_set_file_status->execute("unsupported", undef, $file->{id});
+                    $sth_set_meta_status->execute("nometa", undef, $file->{id});
                     next FILE;
                 }
             }
+
+            next FILE if $file->{status} && $file->{status} =~ /\A(unsupported)\z/;
 
             my ($zip, $tar);
             my @members;
@@ -1180,20 +1268,26 @@ sub _update_index {
                 $zip->read($path) == Archive::Zip::AZ_OK()
                     or do {
                         $log->errorf("Can't read zip file '%s', skipped", $file->{name});
-                        $sth_set_file_status->execute("error", $file->{id});
+                        $sth_set_file_status->execute("err", "can't read zip", $file->{id});
+                        $sth_set_meta_status->execute("err", "file err", $file->{id});
                         next FILE;
                     };
+                #$log->tracef("  listing zip members ...");
                 @members = $zip->members;
+                #$log->tracef("  members: %s", \@members);
             } else {
                 require Archive::Tar;
                 eval {
                     $tar = Archive::Tar->new;
-                    $tar->read($path);
+                    $tar->read($path); # can still die untrapped when out of mem
+                    #$log->tracef("  listing tar members ...");
                     @members = $tar->list_files(["full_path","mode","mtime","size"]);
+                    #$log->tracef("  members: %s", \@members);
                 };
                 if ($@) {
                     $log->errorf("Can't read tar file '%s', skipped", $file->{name});
-                    $sth_set_file_status->execute("error", $file->{id});
+                    $sth_set_file_status->execute("err", $@, $file->{id});
+                    $sth_set_meta_status->execute("err", "file err", $file->{id});
                     next FILE;
                 }
             }
@@ -1209,7 +1303,8 @@ sub _update_index {
                     return (undef);
                 }
                 my $script_name = $1;
-                if ($script_name =~ /\A\./) { # e.g. "bin/.exists"
+                if ($script_name =~ /\A\./ # e.g. "bin/.exists"
+                        || $script_name =~ /\A(?:README(?:\.\w+)?)\z/) { # probably not a script
                     return (undef);
                 }
                 return ($script_name);
@@ -1217,17 +1312,27 @@ sub _update_index {
 
             my $code_is_pm_or_pod = sub {
                 my $name = shift;
-                unless ($name =~ m!\A
-                                   (?:\./)?
-                                   (?:[^/]+/)?
-                                   (?:lib/)?
-                                   (?:(?:[^/]+)/)*
-                                   [^/]+\.(?:pm|pod)?
-                                   \z
-                                  !ix) {
-                    return (undef);
+                # flat, *.pm in top-level
+                if ($name =~ m!\A
+                               (?:\./)?
+                               (?:[^/]+/)? # enclosing dir
+                               [^/]+\.(?:pm|pod)?
+                               \z
+                              !ix) {
+                    return 1;
                 }
-                return 1;
+                # *.pm under lib
+                if ($name =~ m!\A
+                               (?:\./)?
+                               (?:[^/]+/)? # enclosing dir
+                               lib/
+                               (?:[^/]+/)*
+                               [^/]+\.(?:pm|pod)?
+                               \z
+                              !ix) {
+                    return 1;
+                }
+                return 0;
             };
 
             if (!$file->{file_status}) {
@@ -1263,7 +1368,7 @@ sub _update_index {
                         }
                     }
                 }
-                $sth_set_file_status->execute("ok", $file->{id});
+                $sth_set_file_status->execute("ok", undef, $file->{id});
                 $file->{file_status} = 'ok';
             }
 
@@ -1286,15 +1391,17 @@ sub _update_index {
                             #$log->tracef("content=[[%s]]", $content);
                             my $content = $zip->contents($member);
                             if ($type eq 'META.yml') {
-                                $meta = _parse_meta_yml($content);
-                                unless (_check_meta($meta)) {
-                                    $sth_set_meta_status->execute("err", $file->{id});
+                                (my $metaerr, $meta) = _parse_meta_yml($content);
+                                if ($metaerr) {
+                                    $log->warnf("  error in meta: %s", $metaerr);
+                                    $sth_set_meta_status->execute("err", $metaerr, $file->{id});
                                     last GET_META;
                                 }
                             } elsif ($type eq 'META.json') {
-                                $meta = _parse_meta_json($content);
-                                unless (_check_meta($meta)) {
-                                    $sth_set_meta_status->execute("err", $file->{id});
+                                (my $metaerr, $meta) = _parse_meta_json($content);
+                                if ($metaerr) {
+                                    $log->warnf("  error in meta: %s", $metaerr);
+                                    $sth_set_meta_status->execute("err", $metaerr, $file->{id});
                                     last GET_META;
                                 }
                             }
@@ -1312,17 +1419,18 @@ sub _update_index {
                             my $type = $1;
                             my ($obj) = $tar->get_files($member->{full_path});
                             my $content = $obj->get_content;
-                            #$log->trace("[[$content]]");
                             if ($type eq 'META.yml') {
-                                $meta = _parse_meta_yml($content);
-                                unless (_check_meta($meta)) {
-                                    $sth_set_meta_status->execute("err", $file->{id});
+                                (my $metaerr, $meta) = _parse_meta_yml($content);
+                                if ($metaerr) {
+                                    $log->warnf("  error in meta: %s", $metaerr);
+                                    $sth_set_meta_status->execute("err", $metaerr, $file->{id});
                                     last GET_META;
                                 }
                             } elsif ($type eq 'META.json') {
-                                $meta = _parse_meta_json($content);
-                                unless (_check_meta($meta)) {
-                                    $sth_set_meta_status->execute("err", $file->{id});
+                                (my $metaerr, $meta) = _parse_meta_json($content);
+                                if ($metaerr) {
+                                    $log->warnf("  error in meta: %s", $metaerr);
+                                    $sth_set_meta_status->execute("err", $metaerr, $file->{id});
                                     last GET_META;
                                 }
                             }
@@ -1331,7 +1439,7 @@ sub _update_index {
                     }
                 }
 
-                $sth_set_meta_status->execute($meta ? "ok" : "nometa", $file->{id});
+                $sth_set_meta_status->execute($meta ? "ok" : "nometa", undef, $file->{id});
                 $sth_set_meta_info->execute($has_metajson, $has_metayml, $has_makefilepl, $has_buildpl, $file->{id});
                 last GET_META unless $meta;
 
@@ -1403,14 +1511,19 @@ sub _update_index {
                         $file->{id}, $file->{name}, $script_name,
                         $content->{id}, $content->{path},
                         $ct,
-                        defined($script_name) ? 'script' : 'module',
+                        defined($script_name) ? 'script' : 'pm_or_pod',
 
                         $sth_sel_mod,
                         $sth_sel_script,
                         $sth_set_module_abstract,
                         $sth_set_script_abstract,
-                        $sth_ins_module_pod_mention,
-                        $sth_ins_script_pod_mention,
+                        $sth_set_content_package,
+
+                        $module_ids,
+                        $module_file_ids,
+                        $script_file_ids,
+                        $scripts_re,
+                        $sth_ins_mention,
                     );
                 } # for each content
 
@@ -1548,6 +1661,12 @@ _
                 },
             },
         },
+        #skip_file_indexing_pass_1 => {
+        #    schema => ['bool', is=>1],
+        #},
+        #skip_file_indexing_pass_2 => {
+        #    schema => ['bool', is=>1],
+        #},
     },
     tags => ['write-to-db', 'write-to-fs'],
 };
@@ -1583,9 +1702,8 @@ sub _reset {
     my $dbh = shift;
     $dbh->do("DELETE FROM dep");
     $dbh->do("DELETE FROM namespace");
-    $dbh->do("DELETE FROM module_pod_mention");
+    $dbh->do("DELETE FROM mention");
     $dbh->do("DELETE FROM module");
-    $dbh->do("DELETE FROM script_pod_mention");
     $dbh->do("DELETE FROM script");
     $dbh->do("DELETE FROM dist");
     $dbh->do("DELETE FROM content");
@@ -1752,6 +1870,44 @@ sub _complete_ns {
             next unless $ns =~ /\A\Q$word\E\w*(::\w+)?\z/i;
         }
         push @res, $ns;
+    }
+
+    \@res;
+};
+
+sub _complete_script {
+    my %args = @_;
+
+    my $word = $args{word} // '';
+
+    # only run under pericmd
+    my $cmdline = $args{cmdline} or return undef;
+    my $r = $args{r};
+
+    # force read config file, because by default it is turned off when in
+    # completion
+    $r->{read_config} = 1;
+    my $res = $cmdline->parse_argv($r);
+    _set_args_default($res->[2]);
+
+    my $dbh;
+    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}) };
+
+    # if we can't connect (probably because database is not yet setup), bail
+    if ($@) {
+        $log->tracef("[comp] can't connect to db, bailing: %s", $@);
+        return undef;
+    }
+
+    my $sth = $dbh->prepare(
+        "SELECT DISTINCT name FROM script WHERE name LIKE ? ORDER BY name");
+    $sth->execute($word . '%');
+
+    # XXX follow Complete::Common::OPT_CI
+
+    my @res;
+    while (my ($script) = $sth->fetchrow_array) {
+        push @res, $script;
     }
 
     \@res;
@@ -2029,10 +2185,10 @@ sub modules {
 
     my @cols = (
         'name',
-        ['cpanid', 'author'],
         'version',
+        'abstract',
         ['(SELECT name FROM dist WHERE dist.file_id=module.file_id)', 'dist'],
-        ['(SELECT abstract FROM dist WHERE dist.file_id=module.file_id)', 'abstract', 1], # only used for searching
+        ['cpanid', 'author'],
     );
 
     if ($order =~ /rdeps/) {
@@ -2102,7 +2258,6 @@ sub modules {
     my $sth = $dbh->prepare($sql);
     $sth->execute(@bind);
     while (my $row = $sth->fetchrow_hashref) {
-        delete $row->{abstract};
         push @res, $detail ? $row : $row->{name};
     }
     my $resmeta = {};
@@ -2368,7 +2523,9 @@ sub releases {
   has_makefilepl,
   has_buildpl,
   file_status,
+  file_error,
   meta_status,
+  meta_error,
   pod_status
 FROM file f1
 LEFT JOIN dist d ON f1.id=d.file_id
@@ -2386,7 +2543,7 @@ LEFT JOIN dist d ON f1.id=d.file_id
         push @res, $detail ? $row : $row->{name};
     }
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/name author size mtime has_metayml has_metajson has_makefilepl has_buildpl file_status meta_status pod_status/]
+    $resmeta->{'table.fields'} = [qw/name author size mtime has_metayml has_metajson has_makefilepl has_buildpl file_status file_error meta_status meta_error pod_status/]
         if $detail;
     [200, "OK", \@res, $resmeta];
 }

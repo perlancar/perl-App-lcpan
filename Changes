@@ -2,6 +2,9 @@ Revision history for App-lcpan
 
 0.66    2016-02-08 (PERLANCAR) (unreleased)
 
+        - [Bugfix] Previous version was broken (a SQL error when updating
+          index).
+
         - Bump database schema version to v8. We are now indexing more stuffs:
           mtime/size of files, content of files (files inside release files)
           along with their mtime/uncompressed size, scripts. We also parse PODs
