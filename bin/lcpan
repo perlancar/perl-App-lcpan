@@ -134,6 +134,18 @@ B<List releases (tarballs):>
  % lcpan rels --or --exact-match Foo-1.23.tar.gz Bar-2.34.tar.gz --detail  ;# show detail for several rels
  % lcpan rels --author PERLANCAR                ;# rels from certain authors only
 
+B<List contents (files inside release archives):>
+
+ % lcpan contents                               ;# WARNING: LOTS of output
+ % lcpan contents <SOMEQUERY> ... --detail      ;# search, show detail
+ % lcpan contents --dist File-Path              ;# list content of a single dist only
+
+B<List scripts:>
+
+ % lcpan scripts                                ;# WARNING: lots of output
+ % lcpan scripts <SOMEQUERY> ... --detail       ;# search, show detail
+ % lcpan scripts --dist App-PMUtils             ;# list scripts of a single dist only
+
 B<Show dependencies and reverse dependencies>:
 
  % lcpan deps Text::ANSITable    ;# which modules does Text::ANSITable depend on?

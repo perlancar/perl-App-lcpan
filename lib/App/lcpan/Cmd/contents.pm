@@ -14,6 +14,11 @@ our %SPEC;
 $SPEC{'handle_cmd'} = {
     v => 1.1,
     summary => 'List contents inside releases',
+    description => <<'_',
+
+This subcommand lists files inside release archives.
+
+_
     args => {
         %App::lcpan::common_args,
         %App::lcpan::fauthor_args,

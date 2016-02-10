@@ -307,18 +307,19 @@ our $db_schema_spec = {
              -- file status: ok (archive type is known, content can be listed,
              -- and at least some files can be extracted), nofile (file does not
              -- exist in mirror), unsupported (archive type is not supported,
-             -- e.g. rar, pm.gz)
+             -- e.g. rar, pm.gz), err (cannot be opened/extracted for some
+             -- reason)
 
              file_status TEXT,
 
              -- META.* processing status: ok (meta has been extracted and
-             -- parsed), metaerr (META.json/META.yml has some error), nometa (no
+             -- parsed), err (META.json/META.yml has some error), nometa (no
              -- META.json/META.yml found).
 
              meta_status TEXT,
 
              -- POD processing status: ok (POD has been extracted and
-             -- parsed/indexed), NULL (has not been processed yet).
+             -- parsed/indexed).
 
              pod_status TEXT,
 
@@ -334,15 +335,8 @@ our $db_schema_spec = {
              id INTEGER NOT NULL PRIMARY KEY,
              file_id INTEGER NOT NULL REFERENCES file(id),
              path TEXT NOT NULL,
-
              mtime INT,
-             size INT, -- uncompressed size
-
-             -- POD processing status: ok (POD has been parsed and indexed),
-             -- error (POD cannot be parsed for some reason), none (we think
-             -- this content does not have POD and thus skipped), NULL (has not
-             -- been indexed/looked at)
-             pod_status TEXT
+             size INT -- uncompressed size
         )',
         'CREATE UNIQUE INDEX ix_content__file_id__path ON content(file_id, path)',
 
@@ -354,7 +348,7 @@ our $db_schema_spec = {
              version VARCHAR(20),
              version_numified DECIMAL,
              content_id INTEGER REFERENCES content(id),
-             abstract TEXT,
+             abstract TEXT
          )',
         'CREATE UNIQUE INDEX ix_module__name ON module(name)',
         'CREATE INDEX ix_module__file_id ON module(file_id)',
@@ -363,8 +357,10 @@ our $db_schema_spec = {
         'CREATE TABLE script (
              id INTEGER NOT NULL PRIMARY KEY,
              file_id INTEGER NOT NULL REFERENCES file(id), -- [cache]
+             cpanid VARCHAR(20) NOT NULL REFERENCES author(cpanid), -- [cache]
              name TEXT NOT NULL,
-             content_id INT REFERENCES content(id)
+             content_id INT REFERENCES content(id),
+             abstract TEXT
         )',
         'CREATE UNIQUE INDEX ix_script__file_id__name ON script(file_id, name)',
         'CREATE INDEX ix_script__name ON script(name)',
@@ -544,16 +540,8 @@ our $db_schema_spec = {
              id INTEGER NOT NULL PRIMARY KEY,
              file_id INTEGER NOT NULL REFERENCES file(id),
              path TEXT NOT NULL,
-
              mtime INT,
-             size INT, -- uncompressed size
-
-             -- POD processing status: ok (POD has been parsed and indexed),
-             -- error (POD cannot be parsed for some reason), none (we think
-             -- this content does not have POD and thus skipped), NULL (has not
-             -- been indexed/looked at)
-
-             pod_status TEXT
+             size INT -- uncompressed size
         )',
         'CREATE UNIQUE INDEX ix_content__file_id__path ON content(file_id, path)',
 
@@ -563,9 +551,10 @@ our $db_schema_spec = {
         'CREATE TABLE script (
              id INTEGER NOT NULL PRIMARY KEY,
              file_id INTEGER NOT NULL REFERENCES file(id), -- [cache]
+             cpanid VARCHAR(20) NOT NULL REFERENCES author(cpanid), -- [cache]
              name TEXT NOT NULL,
-             abstract TEXT,
              content_id INT REFERENCES content(id)
+             abstract TEXT,
         )',
         'CREATE UNIQUE INDEX ix_script__file_id__name ON script(file_id, name)',
         'CREATE INDEX ix_script__name ON script(name)',
@@ -748,6 +737,67 @@ sub _add_prereqs {
     }
 }
 
+sub _index_pod {
+    my ($file_id, $file_name, $script_name,
+        $content_id, $content_path,
+        $ct,
+        $type,
+
+        $sth_sel_mod,
+        $sth_sel_script,
+        $sth_set_module_abstract,
+        $sth_set_script_abstract,
+        $sth_ins_module_pod_mention,
+        $sth_ins_script_pod_mention,
+    ) = @_;
+
+    $log->tracef("  Indexing POD of %s", $content_path, $file_name);
+
+    my $pkg;
+    if ($ct =~ /^\s*package [ \t]+ ([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z0-9_]+)*)\b
+               /mx) {
+        $pkg = $1;
+    }
+
+    my ($module_id, $script_id);
+    if ($type eq 'module') {
+        if (!$pkg) {
+            $log->warnf("No package declaration in %s (%s), skipped", $content_path, $file_name);
+            return;
+        }
+        $sth_sel_mod->execute($pkg);
+        my $row = $sth_sel_mod->fetchrow_hashref;
+        $sth_sel_mod->finish;
+        if (!$row) {
+            $log->warnf("Unknown module in package declaration in %s (%s), skipped",
+                        $content_path, $file_name);
+            return;
+        }
+        $module_id = $row->{id};
+    } else { # type=script
+        $sth_sel_script->execute($script_name, $file_id);
+        my $row = $sth_sel_script->fetchrow_hashref;
+        $sth_sel_script->finish;
+        if (!$row) {
+            $log->warnf("BUG: Unknown script %s in %s (%s), skipped",
+                        $script_name, $content_path, $file_name);
+            return;
+        }
+        $script_id = $row->{id};
+    }
+
+    if ($ct =~ /^=head1 \s+ NAME\s*\R
+                \s*\R
+                \S+ \s+ - \s+ ([^\r\n]+)
+               /mx) {
+        if ($type eq 'module') {
+            $sth_set_module_abstract->execute($module_id);
+        } else { # script
+            $sth_set_script_abstract->execute($script_id);
+        }
+    }
+}
+
 sub _update_files {
     require IPC::System::Options;
 
@@ -788,6 +838,7 @@ sub _update_files {
     [200];
 }
 
+# return 1 if success
 sub _check_meta {
     my $meta = shift;
 
@@ -1042,24 +1093,43 @@ sub _update_index {
         $dbh->commit;
     }
 
-    # for each new file, list its content, try to extract its CPAN META or
-    # Makefile.PL/Build.PL (dependencies information), parse its PODs
-    # (module/script abstracts, 'mentions' information)
-    {
-        my $sth = $dbh->prepare("SELECT * FROM file WHERE status IS NULL");
+  PROCESS_FILES:
+    for my $pass (1..2) {
+        # we're processing files in two passes. the first pass will: insert
+        # content, scripts, extract meta, insert dep information, set
+        # file_status and meta_status. the second pass will: extract PODs and
+        # insert module/script abstracts and pod mentions.
+
+        # we're doing it in two passes because we want to collect all known
+        # scripts first to be able to detect links to scripts in POD.
+
+        my $sth = $dbh->prepare("SELECT * FROM file WHERE file_status IS NULL OR meta_status IS NULL OR pod_status IS NULL");
         $sth->execute;
+
         my @files;
         while (my $row = $sth->fetchrow_hashref) {
             push @files, $row;
         }
 
-        my $sth_set_file_status = $dbh->prepare("UPDATE file SET status=? WHERE id=?");
-        my $sth_set_file_status_etc = $dbh->prepare("UPDATE file SET status=?,has_metajson=?,has_metayml=?,has_makefilepl=?,has_buildpl=? WHERE id=?");
+        my $sth_set_file_status = $dbh->prepare("UPDATE file SET file_status=? WHERE id=?");
         my $sth_ins_content = $dbh->prepare("INSERT INTO content (file_id,path,mtime,size) VALUES (?,?,?,?)");
+        my $sth_ins_script = $dbh->prepare("INSERT INTO script (name, cpanid, content_id, file_id) VALUES (?,?,?,?)");
+
+        my $sth_set_meta_status = $dbh->prepare("UPDATE file SET meta_status=? WHERE id=?");
+        my $sth_set_meta_info = $dbh->prepare("UPDATE file SET has_metajson=?,has_metayml=?,has_makefilepl=?,has_buildpl=? WHERE id=?");
         my $sth_ins_dist = $dbh->prepare("INSERT OR REPLACE INTO dist (name,cpanid,abstract,file_id,version,version_numified) VALUES (?,?,?,?,?,?)");
         my $sth_upd_dist = $dbh->prepare("UPDATE dist SET cpanid=?,abstract=?,file_id=?,version=?,version_numified=? WHERE id=?");
         my $sth_ins_dep = $dbh->prepare("INSERT OR REPLACE INTO dep (file_id,dist_id,module_id,module_name,phase,rel, version,version_numified) VALUES (?,?,?,?,?,?, ?,?)");
+
         my $sth_sel_mod  = $dbh->prepare("SELECT * FROM module WHERE name=?");
+        my $sth_sel_script  = $dbh->prepare("SELECT * FROM script WHERE name=? AND file_id=?");
+
+        my $sth_set_pod_status = $dbh->prepare("UPDATE file SET pod_status=? WHERE id=?");
+        my $sth_sel_content = $dbh->prepare("SELECT * FROM content WHERE file_id=?");
+        my $sth_set_module_abstract = $dbh->prepare("UPDATE module SET abstract=? WHERE id=?");
+        my $sth_set_script_abstract = $dbh->prepare("UPDATE script SET abstract=? WHERE id=?");
+        my $sth_ins_module_pod_mention = $dbh->prepare("INSERT INTO module_pod_mention (source_content_id,module_id,module_name) VALUES (?,?,?)");
+        my $sth_ins_script_pod_mention = $dbh->prepare("INSERT INTO script_pod_mention (source_content_id,script_id) VALUES (?,?)");
 
         my $i = 0;
         my $after_begin;
@@ -1084,174 +1154,280 @@ sub _update_index {
             }
             $i++;
 
-            $log->infof("[#%i] Processing file %s ...", $i, $file->{name});
-            my $status;
+            $log->infof("[pass %d/2][#%i/%d] Processing file %s ...",
+                        $pass, $i, ~~@files, $file->{name});
+
             my $path = _fullpath($file->{name}, $cpan, $file->{cpanid});
 
-            unless (-f $path) {
-                $log->errorf("File %s doesn't exist, skipped", $path);
-                $sth_set_file_status->execute("nofile", $file->{id});
-                next FILE;
-            }
-
-            my ($meta, $found_meta);
-            my ($has_metajson, $has_metayml, $has_makefilepl, $has_buildpl);
-          GET_META:
-            {
-                unless ($path =~ /(.+)\.(tar|tar\.gz|tar\.bz2|tar\.Z|tgz|tbz2?|zip)$/i) {
+            if (!$file->{file_status}) {
+                unless (-f $path) {
+                    $log->errorf("File %s doesn't exist, skipped", $path);
+                    $sth_set_file_status->execute("nofile", $file->{id});
+                    next FILE;
+                }
+                if ($path !~ /(.+)\.(tar|tar\.gz|tar\.bz2|tar\.Z|tgz|tbz2?|zip)$/i) {
                     $log->errorf("Doesn't support file type: %s, skipped", $file->{name});
                     $sth_set_file_status->execute("unsupported", $file->{id});
                     next FILE;
                 }
+            }
 
-                my @members;
-              L1:
+            my ($zip, $tar);
+            my @members;
+            if ($path =~ /\.zip$/i) {
+                require Archive::Zip;
+                $zip = Archive::Zip->new;
+                $zip->read($path) == Archive::Zip::AZ_OK()
+                    or do {
+                        $log->errorf("Can't read zip file '%s', skipped", $file->{name});
+                        $sth_set_file_status->execute("error", $file->{id});
+                        next FILE;
+                    };
+                @members = $zip->members;
+            } else {
+                require Archive::Tar;
                 eval {
-                    if ($path =~ /\.zip$/i) {
-                        require Archive::Zip;
-                        my $zip = Archive::Zip->new;
-                        $zip->read($path) == Archive::Zip::AZ_OK()
-                            or die "Can't read zip file";
-                        @members = $zip->members;
-                        for my $member (@members) {
-                            # skip directory/symlinks
-                            next if $member->{isSymbolicLink} || $member->{fileName} =~ m!/\z!;
-                            $sth_ins_content->execute($file->{id}, $member->{fileName}, $member->{lastModFileDateTime}, $member->{uncompressedSize});
-                        }
-                        $has_metajson   = (first {m!^[/\\]?(?:[^/\\]+[/\\])?META\.json$!} @members) ? 1:0;
-                        $has_metayml    = (first {m!^[/\\]?(?:[^/\\]+[/\\])?META\.yml$!} @members) ? 1:0;
-                        $has_makefilepl = (first {m!^[/\\]?(?:[^/\\]+[/\\])?Makefile\.PL$!} @members) ? 1:0;
-                        $has_buildpl    = (first {m!^[/\\]?(?:[^/\\]+[/\\])?Build\.PL$!} @members) ? 1:0;
-
-                        for my $member (@members) {
-                            if ($member->fileName =~ m!(?:/|\\)(META\.yml|META\.json)$!) {
-                                $log->tracef("  found %s", $member->fileName);
-                                my $type = $1;
-                                #$log->tracef("content=[[%s]]", $content);
-                                my $content = $zip->contents($member);
-                                if ($type eq 'META.yml') {
-                                    $meta = _parse_meta_yml($content);
-                                    if (_check_meta($meta)) { return } else { undef $meta } # from eval
-                                } elsif ($type eq 'META.json') {
-                                    $meta = _parse_meta_json($content);
-                                    if (_check_meta($meta)) { return } else { undef $meta } # from eval
-                                }
-                            }
-                        }
-                    } # if zip
-                    else {
-                        require Archive::Tar;
-                        my $tar = Archive::Tar->new;
-                        $tar->read($path);
-                        @members = $tar->list_files(["name","mode","mtime","size"]);
-                        for my $member (@members) {
-                            # skip non-regular files
-                            next if $member->{mode} > 0777;
-                            next if $member->{name} =~ m!/\z!;
-                            $sth_ins_content->execute($file->{id}, $member->{name}, $member->{mtime}, $member->{size});
-                        }
-                        $has_metajson   = (first {$_->{name} =~ m!/([^/]+)?META\.json$!} @members) ? 1:0;
-                        $has_metayml    = (first {$_->{name} =~ m!/([^/]+)?META\.yml$!} @members) ? 1:0;
-                        $has_makefilepl = (first {$_->{name} =~ m!/([^/]+)?Makefile\.PL$!} @members) ? 1:0;
-                        $has_buildpl    = (first {$_->{name} =~ m!/([^/]+)?Build\.PL$!} @members) ? 1:0;
-
-                        for my $member (@members) {
-                            if ($member->{name} =~ m!/(META\.yml|META\.json)$!) {
-                                $log->tracef("  found %s", $member->{name});
-                                my $type = $1;
-                                my ($obj) = $tar->get_files($member->{name});
-                                my $content = $obj->get_content;
-                                #$log->trace("[[$content]]");
-                                if ($type eq 'META.yml') {
-                                    $meta = _parse_meta_yml($content);
-                                    $found_meta++;
-                                    if (_check_meta($meta)) { return } else { undef $meta } # from eval
-                                } elsif ($type eq 'META.json') {
-                                    $meta = _parse_meta_json($content);
-                                    $found_meta++;
-                                    if (_check_meta($meta)) { return } else { undef $meta } # from eval
-                                }
-                            }
-                        }
-                    } # if tar
-                }; # eval
-
+                    $tar = Archive::Tar->new;
+                    $tar->read($path);
+                    @members = $tar->list_files(["full_path","mode","mtime","size"]);
+                };
                 if ($@) {
-                    $log->errorf("Can't extract info from file %s: %s", $path, $@);
-                    $sth_set_file_status->execute("err", $file->{id});
+                    $log->errorf("Can't read tar file '%s', skipped", $file->{name});
+                    $sth_set_file_status->execute("error", $file->{id});
                     next FILE;
                 }
+            }
 
-                # list scripts
-                # XXX
-
-                # parse PODs
-                # XXX
-            } # GET_META
-
-            unless ($meta) {
-                if ($found_meta) {
-                    $log->infof("File %s doesn't contain valid META.json/META.yml, skipped", $path);
-                    $sth_set_file_status_etc->execute(
-                        "metaerr",
-                        $has_metajson, $has_metayml, $has_makefilepl, $has_buildpl,
-                        $file->{id});
-                } else {
-                    $log->infof("File %s doesn't contain META.json/META.yml, skipped", $path);
-                    $sth_set_file_status_etc->execute(
-                        "nometa",
-                        $has_metajson, $has_metayml, $has_makefilepl, $has_buildpl,
-                        $file->{id});
+            my $code_is_script = sub {
+                my $name = shift;
+                unless ($name =~ m!\A
+                                   (?:\./)?
+                                   (?:[^/]+/)?
+                                   (?:s?bin|scripts?)/
+                                   ([^/]+)
+                                   \z!x) {
+                    return (undef);
                 }
-                next FILE;
-            }
+                my $script_name = $1;
+                if ($script_name =~ /\A\./) { # e.g. "bin/.exists"
+                    return (undef);
+                }
+                return ($script_name);
+            };
 
-            my $dist_name = $meta->{name};
-            my $dist_abstract = $meta->{abstract};
-            my $dist_version = $meta->{version};
-            $dist_name =~ s/::/-/g; # sometimes author miswrites module name
-            # insert dist record
-            my $dist_id;
-            if (($dist_id) = $dbh->selectrow_array("SELECT id FROM dist WHERE name=?", {}, $dist_name)) {
-                $sth_upd_dist->execute(            $file->{cpanid}, $dist_abstract, $file->{id}, $dist_version, _numify_ver($dist_version), $dist_id);
-            } else {
-                $sth_ins_dist->execute($dist_name, $file->{cpanid}, $dist_abstract, $file->{id}, $dist_version, _numify_ver($dist_version));
-                $dist_id = $dbh->last_insert_id("","","","");
-            }
+            my $code_is_pm_or_pod = sub {
+                my $name = shift;
+                unless ($name =~ m!\A
+                                   (?:\./)?
+                                   (?:[^/]+/)?
+                                   (?:lib/)?
+                                   (?:(?:[^/]+)/)*
+                                   [^/]+\.(?:pm|pod)?
+                                   \z
+                                  !ix) {
+                    return (undef);
+                }
+                return 1;
+            };
 
-            # insert dependency information
-            if (ref($meta->{configure_requires}) eq 'HASH') {
-                _add_prereqs($file->{id}, $dist_id, $meta->{configure_requires}, 'configure', 'requires', $sth_ins_dep, $sth_sel_mod);
-            }
-            if (ref($meta->{build_requires}) eq 'HASH') {
-                _add_prereqs($file->{id}, $dist_id, $meta->{build_requires}, 'build', 'requires', $sth_ins_dep, $sth_sel_mod);
-            }
-            if (ref($meta->{test_requires}) eq 'HASH') {
-                _add_prereqs($file->{id}, $dist_id, $meta->{test_requires}, 'test', 'requires', $sth_ins_dep, $sth_sel_mod);
-            }
-            if (ref($meta->{requires}) eq 'HASH') {
-                _add_prereqs($file->{id}, $dist_id, $meta->{requires}, 'runtime', 'requires', $sth_ins_dep, $sth_sel_mod);
-            }
-            if (ref($meta->{prereqs}) eq 'HASH') {
-                for my $phase (keys %{ $meta->{prereqs} }) {
-                    my $phprereqs = $meta->{prereqs}{$phase};
-                    for my $rel (keys %$phprereqs) {
-                        _add_prereqs($file->{id}, $dist_id, $phprereqs->{$rel}, $phase, $rel, $sth_ins_dep, $sth_sel_mod);
+            if (!$file->{file_status}) {
+                # list contents & scripts and insert into database
+                my %script_names;
+                if ($zip) {
+                    for my $member (@members) {
+                        # skip directory/symlinks
+                        next if $member->{isSymbolicLink} || $member->{fileName} =~ m!/\z!;
+                        $sth_ins_content->execute($file->{id}, $member->{fileName}, $member->{lastModFileDateTime}, $member->{uncompressedSize});
+                        my $content_id = $dbh->last_insert_id("","","","");
+                        my ($script_name) = $code_is_script->($member->{fileName});
+                        if (defined $script_name) {
+                            unless ($script_names{$script_name}++) {
+                                $sth_ins_script->execute($script_name, $file->{cpanid}, $content_id, $file->{id});
+                            }
+                        }
+                    }
+                } else {
+                    my %mem; # tar allows duplicate path?
+                    for my $member (@members) {
+                        # skip non-regular files
+                        next if $member->{mode} > 0777;
+                        next if $member->{full_path} =~ m!/\z!;
+                        next if $mem{$member->{full_path}}++;
+                        $sth_ins_content->execute($file->{id}, $member->{full_path}, $member->{mtime}, $member->{size});
+                        my $content_id = $dbh->last_insert_id("","","","");
+                        my ($script_name) = $code_is_script->($member->{full_path});
+                        if (defined $script_name) {
+                            unless ($script_names{$script_name}++) {
+                                $sth_ins_script->execute($script_name, $file->{cpanid}, $content_id, $file->{id});
+                            }
+                        }
                     }
                 }
+                $sth_set_file_status->execute("ok", $file->{id});
+                $file->{file_status} = 'ok';
             }
 
-            $sth_set_file_status_etc->execute(
-                "ok",
-                $has_metajson, $has_metajson, $has_makefilepl, $has_buildpl,
-                $file->{id});
-        } # for file
+            next FILE if $file->{file_status} ne 'ok';
+
+          GET_META:
+            {
+                last if $file->{meta_status};
+                my $meta;
+                my ($has_metajson, $has_metayml, $has_makefilepl, $has_buildpl);
+                if ($zip) {
+                    $has_metajson   = (first {m!^[/\\]?(?:[^/\\]+[/\\])?META\.json$!} @members) ? 1:0;
+                    $has_metayml    = (first {m!^[/\\]?(?:[^/\\]+[/\\])?META\.yml$!} @members) ? 1:0;
+                    $has_makefilepl = (first {m!^[/\\]?(?:[^/\\]+[/\\])?Makefile\.PL$!} @members) ? 1:0;
+                    $has_buildpl    = (first {m!^[/\\]?(?:[^/\\]+[/\\])?Build\.PL$!} @members) ? 1:0;
+                    for my $member (@members) {
+                        if ($member->fileName =~ m!(?:/|\\)(META\.yml|META\.json)$!) {
+                            $log->tracef("  found META: %s", $member->fileName);
+                            my $type = $1;
+                            #$log->tracef("content=[[%s]]", $content);
+                            my $content = $zip->contents($member);
+                            if ($type eq 'META.yml') {
+                                $meta = _parse_meta_yml($content);
+                                unless (_check_meta($meta)) {
+                                    $sth_set_meta_status->execute("err", $file->{id});
+                                    last GET_META;
+                                }
+                            } elsif ($type eq 'META.json') {
+                                $meta = _parse_meta_json($content);
+                                unless (_check_meta($meta)) {
+                                    $sth_set_meta_status->execute("err", $file->{id});
+                                    last GET_META;
+                                }
+                            }
+                            last;
+                        }
+                    }
+                } else {
+                    $has_metajson   = (first {$_->{full_path} =~ m!/([^/]+)?META\.json$!} @members) ? 1:0;
+                    $has_metayml    = (first {$_->{full_path} =~ m!/([^/]+)?META\.yml$!} @members) ? 1:0;
+                    $has_makefilepl = (first {$_->{full_path} =~ m!/([^/]+)?Makefile\.PL$!} @members) ? 1:0;
+                    $has_buildpl    = (first {$_->{full_path} =~ m!/([^/]+)?Build\.PL$!} @members) ? 1:0;
+                    for my $member (@members) {
+                        if ($member->{full_path} =~ m!/(META\.yml|META\.json)$!) {
+                            $log->tracef("  found META %s", $member->{full_path});
+                            my $type = $1;
+                            my ($obj) = $tar->get_files($member->{full_path});
+                            my $content = $obj->get_content;
+                            #$log->trace("[[$content]]");
+                            if ($type eq 'META.yml') {
+                                $meta = _parse_meta_yml($content);
+                                unless (_check_meta($meta)) {
+                                    $sth_set_meta_status->execute("err", $file->{id});
+                                    last GET_META;
+                                }
+                            } elsif ($type eq 'META.json') {
+                                $meta = _parse_meta_json($content);
+                                unless (_check_meta($meta)) {
+                                    $sth_set_meta_status->execute("err", $file->{id});
+                                    last GET_META;
+                                }
+                            }
+                            last;
+                        }
+                    }
+                }
+
+                $sth_set_meta_status->execute($meta ? "ok" : "nometa", $file->{id});
+                $sth_set_meta_info->execute($has_metajson, $has_metayml, $has_makefilepl, $has_buildpl, $file->{id});
+                last GET_META unless $meta;
+
+                # insert dist & dependency information from meta
+
+                my $dist_name = $meta->{name};
+                my $dist_abstract = $meta->{abstract};
+                my $dist_version = $meta->{version};
+                $dist_name =~ s/::/-/g; # sometimes author miswrites module name
+                # insert dist record
+                my $dist_id;
+                if (($dist_id) = $dbh->selectrow_array("SELECT id FROM dist WHERE name=?", {}, $dist_name)) {
+                    $sth_upd_dist->execute(            $file->{cpanid}, $dist_abstract, $file->{id}, $dist_version, _numify_ver($dist_version), $dist_id);
+                } else {
+                    $sth_ins_dist->execute($dist_name, $file->{cpanid}, $dist_abstract, $file->{id}, $dist_version, _numify_ver($dist_version));
+                    $dist_id = $dbh->last_insert_id("","","","");
+                }
+
+                # insert dependency information
+                if (ref($meta->{configure_requires}) eq 'HASH') {
+                    _add_prereqs($file->{id}, $dist_id, $meta->{configure_requires}, 'configure', 'requires', $sth_ins_dep, $sth_sel_mod);
+                }
+                if (ref($meta->{build_requires}) eq 'HASH') {
+                    _add_prereqs($file->{id}, $dist_id, $meta->{build_requires}, 'build', 'requires', $sth_ins_dep, $sth_sel_mod);
+                }
+                if (ref($meta->{test_requires}) eq 'HASH') {
+                    _add_prereqs($file->{id}, $dist_id, $meta->{test_requires}, 'test', 'requires', $sth_ins_dep, $sth_sel_mod);
+                }
+                if (ref($meta->{requires}) eq 'HASH') {
+                    _add_prereqs($file->{id}, $dist_id, $meta->{requires}, 'runtime', 'requires', $sth_ins_dep, $sth_sel_mod);
+                }
+                if (ref($meta->{prereqs}) eq 'HASH') {
+                    for my $phase (keys %{ $meta->{prereqs} }) {
+                        my $phprereqs = $meta->{prereqs}{$phase};
+                        for my $rel (keys %$phprereqs) {
+                            _add_prereqs($file->{id}, $dist_id, $phprereqs->{$rel}, $phase, $rel, $sth_ins_dep, $sth_sel_mod);
+                        }
+                    }
+                }
+
+            } # GET_META
+
+          PARSE_POD:
+            {
+                last if $pass == 1;
+                last if $file->{pod_status};
+
+                my @contents;
+                $sth_sel_content->execute($file->{id});
+                while (my $row = $sth_sel_content->fetchrow_hashref) {
+                    push @contents, $row;
+                }
+                $sth_sel_content->finish;
+
+                for my $content (@contents) {
+                    my ($script_name) = $code_is_script->($content->{path});
+                    my $is_pm_or_pod = $code_is_pm_or_pod->($content->{path});
+                    next unless defined($script_name) || $is_pm_or_pod;
+
+                    my $ct;
+                    if ($zip) {
+                        $ct = $zip->contents($content->{path});
+                    } else {
+                        my ($obj) = $tar->get_files($content->{path});
+                        $ct = $obj->get_content;
+                    }
+
+                    _index_pod(
+                        $file->{id}, $file->{name}, $script_name,
+                        $content->{id}, $content->{path},
+                        $ct,
+                        defined($script_name) ? 'script' : 'module',
+
+                        $sth_sel_mod,
+                        $sth_sel_script,
+                        $sth_set_module_abstract,
+                        $sth_set_script_abstract,
+                        $sth_ins_module_pod_mention,
+                        $sth_ins_script_pod_mention,
+                    );
+                } # for each content
+
+                $sth_set_pod_status->execute("ok", $file->{id});
+            } # PARSE_POD
+
+        } # for each file
 
         if ($after_begin) {
             $log->tracef("COMMIT");
             $dbh->commit;
         }
-    }
+    } # process files
+
+    #, try to extract its CPAN META or
+    # Makefile.PL/Build.PL (dependencies information), parse its PODs
+    # (module/script abstracts, 'mentions' information)
 
     # there remains some files for which we haven't determine the dist name of
     # (e.g. non-existing file, no info, other error). we determine the dist from
@@ -2185,11 +2361,15 @@ sub releases {
     my $sql = "SELECT
   f1.name name,
   f1.cpanid author,
+  f1.size size,
+  f1.mtime mtime,
   has_metajson,
   has_metayml,
   has_makefilepl,
   has_buildpl,
-  status
+  file_status,
+  meta_status,
+  pod_status
 FROM file f1
 LEFT JOIN dist d ON f1.id=d.file_id
 ".
@@ -2206,7 +2386,7 @@ LEFT JOIN dist d ON f1.id=d.file_id
         push @res, $detail ? $row : $row->{name};
     }
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/name author has_metayml has_metajson has_makefilepl has_buildpl status/]
+    $resmeta->{'table.fields'} = [qw/name author size mtime has_metayml has_metajson has_makefilepl has_buildpl file_status meta_status pod_status/]
         if $detail;
     [200, "OK", \@res, $resmeta];
 }
