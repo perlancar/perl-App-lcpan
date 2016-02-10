@@ -1,6 +1,6 @@
 Revision history for App-lcpan
 
-0.66    2016-02-08 (PERLANCAR) (unreleased)
+0.66    2016-02-11 (PERLANCAR) (unreleased)
 
         - [Bugfix] Previous version was broken (a SQL error when updating
           index).
@@ -10,11 +10,12 @@ Revision history for App-lcpan
           along with their mtime/uncompressed size, scripts. We also parse PODs
           of module/script files inside each release files, so we now record the
           abstract of each module/script, and mentions/references of modules &
-          scripts in POD of modules/scripts.
+          scripts in POD of modules/scripts. Note that size of index (index.db)
+          now increases from ~60M to ~250M.
 
         - This version forces a full reindex.
 
-        - New subcommands: contents, scripts.
+        - New subcommands: contents, scripts, mentions.
 
 
 0.66    2016-02-07 (PERLANCAR)

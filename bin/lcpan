@@ -156,6 +156,11 @@ B<Show dependencies and reverse dependencies>:
 
  % lcpan rdeps Text::ANSITable ;# which dists depend on Text::ANSITable?
 
+B<Show mentions (references to modules/scripts from POD files within releases)>:
+
+ % lcpan mentions --mentioned-module Path::Tiny ;# who mentions Path::Tiny module?
+ % lcpan mentions --mentioned-script mpath      ;# who mentions mpath script?
+
 B<Some other utilities>:
 
  % lcpan mod2dist Text::ANSITable::ColorTheme::Default ;# -> Text-ANSITable
