@@ -31,7 +31,8 @@ sub handle_cmd {
 
     my $sth = $dbh->prepare("SELECT
   module.name name,
-  module.version version
+  module.version version,
+  module.abstract abstract
 FROM module
 LEFT JOIN file ON module.file_id=file.id
 LEFT JOIN dist ON file.id=dist.file_id
@@ -43,7 +44,7 @@ ORDER BY name DESC");
         push @res, $detail ? $row : $row->{name};
     }
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/name version/]
+    $resmeta->{'table.fields'} = [qw/name version abstract/]
         if $detail;
     [200, "OK", \@res, $resmeta];
 }
