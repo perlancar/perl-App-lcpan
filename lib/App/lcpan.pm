@@ -1710,9 +1710,9 @@ sub _reset {
     $dbh->do("DELETE FROM namespace");
     $dbh->do("DELETE FROM mention")   if _table_exists($dbh, "main", "mention");
     $dbh->do("DELETE FROM module");
-    $dbh->do("DELETE FROM script")    if _table_exists($dbh, "main", "mention");
+    $dbh->do("DELETE FROM script")    if _table_exists($dbh, "main", "script");
     $dbh->do("DELETE FROM dist");
-    $dbh->do("DELETE FROM content")   if _table_exists($dbh, "main", "mention");
+    $dbh->do("DELETE FROM content")   if _table_exists($dbh, "main", "content");
     $dbh->do("DELETE FROM file");
     $dbh->do("DELETE FROM author");
 }
