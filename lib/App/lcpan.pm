@@ -1164,7 +1164,7 @@ sub _update_index {
         my $sth = $dbh->prepare(
             $pass == 1 ?
                 "SELECT * FROM file WHERE file_status IS NULL OR meta_status IS NULL ORDER BY name" :
-                "SELECT * FROM file WHERE pod_status IS NULL ORDER BY name");
+                "SELECT * FROM file WHERE pod_status IS NULL AND file_status NOT IN ('nofile','unsupported','err') ORDER BY name");
         $sth->execute;
 
         my @files;
@@ -1220,8 +1220,8 @@ sub _update_index {
                 keys %script_names;
             $scripts_re = "\\A(?:" . join("|", map {quotemeta} @script_names) . ")\\z";
             $scripts_re = qr/$scripts_re/;
-            $log->tracef("TMP: script_re = %s", $scripts_re);
-            $log->tracef("TMP: scripts_names = %s", \%script_names);
+            #$log->tracef("TMP: script_re = %s", $scripts_re);
+            #$log->tracef("TMP: scripts_names = %s", \%script_names);
         }
 
         my $i = 0;
@@ -1273,7 +1273,7 @@ sub _update_index {
                 }
             }
 
-            next FILE if $file->{status} && $file->{status} =~ /\A(unsupported)\z/;
+            next FILE if $file->{file_status} && $file->{file_status} =~ /\A(unsupported)\z/;
 
             my ($zip, $tar);
             my @members;
