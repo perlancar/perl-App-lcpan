@@ -72,3 +72,5 @@ sub start_L {
 
 1;
 # ABSTRACT: Pod parser for use in App::lcpan
+
+=for Pod::Coverage .+

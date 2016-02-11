@@ -1,6 +1,6 @@
 Revision history for App-lcpan
 
-0.66    2016-02-11 (PERLANCAR) (unreleased)
+0.67    2016-02-12 (PERLANCAR)
 
         - [Bugfix] Previous version was broken (a SQL error when updating
           index).
@@ -15,8 +15,9 @@ Revision history for App-lcpan
 
         - This version forces a full reindex.
 
-        - New subcommands: contents, scripts, mentions,
-          authors-by-mod-mention-count, scripts-from-same-dist, distscripts.
+        - New subcommands: contents, scripts, mentions, authors-by-script-count,
+          authors-by-mod-mention-count, scripts-from-same-dist, distscripts,
+          author-scripts.
 
 
 0.66    2016-02-07 (PERLANCAR)
