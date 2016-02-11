@@ -297,7 +297,7 @@ sub _set_namespace {
 }
 
 our $db_schema_spec = {
-    latest_v => 7,
+    latest_v => 8,
 
     install => [
         'CREATE TABLE author (
@@ -568,8 +568,8 @@ our $db_schema_spec = {
              file_id INTEGER NOT NULL REFERENCES file(id), -- [cache]
              cpanid VARCHAR(20) NOT NULL REFERENCES author(cpanid), -- [cache]
              name TEXT NOT NULL,
-             content_id INT REFERENCES content(id)
-             abstract TEXT,
+             content_id INT REFERENCES content(id),
+             abstract TEXT
         )',
         'CREATE UNIQUE INDEX ix_script__file_id__name ON script(file_id, name)',
         'CREATE INDEX ix_script__name ON script(name)',
@@ -1698,15 +1698,21 @@ sub update {
     [200, "OK"];
 }
 
+sub _table_exists {
+    my ($dbh, $schema, $name) = @_;
+    my $sth = $dbh->table_info(undef, $schema, $name, undef);
+    $sth->fetchrow_hashref ? 1:0;
+}
+
 sub _reset {
     my $dbh = shift;
     $dbh->do("DELETE FROM dep");
     $dbh->do("DELETE FROM namespace");
-    $dbh->do("DELETE FROM mention");
+    $dbh->do("DELETE FROM mention")   if _table_exists($dbh, "main", "mention");
     $dbh->do("DELETE FROM module");
-    $dbh->do("DELETE FROM script");
+    $dbh->do("DELETE FROM script")    if _table_exists($dbh, "main", "mention");
     $dbh->do("DELETE FROM dist");
-    $dbh->do("DELETE FROM content");
+    $dbh->do("DELETE FROM content")   if _table_exists($dbh, "main", "mention");
     $dbh->do("DELETE FROM file");
     $dbh->do("DELETE FROM author");
 }
