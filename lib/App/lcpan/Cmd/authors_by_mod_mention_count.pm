@@ -20,7 +20,7 @@ This shows the list of most mentioned authors, that is, authors whose modules
 are linked/referred to the most in PODs.
 
 By default, each source module/script that mentions a module from author is
-counted as one mention (`--count-per content`). Use `--count-perl dist` to only
+counted as one mention (`--count-per content`). Use `--count-per dist` to only
 count mentions by modules/scripts from the same dist as one mention (so an
 author only gets a maximum of 1 vote per dist). Use `--count-per author` to only
 count mentions by modules/scripts from the same author as one mention (so an
