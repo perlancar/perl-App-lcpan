@@ -73,6 +73,13 @@ _
     },
 );
 
+our %detail_args = (
+    detail => {
+        schema => 'bool',
+        cmdline_aliases => {l=>{}},
+    },
+);
+
 our %query_args = (
     query => {
         summary => 'Search query',
@@ -81,10 +88,7 @@ our %query_args = (
         pos => 0,
         tags => ['category:filtering'],
     },
-    detail => {
-        schema => 'bool',
-        cmdline_aliases => {l=>{}},
-    },
+    %detail_args,
 );
 
 our %query_multi_args = (
@@ -167,6 +171,17 @@ our %mods_args = (
         pos => 0,
         greedy => 1,
         element_completion => \&_complete_mod,
+    },
+);
+
+our %scripts_args = (
+    scripts => {
+        schema => ['array*', of=>'str*', min_len=>1],
+        'x.name.is_plural' => 1,
+        req => 1,
+        pos => 0,
+        greedy => 1,
+        element_completion => \&_complete_script,
     },
 );
 
