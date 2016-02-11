@@ -151,7 +151,7 @@ LEFT JOIN module ON module.id=mention.module_id".
         push @res, $row;
     }
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/module script content_path release mentioner_author/];
+    $resmeta->{'table.fields'} = [qw/module module_author script script_author release mentioner_author content_path/];
 
     if (defined($mentioned_module) || $type =~ /module/) {
         $resmeta->{'table.fields'} =
