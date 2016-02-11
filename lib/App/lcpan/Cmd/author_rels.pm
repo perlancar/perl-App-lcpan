@@ -19,9 +19,7 @@ $SPEC{'handle_cmd'} = {
         %App::lcpan::author_args,
         %App::lcpan::flatest_args,
         %App::lcpan::full_path_args,
-        detail => {
-            schema => 'bool',
-        },
+        %App::lcpan::detail_args,
     },
 };
 sub handle_cmd {

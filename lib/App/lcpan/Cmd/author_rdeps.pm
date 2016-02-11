@@ -19,9 +19,6 @@ $SPEC{'handle_cmd'} = {
         %App::lcpan::author_args,
         %App::lcpan::rdeps_rel_arg,
         %App::lcpan::rdeps_phase_arg,
-        #detail => {
-        #    schema => 'bool',
-        #},
         user_author => {
             schema => ['array*', of=>'str*'],
             element_completion => \&App::lcpan::_complete_cpanid,
