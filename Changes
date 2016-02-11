@@ -15,7 +15,8 @@ Revision history for App-lcpan
 
         - This version forces a full reindex.
 
-        - New subcommands: contents, scripts, mentions.
+        - New subcommands: contents, scripts, mentions,
+          authors-by-mod-mention-count.
 
 
 0.66    2016-02-07 (PERLANCAR)
