@@ -73,6 +73,13 @@ _
     },
 );
 
+our %all_args = (
+    all => {
+        schema => 'bool',
+        cmdline_aliases => {a=>{}},
+    },
+);
+
 our %detail_args = (
     detail => {
         schema => 'bool',
@@ -171,6 +178,15 @@ our %mods_args = (
         pos => 0,
         greedy => 1,
         element_completion => \&_complete_mod,
+    },
+);
+
+our %script_args = (
+    script => {
+        schema => 'str*',
+        req => 1,
+        pos => 0,
+        completion => \&_complete_script,
     },
 );
 
