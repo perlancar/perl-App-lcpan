@@ -1,5 +1,13 @@
 Revision history for App-lcpan
 
+0.68    2016-02-12 (PERLANCAR)
+
+        - Skip files that cannot be extracted from pass 2 of files processing.
+
+        - Add subcommands: mods-by-mention-count, scripts-by-mention-count,
+          script2dist, script2rel.
+
+
 0.67    2016-02-12 (PERLANCAR)
 
         - [Bugfix] Previous version was broken (a SQL error when updating
