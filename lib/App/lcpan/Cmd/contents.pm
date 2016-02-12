@@ -29,7 +29,8 @@ _
         },
         %App::lcpan::query_multi_args,
         query_type => {
-            schema => ['str*', in=>[qw/any path exact-path package exact-package/]],
+            schema => ['str*', in=>[qw/any path exact-path package
+                                       exact-package/]],
             default => 'any',
         },
         #%App::lcpan::dist_args,
@@ -98,7 +99,7 @@ sub handle_cmd {
   content.path path,
   content.mtime mtime,
   content.size size,
-  content.package package
+  content.package AS package
 FROM content
 LEFT JOIN file ON content.file_id=file.id
 ".
