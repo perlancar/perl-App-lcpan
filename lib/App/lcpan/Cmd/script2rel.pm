@@ -16,7 +16,7 @@ $SPEC{'handle_cmd'} = {
     summary => 'Get release name of a script',
     args => {
         %App::lcpan::common_args,
-        %App::lcpan::script_args,
+        %App::lcpan::scripts_args,
         %App::lcpan::full_path_args,
         %App::lcpan::all_args,
     },
@@ -27,19 +27,25 @@ sub handle_cmd {
     my $state = App::lcpan::_init(\%args, 'ro');
     my $dbh = $state->{dbh};
 
-    my $script = $args{script};
+    my $scripts = $args{scripts};
+    my $scripts_s = join(",", map {$dbh->quote($_)} @$scripts);
 
     my $sth = $dbh->prepare("SELECT
+  script.name script,
   file.cpanid author,
   file.name release
 FROM script
 LEFT JOIN file ON script.file_id=file.id
-WHERE script.name=?
+WHERE script.name IN ($scripts_s)
 ORDER BY file.id DESC");
-    $sth->execute($script);
+    $sth->execute;
 
     my @res;
+    my %mem;
     while (my $row = $sth->fetchrow_hashref) {
+        unless ($args{all}) {
+            next if $mem{$row->{release}}++;
+        }
         if ($args{full_path}) {
             $row->{release} = App::lcpan::_fullpath(
                 $row->{release}, $state->{cpan}, $row->{author});
@@ -47,12 +53,22 @@ ORDER BY file.id DESC");
             $row->{release} = App::lcpan::_relpath(
                 $row->{release}, $row->{author});
         }
-        return [200, "OK", $row->{release}] unless $args{all};
+        delete $row->{author};
         push @res, $row;
     }
-    return [404, "No such script"] unless $args{all};
 
-    [200, "OK", \@res, {'table.fields' => [qw/release author/]}];
+    if (@$scripts == 1) {
+        @res = map { $_->{release} } @res;
+        if (!@res) {
+            return [404, "No such script"];
+        } elsif (@res == 1) {
+            return [200, "OK", $res[0]];
+        } else {
+            return [200, "OK", \@res];
+        }
+    }
+
+    [200, "OK", \@res, {'table.fields' => [qw/script release/]}];
 }
 
 1;

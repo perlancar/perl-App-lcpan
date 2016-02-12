@@ -51,7 +51,9 @@ WHERE script.name IN ($scripts_s)");
 
     if (@$scripts == 1) {
         @res = map { $_->{dist} } @res;
-        if (@res == 1) {
+        if (!@res) {
+            return [404, "No such script"];
+        } elsif (@res == 1) {
             return [200, "OK", $res[0]];
         } else {
             return [200, "OK", \@res];
