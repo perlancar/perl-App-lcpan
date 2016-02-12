@@ -383,6 +383,7 @@ our $db_schema_spec = {
              size INT -- uncompressed size
         )',
         'CREATE UNIQUE INDEX ix_content__file_id__path ON content(file_id, path)',
+        'CREATE INDEX ix_content__package ON content(package)',
 
         'CREATE TABLE module (
              id INTEGER NOT NULL PRIMARY KEY,
@@ -618,6 +619,9 @@ our $db_schema_spec = {
         'CREATE UNIQUE INDEX ix_mention__script_name__source_content_id ON mention(script_name, source_content_id)',
     ],
 
+    upgrade_to_v9 => [
+        'CREATE INDEX ix_content__package ON content(package)',
+    ],
     # for testing
     install_v1 => [
         'CREATE TABLE author (
