@@ -1,5 +1,13 @@
 Revision history for App-lcpan
 
+0.71    2016-02-12 (PERLANCAR)
+
+	- No functional changes.
+
+	- 2nd attempt to workaround PAUSE indexer mistakenly detects a
+	  package declaration.
+
+
 0.70    2016-02-12 (PERLANCAR)
 
 	- No functional changes.
