@@ -1,5 +1,12 @@
 Revision history for App-lcpan
 
+0.70    2016-02-12 (PERLANCAR)
+
+	- No functional changes.
+
+	- Workaround package declaration false positive from PAUSE indexer.
+
+
 0.69    2016-02-12 (PERLANCAR)
 
         - Bump database schema version to v9 (add index for 'package' field in
