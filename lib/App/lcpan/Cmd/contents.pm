@@ -23,9 +23,13 @@ _
         %App::lcpan::common_args,
         %App::lcpan::fauthor_args,
         %App::lcpan::fdist_args,
+        package => {
+            schema => 'str*',
+            tags => ['category:filtering'],
+        },
         %App::lcpan::query_multi_args,
         query_type => {
-            schema => ['str*', in=>[qw/any path exact-path/]],
+            schema => ['str*', in=>[qw/any path exact-path package exact-package/]],
             default => 'any',
         },
         #%App::lcpan::dist_args,
@@ -41,6 +45,7 @@ sub handle_cmd {
     my $detail = $args{detail};
     my $author = uc($args{author} // '');
     my $dist = $args{dist};
+    my $package = $args{package};
     my $qt = $args{query_type} // 'any';
 
     my @bind;
@@ -48,12 +53,23 @@ sub handle_cmd {
     {
         my @q_where;
         for my $q0 (@{ $args{query} // [] }) {
-            if ($qt eq 'any' || $qt eq 'path') {
+            if ($qt eq 'any') {
+                my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
+                push @q_where, "(content.path LIKE ? OR package LIKE ?)";
+                push @bind, $q, $q;
+            } elsif ($qt eq 'path') {
                 my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
                 push @q_where, "(content.path LIKE ?)";
                 push @bind, $q;
             } elsif ($qt eq 'exact-path') {
                 push @q_where, "(content.path=?)";
+                push @bind, $q0;
+            } elsif ($qt eq 'package') {
+                my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
+                push @q_where, "(content.package LIKE ?)";
+                push @bind, $q;
+            } elsif ($qt eq 'exact-package') {
+                push @q_where, "(content.package=?)";
                 push @bind, $q0;
             }
         }
@@ -71,13 +87,18 @@ sub handle_cmd {
         push @where, "(file.id=(SELECT file_id FROM dist WHERE name=?))";
         push @bind, $dist;
     }
+    if ($package) {
+        push @where, "content.package=?";
+        push @bind, $package;
+    }
 
     my $sql = "SELECT
   file.cpanid cpanid,
   file.name release,
   content.path path,
   content.mtime mtime,
-  content.size size
+  content.size size,
+  content.package package
 FROM content
 LEFT JOIN file ON content.file_id=file.id
 ".
@@ -90,7 +111,7 @@ LEFT JOIN file ON content.file_id=file.id
         push @res, $detail ? $row : $row->{path};
     }
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/path release cpanid mtime size/]
+    $resmeta->{'table.fields'} = [qw/path release cpanid mtime size package/]
         if $detail;
     [200, "OK", \@res, $resmeta];
 }
