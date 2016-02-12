@@ -13,7 +13,7 @@ our %SPEC;
 
 $SPEC{'handle_cmd'} = {
     v => 1.1,
-    summary => 'Get release name of a script',
+    summary => 'Get release(s) of script(s)',
     args => {
         %App::lcpan::common_args,
         %App::lcpan::scripts_args,
@@ -44,7 +44,7 @@ ORDER BY file.id DESC");
     my %mem;
     while (my $row = $sth->fetchrow_hashref) {
         unless ($args{all}) {
-            next if $mem{$row->{release}}++;
+            next if $mem{$row->{script}}++;
         }
         if ($args{full_path}) {
             $row->{release} = App::lcpan::_fullpath(

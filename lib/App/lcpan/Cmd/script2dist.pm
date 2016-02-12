@@ -13,7 +13,7 @@ our %SPEC;
 
 $SPEC{'handle_cmd'} = {
     v => 1.1,
-    summary => 'Get distribution name of a script',
+    summary => 'Get distribution(s) of script(s)',
     args => {
         %App::lcpan::common_args,
         %App::lcpan::scripts_args,
