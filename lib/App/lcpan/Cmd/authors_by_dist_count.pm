@@ -26,7 +26,8 @@ sub handle_cmd {
 
     my $sql = "SELECT
   cpanid author,
-  COUNT(*) AS dist_count
+  COUNT(*) AS dist_count,
+  ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM dist), 4) dist_count_pct
 FROM dist d
 GROUP BY cpanid
 ORDER BY dist_count DESC
@@ -39,7 +40,7 @@ ORDER BY dist_count DESC
         push @res, $row;
     }
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/author dist_count/];
+    $resmeta->{'table.fields'} = [qw/author dist_count dist_count_pct/];
     [200, "OK", \@res, $resmeta];
 }
 

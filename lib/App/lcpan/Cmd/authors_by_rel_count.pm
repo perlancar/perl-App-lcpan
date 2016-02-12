@@ -26,7 +26,8 @@ sub handle_cmd {
 
     my $sql = "SELECT
   cpanid author,
-  COUNT(*) AS rel_count
+  COUNT(*) AS rel_count,
+  ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM file), 4) rel_count_pct
 FROM file a
 GROUP BY cpanid
 ORDER BY rel_count DESC
@@ -39,7 +40,7 @@ ORDER BY rel_count DESC
         push @res, $row;
     }
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/author rel_count/];
+    $resmeta->{'table.fields'} = [qw/author rel_count rel_count_pct/];
     [200, "OK", \@res, $resmeta];
 }
 

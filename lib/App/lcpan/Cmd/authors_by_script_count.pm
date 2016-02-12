@@ -13,7 +13,7 @@ our %SPEC;
 
 $SPEC{'handle_cmd'} = {
     v => 1.1,
-    summary => 'List authors ranked by number of modules',
+    summary => 'List authors ranked by number of scripts',
     args => {
         %App::lcpan::common_args,
     },
@@ -26,7 +26,8 @@ sub handle_cmd {
 
     my $sql = "SELECT
   file.cpanid author,
-  COUNT(*) AS script_count
+  COUNT(*) AS script_count,
+  ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM script), 4) script_count_pct
 FROM script
 LEFT JOIN file ON script.file_id=file.id
 GROUP BY file.cpanid
@@ -40,7 +41,7 @@ ORDER BY script_count DESC
         push @res, $row;
     }
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/author script_count/];
+    $resmeta->{'table.fields'} = [qw/author script_count script_count_pct/];
     [200, "OK", \@res, $resmeta];
 }
 

@@ -26,7 +26,8 @@ sub handle_cmd {
 
     my $sql = "SELECT
   cpanid author,
-  COUNT(*) AS mod_count
+  COUNT(*) AS mod_count,
+  ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM module), 4) mod_count_pct
 FROM module m
 GROUP BY cpanid
 ORDER BY mod_count DESC
@@ -39,7 +40,7 @@ ORDER BY mod_count DESC
         push @res, $row;
     }
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/author mod_count/];
+    $resmeta->{'table.fields'} = [qw/author mod_count mod_count_pct/];
     [200, "OK", \@res, $resmeta];
 }
 

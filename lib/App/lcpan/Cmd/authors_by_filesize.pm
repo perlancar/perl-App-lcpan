@@ -30,7 +30,7 @@ sub handle_cmd {
     my $sql = "SELECT
   file.cpanid author,
   SUM(size) AS filesize,
-  ROUND(100.0 * SUM(size) / (SELECT SUM(size) FROM file), 2) AS filesize_pct,
+  ROUND(100.0 * SUM(size) / (SELECT SUM(size) FROM file), 4) AS filesize_pct,
   COUNT(*) rel_count
 FROM file
 GROUP BY file.cpanid
