@@ -2517,6 +2517,11 @@ $SPEC{'releases'} = {
         has_buildpl    => {schema=>'bool'},
         %flatest_args,
         %full_path_args,
+        sort => {
+            schema => ['array*', of=>['str*', in=>[qw/author -author size -size name -name mtime -mtime/]]],
+            default => ['name'],
+            tags => ['category:sorting'],
+        },
     },
     description => <<'_',
 
@@ -2538,6 +2543,7 @@ sub releases {
     my $detail = $args{detail};
     my $author = uc($args{author} // '');
     my $qt = $args{query_type} // 'any';
+    my $sort = $args{sort} // ['name'];
 
     my @bind;
     my @where;
@@ -2580,6 +2586,10 @@ sub releases {
     } elsif (defined $args{latest}) {
         push @where, "NOT(d.is_latest)";
     }
+
+    my @order;
+    for (@$sort) { /\A(-?)(\w+)/ and push @order, $2 . ($1 ? " DESC" : "") }
+
     my $sql = "SELECT
   f1.name name,
   f1.cpanid author,
@@ -2597,8 +2607,8 @@ sub releases {
 FROM file f1
 LEFT JOIN dist d ON f1.id=d.file_id
 ".
-        (@where ? " WHERE ".join(" AND ", @where) : "").
-            " ORDER BY name";
+    (@where ? " WHERE ".join(" AND ", @where) : "").
+    (@order ? " ORDER BY ".join(", ", @order) : "");
 
     my @res;
     my $sth = $dbh->prepare($sql);
@@ -2607,6 +2617,9 @@ LEFT JOIN dist d ON f1.id=d.file_id
         $row->{name} = $args{full_path} ?
             _fullpath($row->{name}, $state->{cpan}, $row->{author}) :
             _relpath($row->{name}, $row->{author});
+        for (qw/file_error meta_error/) {
+            $row->{$_} =~ s/\R+/ /g if defined $row->{$_};
+        }
         push @res, $detail ? $row : $row->{name};
     }
     my $resmeta = {};
