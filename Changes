@@ -1,6 +1,25 @@
 Revision history for App-lcpan
 
-0.68    2016-02-12 (PERLANCAR)
+0.69    2016-02-12 (PERLANCAR)
+
+        - Bump database schema version to v9 (add index for 'package' field in
+          'content' table).
+
+        - New subcommands: doc, script2mod, copy-script, extract-script,
+          authors-by-filesize.
+
+        - script2dist: Add option --all.
+
+        - script2rel: Accept multiple arguments.
+
+        - dists: Add options --sort, --has-multiple-rels.
+
+        - authors-by-*: Add percentage result field.
+
+        - contents: Add option --package.
+
+
+0.68    2016-02-11 (PERLANCAR)
 
         - Skip files that cannot be extracted from pass 2 of files processing.
 
@@ -8,7 +27,7 @@ Revision history for App-lcpan
           script2dist, script2rel.
 
 
-0.67    2016-02-12 (PERLANCAR)
+0.67    2016-02-11 (PERLANCAR)
 
         - [Bugfix] Previous version was broken (a SQL error when updating
           index).
