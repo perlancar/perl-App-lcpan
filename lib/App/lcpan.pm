@@ -2078,6 +2078,70 @@ sub _complete_rel {
     \@res;
 };
 
+sub _complete_content_package_or_script {
+    my %args = @_;
+
+    my $word = $args{word} // '';
+
+    # only run under pericmd
+    my $cmdline = $args{cmdline} or return undef;
+    my $r = $args{r};
+
+    # force read config file, because by default it is turned off when in
+    # completion
+    $r->{read_config} = 1;
+    my $res = $cmdline->parse_argv($r);
+    _set_args_default($res->[2]);
+
+    my $dbh;
+    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}) };
+
+    # if we can't connect (probably because database is not yet setup), bail
+    if ($@) {
+        $log->tracef("[comp] can't connect to db, bailing: %s", $@);
+        return undef;
+    }
+
+    my $sth;
+    my @res;
+
+    # complete from content package
+    {
+        $sth = $dbh->prepare(
+            "SELECT DISTINCT package FROM content WHERE package LIKE ? ORDER BY package");
+        $sth->execute($word . '%');
+
+        # XXX follow Complete::Common::OPT_CI
+
+        while (my ($pkg) = $sth->fetchrow_array) {
+            # only complete one level deeper at a time
+            if ($pkg =~ /:\z/) {
+                next unless $pkg =~ /\A\Q$word\E:*\w+\z/i;
+            } else {
+                next unless $pkg =~ /\A\Q$word\E\w*(::\w+)?\z/i;
+            }
+            push @res, $pkg;
+        }
+    }
+
+    # complete from script
+    {
+        last if $word =~ /::/;
+        $sth = $dbh->prepare(
+            "SELECT DISTINCT name FROM script WHERE name LIKE ? ORDER BY name");
+        $sth->execute($word . '%');
+
+        # XXX follow Complete::Common::OPT_CI
+
+        while (my ($script) = $sth->fetchrow_array) {
+            push @res, $script;
+        }
+    }
+
+    \@res;
+};
+
+
 $SPEC{authors} = {
     v => 1.1,
     summary => 'List authors',
