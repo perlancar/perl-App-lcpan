@@ -2338,6 +2338,12 @@ $SPEC{dists} = {
             schema => 'bool',
             tags => ['category:filtering'],
         },
+        has_multiple_rels => {
+            'summary.alt.bool.yes' => 'Only list dists having multiple releases indexed',
+            'summary.alt.bool.not' => 'Only list dists having a single release indexed',
+            schema => 'bool',
+            tags => ['category:filtering'],
+        },
     },
     result => {
         description => <<'_',
@@ -2346,6 +2352,9 @@ By default will return an array of distribution names. If you set `detail` to
 true, will return array of records.
 
 _
+    },
+    args_rels => {
+        choose_one => [qw/latest has_multiple_rels/],
     },
     examples => [
         {
@@ -2385,8 +2394,18 @@ sub dists {
     my $author = uc($args{author} // '');
     my $qt = $args{query_type} // 'any';
 
+    my @cols = (
+        "d.name name",
+        "d.cpanid author",
+        "version",
+        "f.name file",
+        "abstract",
+    );
+
+    my %delcols;
     my @bind;
     my @where;
+    #my @having;
     {
         my @q_where;
         for my $q0 (@{ $args{query} // [] }) {
@@ -2450,12 +2469,18 @@ sub dists {
             push @where, "has_metajson=0";
         }
     }
-    my $sql = "SELECT
-  d.name name,
-  d.cpanid author,
-  version,
-  f.name file,
-  abstract
+
+    if (defined $args{has_multiple_rels}) {
+        push @cols, "(SELECT COUNT(*) FROM dist d2 WHERE d2.name=d.name) rel_count";
+        if ($args{has_multiple_rels}) {
+            push @where, "rel_count > 1";
+        } else {
+            push @where, "rel_count = 1";
+        }
+        $delcols{rel_count}++;
+    }
+
+    my $sql = "SELECT ".join(", ", @cols)."
 FROM dist d
 LEFT JOIN file f ON d.file_id=f.id
 ".
@@ -2466,6 +2491,7 @@ LEFT JOIN file f ON d.file_id=f.id
     my $sth = $dbh->prepare($sql);
     $sth->execute(@bind);
     while (my $row = $sth->fetchrow_hashref) {
+        delete $row->{$_} for keys %delcols;
         push @res, $detail ? $row : $row->{name};
     }
     my $resmeta = {};
