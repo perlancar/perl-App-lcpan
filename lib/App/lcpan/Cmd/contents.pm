@@ -23,7 +23,7 @@ _
         %App::lcpan::common_args,
         %App::lcpan::fauthor_args,
         %App::lcpan::fdist_args,
-        package => {
+        "package" => {
             schema => 'str*',
             tags => ['category:filtering'],
         },
