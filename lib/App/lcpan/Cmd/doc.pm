@@ -113,10 +113,11 @@ sub handle_cmd {
         my @bind = ($name);
         if ($look eq 'module') {
 
+            push @where, "package=?";
             if ($ext eq 'pm') {
                 push @where, "path LIKE '%.pm'";
             } elsif ($ext eq 'pod') {
-                push @where, "path LIKE '%.pm'";
+                push @where, "path LIKE '%.pod'";
             }
             $row = $dbh->selectrow_hashref("SELECT
   content.path content_path,
@@ -124,7 +125,6 @@ sub handle_cmd {
   file.name release
 FROM content
 LEFT JOIN file ON content.file_id=file.id
-WHERE package=?
 ".(@where ? " WHERE ".join(" AND ", @where) : "")."
 ORDER BY content.size DESC
 LIMIT 1", {}, @bind);
@@ -132,6 +132,7 @@ LIMIT 1", {}, @bind);
 
         } elsif ($look eq 'script') {
 
+            push @where, "script.name=?";
             $row = $dbh->selectrow_hashref("SELECT
   content.path content_path,
   file.cpanid author,
@@ -139,7 +140,6 @@ LIMIT 1", {}, @bind);
 FROM script
 LEFT JOIN file ON script.file_id=file.id
 LEFT JOIN content ON script.content_id=content.id
-WHERE script.name=?
 ".(@where ? " WHERE ".join(" AND ", @where) : "")."
 ORDER BY content.size DESC
 LIMIT 1", {}, @bind);
