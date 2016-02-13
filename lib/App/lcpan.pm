@@ -161,6 +161,12 @@ our %full_path_args = (
     },
 );
 
+our %no_path_args = (
+    no_path => {
+        schema => ['bool*' => is=>1],
+    },
+);
+
 our %mod_args = (
     module => {
         schema => 'str*',
@@ -225,6 +231,14 @@ our %rel_args = (
         req => 1,
         pos => 0,
         completion => \&_complete_rel,
+    },
+);
+
+our %sort_args_for_rels = (
+    sort => {
+        schema => ['array*', of=>['str*', in=>[qw/author -author size -size name -name mtime -mtime/]]],
+        default => ['name'],
+        tags => ['category:sorting'],
     },
 );
 
@@ -2585,11 +2599,11 @@ $SPEC{'releases'} = {
         has_buildpl    => {schema=>'bool'},
         %flatest_args,
         %full_path_args,
-        sort => {
-            schema => ['array*', of=>['str*', in=>[qw/author -author size -size name -name mtime -mtime/]]],
-            default => ['name'],
-            tags => ['category:sorting'],
-        },
+        %no_path_args,
+        %sort_args_for_rels,
+    },
+    args_rels => {
+        choose_one => ['full_path', 'no_path'],
     },
     description => <<'_',
 
@@ -2682,9 +2696,12 @@ LEFT JOIN dist d ON f1.id=d.file_id
     my $sth = $dbh->prepare($sql);
     $sth->execute(@bind);
     while (my $row = $sth->fetchrow_hashref) {
-        $row->{name} = $args{full_path} ?
-            _fullpath($row->{name}, $state->{cpan}, $row->{author}) :
-            _relpath($row->{name}, $row->{author});
+        if ($args{no_path}) {
+        } elsif ($args{full_path}) {
+            $row->{name} = _fullpath($row->{name}, $state->{cpan}, $row->{author});
+        } else {
+            $row->{name} = _relpath($row->{name}, $row->{author});
+        }
         for (qw/file_error meta_error/) {
             $row->{$_} =~ s/\R+/ /g if defined $row->{$_};
         }
