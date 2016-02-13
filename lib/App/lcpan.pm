@@ -145,11 +145,11 @@ our %flatest_args = (
     },
 );
 
-our %sort_modules_args = (
+our %sort_args_for_mods = (
     sort => {
         summary => 'Sort the result',
-        schema => ['str*', in=>[map {($_,"-$_")} qw/name author rdeps/]],
-        default => 'name',
+        schema => ['str*', in=>[map {($_,"-$_")} qw/module author rdeps rel_mtime/]],
+        default => 'module',
         tags => ['category:ordering'],
     },
 );
@@ -2274,7 +2274,7 @@ $SPEC{modules} = {
             tags => ['category:filtering'],
             element_completion => \&_complete_ns,
         },
-        %sort_modules_args,
+        %sort_args_for_mods,
     },
     result => {
         description => <<'_',
@@ -2301,17 +2301,18 @@ sub modules {
         my $order;
         if ($sort eq 'author') { $order = 'author' }
         elsif ($sort eq 'rdeps') { $order = 'rdeps' }
-        else { $order = 'name' }
+        else { $order = 'module' }
         $order .= " DESC" if $is_desc;
         $order;
     };
 
     my @cols = (
-        'name',
-        'version',
-        'abstract',
-        ['(SELECT name FROM dist WHERE dist.file_id=module.file_id)', 'dist'],
-        ['cpanid', 'author'],
+        ['module.name', 'module'],
+        ['module.version', 'version'],
+        ['module.abstract', 'abstract'],
+        ['dist.name', 'dist'],
+        ['file.cpanid', 'author'],
+        ['file.mtime', 'rel_mtime'],
     );
 
     if ($order =~ /rdeps/) {
@@ -2325,21 +2326,20 @@ sub modules {
     {
         my @q_where;
         for my $q0 (@{ $args{query} // [] }) {
-            #push @q_where, "(name LIKE ? OR dist LIKE ?)"; # rather slow
             if ($qt eq 'any') {
                 my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
-                push @q_where, "(name LIKE ? OR abstract LIKE ?)";
-                push @bind, $q, $q;
+                push @q_where, "(module.name LIKE ? OR module.abstract LIKE ? OR dist.name LIKE ?)";
+                push @bind, $q, $q, $q;
             } elsif ($qt eq 'name') {
                 my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
-                push @q_where, "(name LIKE ?)";
+                push @q_where, "(module.name LIKE ?)";
                 push @bind, $q;
             } elsif ($qt eq 'exact-name') {
-                push @q_where, "(name=?)";
+                push @q_where, "(module.name=?)";
                 push @bind, $q0;
             } elsif ($qt eq 'abstract') {
                 my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
-                push @q_where, "(abstract LIKE ?)";
+                push @q_where, "(module.abstract LIKE ?)";
                 push @bind, $q;
             }
         }
@@ -2354,7 +2354,6 @@ sub modules {
         push @bind, $author;
     }
     if ($args{dist}) {
-        #push @where, "(dist_id=(SELECT dist_id FROM dist WHERE dist_name=?))";
         push @where, "(dist=?)";
         push @bind, $args{dist};
     }
@@ -2363,25 +2362,28 @@ sub modules {
         for my $ns (@{ $args{namespaces} }) {
             return [400, "Invalid namespace '$ns', please use Word or Word(::Sub)+"]
                 unless $ns =~ /\A\w+(::\w+)*\z/;
-            push @ns_where, "(name='$ns' OR name LIKE '$ns\::%')";
+            push @ns_where, "(module.name='$ns' OR module.name LIKE '$ns\::%')";
         }
         push @where, "(".join(" OR ", @ns_where).")";
     }
     if ($args{latest}) {
-        push @where, "(SELECT is_latest FROM dist d WHERE d.file_id=module.file_id)";
+        push @where, "dist.is_latest";
     } elsif (defined $args{latest}) {
-        push @where, "NOT(SELECT is_latest FROM dist d WHERE d.file_id=module.file_id)";
+        push @where, "NOT dist.is_latest";
     }
-    my $sql = "SELECT ".join(", ", map {ref($_) ? "$_->[0] AS $_->[1]" : $_} @cols).
-        " FROM module".
-        (@where ? " WHERE ".join(" AND ", @where) : "").
+    my $sql = "SELECT ".join(", ", map {ref($_) ? "$_->[0] AS $_->[1]" : $_} @cols)."
+FROM module
+LEFT JOIN file ON module.file_id=file.id
+LEFT JOIN dist ON file.id=dist.file_id
+".
+    (@where ? " WHERE ".join(" AND ", @where) : "").
         " ORDER BY ".$order;
 
     my @res;
     my $sth = $dbh->prepare($sql);
     $sth->execute(@bind);
     while (my $row = $sth->fetchrow_hashref) {
-        push @res, $detail ? $row : $row->{name};
+        push @res, $detail ? $row : $row->{module};
     }
     my $resmeta = {};
     $resmeta->{'table.fields'} = [map {ref($_) ? $_->[1] : $_} grep {!ref($_) || !$_->[2]} @cols]
