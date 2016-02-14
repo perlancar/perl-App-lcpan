@@ -108,6 +108,7 @@ sub handle_cmd {
     }
 
     my $row;
+  LOOK:
     for my $look (@look_order) {
         my @where;
         my @bind = ($name);
@@ -128,7 +129,31 @@ LEFT JOIN file ON content.file_id=file.id
 ".(@where ? " WHERE ".join(" AND ", @where) : "")."
 ORDER BY content.size DESC
 LIMIT 1", {}, @bind);
-            last if $row;
+            last LOOK if $row;
+
+            if ($ext eq 'pod') {
+                # .pod doesn't always declare package so we also try to guess
+                # from content path
+                $name =~ s!::!/!g; $name .= ".pod";
+                @where = ("content.path LIKE ?");
+                @bind = ("%$name");
+
+                my $sth = $dbh->prepare("SELECT
+  content.path content_path,
+  file.cpanid author,
+  file.name release
+FROM content
+LEFT JOIN file ON content.file_id=file.id
+".(@where ? " WHERE ".join(" AND ", @where) : "")."
+ORDER BY content.size DESC");
+                $sth->execute(@bind);
+                while (my $r = $sth->fetchrow_hashref) {
+                    if ($r->{content_path} =~ m!^[^/]+/\Q$name\E$!) {
+                        $row = $r;
+                        last LOOK;
+                    }
+                }
+            }
 
         } elsif ($look eq 'script') {
 
@@ -143,7 +168,7 @@ LEFT JOIN content ON script.content_id=content.id
 ".(@where ? " WHERE ".join(" AND ", @where) : "")."
 ORDER BY content.size DESC
 LIMIT 1", {}, @bind);
-            last if $row;
+            last LOOK if $row;
 
         }
     }
