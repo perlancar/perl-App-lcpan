@@ -1,5 +1,11 @@
 Revision history for App-lcpan
 
+0.73    2016-02-14 (PERLANCAR)
+
+	- doc: Search .pod using content path to be able to show POD when
+	  there is no package declaration in the .pod.
+
+
 0.72    2016-02-14 (PERLANCAR)
 
         - [Bugfix] doc: Fix SQL error when name contains /\.(pod|pm)$/.
