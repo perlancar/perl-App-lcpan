@@ -1,8 +1,12 @@
 Revision history for App-lcpan
 
-0.72    2016-02-14 (PERLANCAR) (unreleased)
+0.72    2016-02-14 (PERLANCAR)
 
         - [Bugfix] doc: Fix SQL error when name contains /\.(pod|pm)$/.
+
+        - mods: Add result field rel_mtime.
+
+        - rels: Add option --no-path.
 
 
 0.71    2016-02-12 (PERLANCAR)

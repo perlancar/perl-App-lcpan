@@ -1,0 +1,11 @@
+package App::lcpan::Manual::Cookbook; # just to make PodWeaver happy
+
+# DATE
+# VERSION
+
+1;
+# ABSTRACT: lcpan recipes/tips
+
+=head1 RECIPES
+
+=cut
