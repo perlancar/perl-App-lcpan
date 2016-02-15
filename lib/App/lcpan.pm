@@ -1828,6 +1828,8 @@ FROM file");
     ($stat->{num_content}) = $dbh->selectrow_array("SELECT COUNT(*) FROM content");
     ($stat->{num_mentions}) = $dbh->selectrow_array("SELECT COUNT(*) FROM mention");
 
+    ($stat->{total_filesize}) = $dbh->selectrow_array("SELECT SUM(size) FROM file");
+
     {
         my ($time) = $dbh->selectrow_array("SELECT value FROM meta WHERE name='last_index_time'");
         $stat->{raw_last_index_time} = $time;
