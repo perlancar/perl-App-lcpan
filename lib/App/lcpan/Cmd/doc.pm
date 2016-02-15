@@ -45,12 +45,35 @@ _
             schema => ['bool', is=>1],
             cmdline_aliases => {s=>{}},
         },
-        raw => {
-            summary => 'Dump raw POD instead of rendering it',
-            schema => ['bool', is=>1],
-            cmdline_aliases => {r=>{}},
+        format => {
+            schema => ['str*', in=>[qw/raw html man/]],
+            default => 'man',
+            cmdline_aliases => {
+                raw => {
+                    summary => 'Dump raw POD instead of rendering it',
+                    is_flag => 1,
+                    code => sub { $_[0]{format} = 'raw' },
+                },
+                r => {
+                    summary => 'Same as --raw',
+                    is_flag => 1,
+                    code => sub { $_[0]{format} = 'raw' },
+                },
+                html => {
+                    summary => 'Show HTML documentation in browser instead of rendering as man',
+                    is_flag => 1,
+                    code => sub { $_[0]{format} = 'html' },
+                },
+                man => {
+                    summary => 'Read as manpage (the default)',
+                    is_flag => 1,
+                    code => sub { $_[0]{format} = 'man' },
+                },
+            },
             tags => ['category:output'],
         },
+    },
+    args_rels => {
     },
     examples => [
         {
@@ -86,7 +109,10 @@ _
         # filter arg: rel to pick a specific release file
     ],
     deps => {
-        prog => 'pod2man', # XXX unless when raw=1
+        all => [
+            {prog => 'pod2man'},  # XXX only when format=man
+            {prog => 'pod2html'}, # XXX only when format=html
+        ],
     },
 };
 sub handle_cmd {
@@ -198,8 +224,28 @@ LIMIT 1", {}, @bind);
         $content = $obj->get_content;
     }
 
-    if ($args{raw}) {
+    if ($args{format} eq 'raw') {
         return [200, "OK", $content, {'cmdline.skip_format'=>1}];
+    } elsif ($args{format} eq 'html') {
+        require Browser::Open;
+        require File::Slurper;
+        require File::Temp;
+        require File::Util::Tempdir;
+
+        my $tmpdir = File::Util::Tempdir::get_tempdir();
+        my $cachedir = File::Temp::tempdir(CLEANUP => 1);
+        my $name = $name; $name =~ s/:+/_/g;
+        File::Slurper::write_text("$tmpdir/$name.pod", $content);
+        system(
+            "pod2html",
+            "--infile", "$tmpdir/$name.pod",
+            "--outfile", "$tmpdir/$name.html",
+            "--cachedir", $cachedir,
+        );
+        return [500, "Can't pod2html: $!"] if $?;
+        my $err = Browser::Open::open_browser("file:$tmpdir/$name.html");
+        return [500, "Can't open browser"] if $err;
+        [200];
     } else {
         return [200, "OK", $content, {
             "cmdline.page_result"=>1,
