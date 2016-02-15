@@ -235,15 +235,18 @@ LIMIT 1", {}, @bind);
         my $tmpdir = File::Util::Tempdir::get_tempdir();
         my $cachedir = File::Temp::tempdir(CLEANUP => 1);
         my $name = $name; $name =~ s/:+/_/g;
-        File::Slurper::write_text("$tmpdir/$name.pod", $content);
+        my ($infh, $infile) = File::Temp::tempfile(
+            "$name.XXXXXXXX", DIR=>$tmpdir, SUFFIX=>".pod");
+        my $outfile = "$infile.html";
+        File::Slurper::write_text($infile, $content);
         system(
             "pod2html",
-            "--infile", "$tmpdir/$name.pod",
-            "--outfile", "$tmpdir/$name.html",
+            "--infile", $infile,
+            "--outfile", $outfile,
             "--cachedir", $cachedir,
         );
         return [500, "Can't pod2html: $!"] if $?;
-        my $err = Browser::Open::open_browser("file:$tmpdir/$name.html");
+        my $err = Browser::Open::open_browser("file:$outfile");
         return [500, "Can't open browser"] if $err;
         [200];
     } else {
