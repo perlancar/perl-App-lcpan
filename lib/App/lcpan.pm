@@ -2489,7 +2489,7 @@ sub dists {
         "d.cpanid author",
         "version",
         "f.name release",
-        "f.name rel_size",
+        "f.size rel_size",
         "f.mtime rel_mtime",
         "abstract",
     );
