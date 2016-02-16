@@ -148,8 +148,17 @@ our %flatest_args = (
 our %sort_args_for_mods = (
     sort => {
         summary => 'Sort the result',
-        schema => ['str*', in=>[map {($_,"-$_")} qw/module author rdeps rel_mtime/]],
+        schema => ['array*', of=>['str*', in=>[map {($_,"-$_")} qw/module author rdeps rel_mtime/]]],
         default => 'module',
+        tags => ['category:ordering'],
+    },
+);
+
+our %sort_args_for_dists = (
+    sort => {
+        summary => 'Sort the result',
+        schema => ['array*', of=>['str*', in=>[map {($_,"-$_")} qw/dist author release rel_size rel_mtime abstract/]]],
+        default => 'dist',
         tags => ['category:ordering'],
     },
 );
@@ -2296,17 +2305,7 @@ sub modules {
     my $detail = $args{detail};
     my $author = uc($args{author} // '');
     my $qt = $args{query_type} // 'any';
-
-    my $order = do {
-        my $sort = $args{sort} // '';
-        my $is_desc = $sort =~ s/^-//;
-        my $order;
-        if ($sort eq 'author') { $order = 'author' }
-        elsif ($sort eq 'rdeps') { $order = 'rdeps' }
-        else { $order = 'module' }
-        $order .= " DESC" if $is_desc;
-        $order;
-    };
+    my $sort = $args{sort} // ['module'];
 
     my @cols = (
         ['module.name', 'module'],
@@ -2316,12 +2315,6 @@ sub modules {
         ['file.cpanid', 'author'],
         ['file.mtime', 'rel_mtime'],
     );
-
-    if ($order =~ /rdeps/) {
-        push @cols, (
-            ['(SELECT COUNT(DISTINCT dist_id) FROM dep WHERE module_id=module.id)', 'rdeps'],
-        );
-    }
 
     my @bind;
     my @where;
@@ -2373,13 +2366,17 @@ sub modules {
     } elsif (defined $args{latest}) {
         push @where, "NOT dist.is_latest";
     }
+
+    my @order;
+    for (@$sort) { /\A(-?)(\w+)/ and push @order, $2 . ($1 ? " DESC" : "") }
+
     my $sql = "SELECT ".join(", ", map {ref($_) ? "$_->[0] AS $_->[1]" : $_} @cols)."
 FROM module
 LEFT JOIN file ON module.file_id=file.id
 LEFT JOIN dist ON file.id=dist.file_id
 ".
     (@where ? " WHERE ".join(" AND ", @where) : "").
-        " ORDER BY ".$order;
+    (@order ? " ORDER BY ".join(", ", @order) : "");
 
     my @res;
     my $sth = $dbh->prepare($sql);
@@ -2430,6 +2427,12 @@ $SPEC{dists} = {
             schema => 'bool',
             tags => ['category:filtering'],
         },
+        rel_mtime_newer_than => {
+            schema => 'date*',
+            'x.perl.coerce_to' => 'int(epoch)',
+            tags => ['category:filtering'],
+        },
+        %sort_args_for_dists,
     },
     result => {
         description => <<'_',
@@ -2479,13 +2482,15 @@ sub dists {
     my $detail = $args{detail};
     my $author = uc($args{author} // '');
     my $qt = $args{query_type} // 'any';
+    my $sort = $args{sort} // ['dist'];
 
     my @cols = (
-        "d.name name",
+        "d.name dist",
         "d.cpanid author",
         "version",
         "f.name release",
         "f.name rel_size",
+        "f.mtime rel_mtime",
         "abstract",
     );
 
@@ -2556,7 +2561,6 @@ sub dists {
             push @where, "has_metajson=0";
         }
     }
-
     if (defined $args{has_multiple_rels}) {
         push @cols, "(SELECT COUNT(*) FROM dist d2 WHERE d2.name=d.name) rel_count";
         if ($args{has_multiple_rels}) {
@@ -2566,13 +2570,20 @@ sub dists {
         }
         $delcols{rel_count}++;
     }
+    if (defined $args{rel_mtime_newer_than}) {
+        push @where, "f.mtime > ?";
+        push @bind, $args{rel_mtime_newer_than};
+    }
+
+    my @order;
+    for (@$sort) { /\A(-?)(\w+)/ and push @order, $2 . ($1 ? " DESC" : "") }
 
     my $sql = "SELECT ".join(", ", @cols)."
 FROM dist d
 LEFT JOIN file f ON d.file_id=f.id
 ".
         (@where ? " WHERE ".join(" AND ", @where) : "").
-            " ORDER BY d.name";
+        (@order ? " ORDER BY ".join(", ", @order) : "");
 
     my @res;
     my $sth = $dbh->prepare($sql);
@@ -2582,7 +2593,7 @@ LEFT JOIN file f ON d.file_id=f.id
         push @res, $detail ? $row : $row->{name};
     }
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/name author version release rel_size abstract/]
+    $resmeta->{'table.fields'} = [qw/dist author version release rel_size rel_mtime abstract/]
         if $detail;
     [200, "OK", \@res, $resmeta];
 }
