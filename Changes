@@ -1,5 +1,11 @@
 Revision history for App-lcpan
 
+0.76    2016-02-16 (PERLANCAR)
+
+	- [Bugfix] dists: release name was shown instead of size in
+	  rel_size result field.
+
+
 0.75    2016-02-16 (PERLANCAR)
 
 	- dists: Add options --sort, --rel-mtime-newer-than.
