@@ -1,5 +1,17 @@
 Revision history for App-lcpan
 
+0.74    2016-02-16 (PERLANCAR)
+
+        - Add subcommand: stats-last-index-time. This is a faster version of
+          'stats' for App::lcpan::Call by only returning the result that is
+          needed.
+
+        - stats: Add total_filesize.
+
+        - doc: Add option --html to open browser and show the HTML
+          documentation.
+
+
 0.73    2016-02-14 (PERLANCAR)
 
 	- doc: Search .pod using content path to be able to show POD when
