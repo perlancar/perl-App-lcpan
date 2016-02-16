@@ -1,5 +1,10 @@
 Revision history for App-lcpan
 
+0.75    2016-02-16 (PERLANCAR)
+
+	- dists: Add options --sort, --rel-mtime-newer-than.
+
+
 0.74    2016-02-16 (PERLANCAR)
 
         - Add subcommand: stats-last-index-time. This is a faster version of
