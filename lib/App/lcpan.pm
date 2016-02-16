@@ -2484,7 +2484,8 @@ sub dists {
         "d.name name",
         "d.cpanid author",
         "version",
-        "f.name file",
+        "f.name release",
+        "f.name rel_size",
         "abstract",
     );
 
@@ -2581,7 +2582,7 @@ LEFT JOIN file f ON d.file_id=f.id
         push @res, $detail ? $row : $row->{name};
     }
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/name author version file abstract/]
+    $resmeta->{'table.fields'} = [qw/name author version release rel_size abstract/]
         if $detail;
     [200, "OK", \@res, $resmeta];
 }
