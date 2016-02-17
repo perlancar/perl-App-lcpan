@@ -1306,15 +1306,17 @@ sub _update_index {
                 $dbh->begin_work;
             }
             if ($i % 500 == 0) {
-                $log->tracef("BEGIN");
-                $dbh->begin_work;
-                $after_begin = 1;
+                unless ($after_begin) {
+                    $log->tracef("BEGIN");
+                    $dbh->begin_work;
+                    $after_begin = 1;
+                }
             }
             $i++;
 
             my $path = _fullpath($file->{name}, $cpan, $file->{cpanid});
 
-            $log->infof("[pass %d/2][#%i/%d] Processing file %s ...",
+            $log->infof("[pass %d/3][#%i/%d] Processing file %s ...",
                         $pass, $i, ~~@files, $path);
 
             if (!$file->{file_status}) {
