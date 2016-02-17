@@ -2590,7 +2590,7 @@ LEFT JOIN file f ON d.file_id=f.id
     $sth->execute(@bind);
     while (my $row = $sth->fetchrow_hashref) {
         delete $row->{$_} for keys %delcols;
-        push @res, $detail ? $row : $row->{name};
+        push @res, $detail ? $row : $row->{dist};
     }
     my $resmeta = {};
     $resmeta->{'table.fields'} = [qw/dist author version release rel_size rel_mtime abstract/]
