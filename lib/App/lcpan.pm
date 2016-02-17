@@ -23,8 +23,19 @@ our @EXPORT_OK = qw(
                        rdeps
                );
 
+# XXX also add author instead of just release name, since PAUSE allows 2
+# different authors to have the same filename.
+
 my @builtin_file_skip_list = (
     'Perl-ToPerl6-0.031.tar.gz', # 2016-02-10 - too big, causes Archive::Tar to go out of mem
+);
+
+my @builtin_file_skip_list_sub = (
+    'CharsetDetector-2.0.2.tar.gz',       # 2016-02-17 - segfaults Compiler::Lexer 0.22
+    'Crypt-GeneratePassword-0.05.tar.gz', # 2016-02-17 - segfaults Compiler::Lexer 0.22
+    'Encode-Detect-CJK-2.0.2.tar.gz',     # 2016-02-17 - segfaults Compiler::Lexer 0.22
+    'Shipment-0.13.tar.gz',               # 2016-02-17 - segfaults Compiler::Lexer 0.22
+    'Shipment-2.00.tar.gz',               # 2016-02-17 - segfaults Compiler::Lexer 0.22
 );
 
 our %SPEC;
@@ -159,6 +170,16 @@ our %sort_args_for_dists = (
         summary => 'Sort the result',
         schema => ['array*', of=>['str*', in=>[map {($_,"-$_")} qw/dist author release rel_size rel_mtime abstract/]]],
         default => ['dist'],
+        tags => ['category:ordering'],
+    },
+);
+
+# XXX should it be put in App/lcpan/Cmd/subs.pm?
+our %sort_args_for_subs = (
+    sort => {
+        summary => 'Sort the result',
+        schema => ['array*', of=>['str*', in=>[map {($_,"-$_")} qw/sub package linum author/]]],
+        default => ['sub'],
         tags => ['category:ordering'],
     },
 );
@@ -400,6 +421,10 @@ our $db_schema_spec = {
 
              pod_status TEXT,
 
+             -- sub processing status: ok (sub names have been parsed/indexed)
+
+             sub_status TEXT,
+
              has_metajson INTEGER,
              has_metayml INTEGER,
              has_makefilepl INTEGER,
@@ -493,6 +518,16 @@ our $db_schema_spec = {
          )',
         'CREATE INDEX ix_dep__module_name ON dep(module_name)',
         # 'CREATE UNIQUE INDEX ix_dep__file_id__module_id ON dep(file_id,module_id)', # not all module have module_id anyway, and ones with module_id should already be correct because dep is a hash with module name as key
+
+        'CREATE TABLE sub (
+             id INTEGER NOT NULL PRIMARY KEY,
+             file_id INTEGER NOT NULL REFERENCES file(id), --[cache]
+             content_id INTEGER NOT NULL REFERENCES content(id),
+             name TEXT NOT NULL,
+             linum INTEGER NOT NULL
+         )',
+        'CREATE UNIQUE INDEX ix_sub__name__content_id ON sub(name, content_id)',
+
     ], # install
 
     upgrade_to_v2 => [
@@ -658,7 +693,28 @@ our $db_schema_spec = {
     ],
 
     upgrade_to_v10 => [
-        \&_reset_content_mention_script,
+        # there was a bug which excludes content with mode > 777 which excludes
+        # some (many?) content, so we reindex content/mention/script
+        sub {
+            my $dbh = shift;
+            $dbh->do("UPDATE file SET file_status=NULL, file_error=NULL, pod_status=NULL");
+            $dbh->do("DELETE FROM mention");
+            $dbh->do("DELETE FROM script");
+            $dbh->do("DELETE FROM content");
+        },
+
+        'ALTER TABLE file ADD COLUMN sub_status TEXT',
+
+        # experimental
+        'CREATE TABLE sub (
+             id INTEGER NOT NULL PRIMARY KEY,
+             file_id INTEGER NOT NULL REFERENCES file(id), --[cache]
+             content_id INTEGER NOT NULL REFERENCES content(id),
+             name TEXT NOT NULL,
+             linum INTEGER NOT NULL
+         )',
+        'CREATE UNIQUE INDEX ix_sub__name__content_id ON sub(name, content_id)',
+
     ],
 
     # for testing
@@ -918,6 +974,35 @@ sub _index_pod {
         $pod_parser->{sth_ins_mention} = $sth_ins_mention;
 
         $pod_parser->parse_string_document($ct);
+    }
+}
+
+sub _index_sub {
+    my ($file_id,
+        $content_id, $content_path,
+        $ct,
+
+        $sth_ins_sub,
+    ) = @_;
+
+    $log->tracef("  Indexing subs in %s", $content_path);
+
+    require Compiler::Lexer;
+    my $lexer = Compiler::Lexer->new;
+    my $tokens = $lexer->tokenize($ct);
+    for my $i (0..@$tokens-1) {
+        my $t = $tokens->[$i];
+        my $sub;
+        if ($i < @$tokens-1 && $t->{name} eq 'FunctionDecl') {
+            my $t2 = $tokens->[$i+1];
+            if ($t2->{name} eq 'Function') {
+                $sub = $t2->{data};
+            }
+        }
+        next unless $sub;
+        next if $sub =~ /\A_/;
+        $log->tracef("  found sub declaration '%s' (line %s)", $sub, $t->{line});
+        $sth_ins_sub->execute($sub, $t->{line}, $file_id, $content_id);
     }
 }
 
@@ -1188,6 +1273,9 @@ sub _update_index {
             $log->tracef("  Deleting old script records");
             $dbh->do("DELETE FROM script WHERE file_id IN (".join(",",@old_file_ids).")");
 
+            $log->tracef("  Deleting old sub records");
+            $dbh->do("DELETE FROM sub WHERE file_id IN (".join(",",@old_file_ids).")");
+
             $log->tracef("  Deleting old content records");
             $dbh->do("DELETE FROM content WHERE file_id IN (".join(",",@old_file_ids).")");
 
@@ -1199,31 +1287,50 @@ sub _update_index {
     }
 
     my @passes;
-    #if ($args{skip_file_indexing_pass_1}) {
-    #    $log->info("Will be skipping file indexing pass 1");
-    #} else {
+    if ($args{skip_file_indexing_pass_1}) {
+        $log->info("Will be skipping file indexing pass 1");
+    } else {
         push @passes, 1;
-    #}
-    #if ($args{skip_file_indexing_pass_2}) {
-    #    $log->info("Will be skipping file indexing pass 2");
-    #} else {
+    }
+    if ($args{skip_file_indexing_pass_2}) {
+        $log->info("Will be skipping file indexing pass 2");
+    } else {
         push @passes, 2;
-    #}
+    }
+    if ($args{skip_file_indexing_pass_3} ||
+            ($args{skip_sub_indexing} // 1)) {
+        $log->info("Will be skipping file indexing pass 3");
+    } else {
+        push @passes, 3;
+    }
 
   PROCESS_FILES:
     for my $pass (@passes) {
-        # we're processing files in two passes. the first pass will: insert
-        # content, scripts, extract meta, insert dep information, set
-        # file_status and meta_status. the second pass will: extract PODs and
-        # insert module/script abstracts and pod mentions.
+        # we're processing files in several passes.
 
-        # we're doing it in two passes because we want to collect all known
-        # scripts first to be able to detect links to scripts in POD.
+        # the first pass: insert content, scripts, extract meta, insert dep
+        # information, set file_status and meta_status.
+
+        # the second pass: extract PODs and insert module/script abstracts and
+        # pod mentions.
+
+        # the third pass:
+
+        # we're doing it in several passes because: in pass 2, we want to
+        # collect all known scripts first to be able to detect links to scripts
+        # in POD (collected in pass 1). also some passes are more high-level
+        # and/or experimental and/or optional.
+
 
         my $sth = $dbh->prepare(
             $pass == 1 ?
                 "SELECT * FROM file WHERE file_status IS NULL OR meta_status IS NULL ORDER BY name" :
-                "SELECT * FROM file WHERE pod_status IS NULL AND file_status NOT IN ('nofile','unsupported','err') ORDER BY name");
+
+                $pass == 2 ?
+                "SELECT * FROM file WHERE pod_status IS NULL AND file_status NOT IN ('nofile','unsupported','err') ORDER BY name" :
+
+                "SELECT * FROM file WHERE sub_status IS NULL AND file_status NOT IN ('nofile','unsupported','err') AND EXISTS(SELECT id FROM content WHERE file_id=file.id AND package IS NOT NULL) ORDER BY name"
+        );
         $sth->execute;
 
         my @files;
@@ -1244,12 +1351,18 @@ sub _update_index {
         my $sth_sel_mod  = $dbh->prepare("SELECT * FROM module WHERE name=?");
         my $sth_sel_script  = $dbh->prepare("SELECT * FROM script WHERE name=? AND file_id=?");
 
+        # for pass 2
         my $sth_set_pod_status = $dbh->prepare("UPDATE file SET pod_status=? WHERE id=?");
         my $sth_sel_content = $dbh->prepare("SELECT * FROM content WHERE file_id=?");
         my $sth_set_module_abstract = $dbh->prepare("UPDATE module SET abstract=? WHERE id=?");
         my $sth_set_script_abstract = $dbh->prepare("UPDATE script SET abstract=? WHERE id=?");
         my $sth_ins_mention = $dbh->prepare("INSERT OR IGNORE INTO mention (source_content_id,source_file_id,module_id,module_name,script_name) VALUES (?,?,?,?,?)");
         my $sth_set_content_package = $dbh->prepare("UPDATE content SET package=? WHERE id=?");
+
+        # for pass 3
+        my $sth_sel_content__has_package = $dbh->prepare("SELECT * FROM content WHERE file_id=? AND package IS NOT NULL");
+        my $sth_ins_sub = $dbh->prepare("INSERT OR IGNORE INTO sub (name, linum, file_id, content_id) VALUES (?,?,?,?)");
+        my $sth_set_sub_status = $dbh->prepare("UPDATE file SET sub_status=? WHERE id=?");
 
         my $module_ids; # hash, key=module name, value=module id
         my $module_file_ids; # hash, key=module name, value=file id
@@ -1559,7 +1672,7 @@ sub _update_index {
 
           PARSE_POD:
             {
-                last if $pass == 1;
+                last if $pass != 2;
                 last if $file->{pod_status};
 
                 my @contents;
@@ -1604,6 +1717,43 @@ sub _update_index {
 
                 $sth_set_pod_status->execute("ok", $file->{id});
             } # PARSE_POD
+
+          PARSE_SUB:
+            {
+                last if $pass != 3;
+
+                if (first {$_ eq $file->{name}} @builtin_file_skip_list_sub) {
+                    $log->infof("Skipped file %s (built-in file skip list for sub)", $file->{name});
+                    last;
+                }
+
+                my @contents;
+                $sth_sel_content__has_package->execute($file->{id});
+                while (my $row = $sth_sel_content__has_package->fetchrow_hashref) {
+                    push @contents, $row;
+                }
+                $sth_sel_content__has_package->finish;
+
+                for my $content (@contents) {
+                    my $ct;
+                    if ($zip) {
+                        $ct = $zip->contents($content->{path});
+                    } else {
+                        my ($obj) = $tar->get_files($content->{path});
+                        $ct = $obj->get_content;
+                    }
+
+                    _index_sub(
+                        $file->{id},
+                        $content->{id}, $content->{path},
+                        $ct,
+
+                        $sth_ins_sub,
+                    );
+                } # for each content
+
+                $sth_set_sub_status->execute("ok", $file->{id});
+            } # PARSE_SUB
 
         } # for each file
 
@@ -1736,12 +1886,25 @@ _
                 },
             },
         },
-        #skip_file_indexing_pass_1 => {
-        #    schema => ['bool', is=>1],
-        #},
-        #skip_file_indexing_pass_2 => {
-        #    schema => ['bool', is=>1],
-        #},
+        skip_file_indexing_pass_1 => {
+            schema => ['bool', is=>1],
+        },
+        skip_file_indexing_pass_2 => {
+            schema => ['bool', is=>1],
+        },
+        skip_file_indexing_pass_3 => {
+            schema => ['bool', is=>1],
+        },
+        skip_sub_indexing => {
+            schema => ['bool'],
+            default => 1,
+            description => <<'_',
+
+Since sub indexing is still experimental, it is not enabled by default. To
+enable it, pass the `--no-skip-sub-indexing` option.
+
+_
+        },
     },
     tags => ['write-to-db', 'write-to-fs'],
 };
@@ -1780,24 +1943,19 @@ sub _table_exists {
 }
 
 sub _reset {
+    # this sub is used since v7, so we need to check tables that have not
+    # existed in v7 or earlier.
     my $dbh = shift;
     $dbh->do("DELETE FROM dep");
     $dbh->do("DELETE FROM namespace");
     $dbh->do("DELETE FROM mention")   if _table_exists($dbh, "main", "mention");
     $dbh->do("DELETE FROM module");
     $dbh->do("DELETE FROM script")    if _table_exists($dbh, "main", "script");
+    $dbh->do("DELETE FROM sub")       if _table_exists($dbh, "main", "sub");
     $dbh->do("DELETE FROM dist");
     $dbh->do("DELETE FROM content")   if _table_exists($dbh, "main", "content");
     $dbh->do("DELETE FROM file");
     $dbh->do("DELETE FROM author");
-}
-
-sub _reset_content_mention_script {
-    my $dbh = shift;
-    $dbh->do("UPDATE file SET file_status=NULL, file_error=NULL, pod_status=NULL");
-    $dbh->do("DELETE FROM mention");
-    $dbh->do("DELETE FROM script");
-    $dbh->do("DELETE FROM content");
 }
 
 $SPEC{'reset'} = {
@@ -1863,6 +2021,8 @@ FROM file");
     ($stat->{num_mentions}) = $dbh->selectrow_array("SELECT COUNT(*) FROM mention");
 
     ($stat->{total_filesize}) = $dbh->selectrow_array("SELECT SUM(size) FROM file");
+
+    ($stat->{num_subs}) = $dbh->selectrow_array("SELECT COUNT(*) FROM sub");
 
     {
         my ($time) = $dbh->selectrow_array("SELECT value FROM meta WHERE name='last_index_time'");

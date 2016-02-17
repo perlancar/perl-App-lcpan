@@ -1,5 +1,39 @@
 Revision history for App-lcpan
 
+0.78    2016-02-17 (PERLANCAR) (unreleased)
+
+        [Bug fixes]
+
+        - Fix indexing of content. Previously content mode (>777) was used to
+          skip directory, this is wrong so some (many?) content were not
+          indexed. It is now fixed and we force a reindex of
+          content/script/mention.
+
+        - dists: Forgot to update field name.
+
+        - dists: fix Rinci argument specification for 'sort'.
+
+        [Experimental]
+
+        - Indexing of subroutines. Currently basic (only subroutine name and
+          source line number are indexed). I plan to add include more
+          information e.g. type (whether subroutine is a method, static method,
+          function), argument list (either from POD or subroutine signature),
+          summary (from POD). Also planned is support for Mo/Moo/Moose/Mouse and
+          the indexing of classes/roles, attributes.
+
+          Since this is experimental, it's not enabled by default. To index
+          subroutines, you'll have to add '--no-skip-sub-indexing' option during
+          'lcpan update'.
+
+        - Bump database schema version to 10 to support subroutine indexing and
+          force reindexing of content/script/mention.
+
+        [Enhancements]
+
+        - New subcommands: sub, script2author, mod2author, dist2author.
+
+
 0.77    2016-02-17 (PERLANCAR)
 
 	- No functional changes.
