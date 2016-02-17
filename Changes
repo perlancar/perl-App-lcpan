@@ -31,7 +31,8 @@ Revision history for App-lcpan
 
         [Enhancements]
 
-        - New subcommands: sub, script2author, mod2author, dist2author.
+        - New subcommands: sub, subs-by-count, script2author, mod2author,
+          dist2author.
 
 
 0.77    2016-02-17 (PERLANCAR)
