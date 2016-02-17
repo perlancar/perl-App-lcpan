@@ -1,4 +1,4 @@
-package App::lcpan::Cmd::mod2dist;
+package App::lcpan::Cmd::mod2author;
 
 # DATE
 # VERSION
@@ -13,7 +13,7 @@ our %SPEC;
 
 $SPEC{'handle_cmd'} = {
     v => 1.1,
-    summary => 'Get distribution name of module(s)',
+    summary => 'Get author of module(s)',
     args => {
         %App::lcpan::common_args,
         %App::lcpan::mods_args,
@@ -32,24 +32,28 @@ sub handle_cmd {
     my $sth = $dbh->prepare("
 SELECT
   module.name module,
-  dist.name dist
+  module.cpanid author
 FROM module
-LEFT JOIN file ON module.file_id=file.id
-LEFT JOIN dist ON file.id=dist.file_id
 WHERE module.name IN ($mods_s)");
 
-    my $res;
+    my @res;
+    $sth->execute;
+    while (my $row = $sth->fetchrow_hashref) {
+        push @res, $row;
+    }
+
     if (@$mods == 1) {
-        $sth->execute;
-        (undef, $res) = $sth->fetchrow_array;
-    } else {
-        $sth->execute;
-        $res = {};
-        while (my $row = $sth->fetchrow_hashref) {
-            $res->{$row->{module}} = $row->{dist};
+        @res = map { $_->{author} } @res;
+        if (!@res) {
+            return [404, "No such module"];
+        } elsif (@res == 1) {
+            return [200, "OK", $res[0]];
+        } else {
+            return [200, "OK", \@res];
         }
     }
-    [200, "OK", $res];
+
+    [200, "OK", \@res, {'table.fields'=>[qw/module author/]}];
 }
 
 1;
