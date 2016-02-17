@@ -26,6 +26,8 @@ Revision history for App-lcpan
           subroutines, you'll have to add '--no-skip-sub-indexing' option during
           'lcpan update'.
 
+          It increases index size to ~360M on current mini CPAN.
+
         - Bump database schema version to 10 to support subroutine indexing and
           force reindexing of content/script/mention.
 
