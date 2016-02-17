@@ -149,7 +149,7 @@ our %sort_args_for_mods = (
     sort => {
         summary => 'Sort the result',
         schema => ['array*', of=>['str*', in=>[map {($_,"-$_")} qw/module author rdeps rel_mtime/]]],
-        default => 'module',
+        default => ['module'],
         tags => ['category:ordering'],
     },
 );
