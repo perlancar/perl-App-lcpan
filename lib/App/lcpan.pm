@@ -158,7 +158,7 @@ our %sort_args_for_dists = (
     sort => {
         summary => 'Sort the result',
         schema => ['array*', of=>['str*', in=>[map {($_,"-$_")} qw/dist author release rel_size rel_mtime abstract/]]],
-        default => 'dist',
+        default => ['dist'],
         tags => ['category:ordering'],
     },
 );
