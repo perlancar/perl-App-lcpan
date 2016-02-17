@@ -1303,7 +1303,7 @@ sub _update_index {
             if ($i % 500 == 499) {
                 $log->tracef("COMMIT");
                 $dbh->commit;
-                $after_begin = 0;
+                $dbh->begin_work;
             }
             if ($i % 500 == 0) {
                 $log->tracef("BEGIN");
