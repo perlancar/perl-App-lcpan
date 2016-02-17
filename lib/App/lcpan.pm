@@ -351,7 +351,7 @@ sub _set_namespace {
 }
 
 our $db_schema_spec = {
-    latest_v => 9,
+    latest_v => 10,
 
     install => [
         'CREATE TABLE author (
@@ -645,6 +645,11 @@ our $db_schema_spec = {
     upgrade_to_v9 => [
         'CREATE INDEX ix_content__package ON content(package)',
     ],
+
+    upgrade_to_v10 => [
+        \&_reset_content_mention_script,
+    ],
+
     # for testing
     install_v1 => [
         'CREATE TABLE author (
@@ -1412,9 +1417,8 @@ sub _update_index {
                 } else {
                     my %mem; # tar allows duplicate path?
                     for my $member (@members) {
-                        # skip non-regular files
-                        next if $member->{mode} > 0777;
                         next if $member->{full_path} =~ m!/\z!;
+                        next if !$member->{size};
                         next if $mem{$member->{full_path}}++;
                         $sth_ins_content->execute($file->{id}, $member->{full_path}, $member->{mtime}, $member->{size});
                         my $content_id = $dbh->last_insert_id("","","","");
@@ -1773,6 +1777,14 @@ sub _reset {
     $dbh->do("DELETE FROM content")   if _table_exists($dbh, "main", "content");
     $dbh->do("DELETE FROM file");
     $dbh->do("DELETE FROM author");
+}
+
+sub _reset_content_mention_script {
+    my $dbh = shift;
+    $dbh->do("UPDATE file SET file_status=NULL, file_error=NULL, pod_status=NULL");
+    $dbh->do("DELETE FROM mention");
+    $dbh->do("DELETE FROM script");
+    $dbh->do("DELETE FROM content");
 }
 
 $SPEC{'reset'} = {
