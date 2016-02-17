@@ -1,5 +1,12 @@
 Revision history for App-lcpan
 
+0.77    2016-02-17 (PERLANCAR)
+
+	- No functional changes.
+
+	- [Bugfix] mods: fix Rinci argument specification for 'sort'.
+
+
 0.76    2016-02-16 (PERLANCAR)
 
 	- [Bugfix] dists: release name was shown instead of size in
