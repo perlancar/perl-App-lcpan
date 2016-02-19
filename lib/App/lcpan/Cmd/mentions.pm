@@ -121,7 +121,13 @@ sub handle_cmd {
 
     if (@$mentioned_modules) {
         my $mods_s = join(",", map { $dbh->quote($_) } @$mentioned_modules);
-        push @where, "(m1.name IN ($mods_s) OR mention.module_name IN ($mods_s))";
+        if ($type eq 'known-module') {
+            push @where, "m1.name IN ($mods_s)";
+        } elsif ($type eq 'unknown-module') {
+            push @where, "mention.module_name IN ($mods_s)";
+        } else {
+            push @where, "(m1.name IN ($mods_s) OR mention.module_name IN ($mods_s))";
+        }
     }
 
     if (@$mentioned_scripts) {
