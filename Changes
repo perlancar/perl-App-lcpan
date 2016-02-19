@@ -1,5 +1,16 @@
 Revision history for App-lcpan
 
+0.79    2016-02-19 (PERLANCAR)
+
+	- Add subcommand: related-mods.
+
+	- [opt] mentions: No need to include both clause when
+	  type=known-module or type=unknown-module.
+
+	- mentions: Allow multiple --mentioned-{module,script,author}, add
+	  options --mentioner-{module,script}.
+
+
 0.78    2016-02-17 (PERLANCAR)
 
         [Bug fixes]
