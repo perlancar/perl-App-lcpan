@@ -28,38 +28,58 @@ _
     args => {
         %App::lcpan::common_args,
         type => {
+            summary => 'Filter by type of things being mentioned',
             schema => ['str*', in=>['any', 'script', 'module', 'unknown-module', 'known-module']],
             default => 'any',
             tags => ['category:filtering'],
         },
-        mentioned_module => {
-            summary => 'Filter by module name being mentioned',
-            schema => 'str*',
-            completion => \&App::lcpan::_complete_mod,
+
+        mentioned_modules => {
+            'x.name.is_plural' => 1,
+            summary => 'Filter by module name(s) being mentioned',
+            schema => ['array*', of=>'str*', min_len=>1],
+            element_completion => \&App::lcpan::_complete_mod,
             tags => ['category:filtering'],
         },
-        mentioned_script => {
-            summary => 'Filter by script name being mentioned',
-            schema => 'str*',
-            completion => \&App::lcpan::_complete_script,
+        mentioned_scripts => {
+            'x.name.is_plural' => 1,
+            summary => 'Filter by script name(s) being mentioned',
+            schema => ['array*', of=>'str*', min_len=>1],
+            element_completion => \&App::lcpan::_complete_script,
             tags => ['category:filtering'],
         },
-        mentioned_author => {
-            summary => 'Filter by author of module/script being mentioned',
-            schema => 'str*',
-            tags => ['category:filtering'],
-            completion => \&App::lcpan::_complete_cpanid,
-        },
-        mentioner_author => {
-            summary => 'Filter by author of module/script being mentioned',
-            schema => 'str*',
+        mentioned_authors => {
+            'x.name.is_plural' => 1,
+            summary => 'Filter by author(s) of module/script being mentioned',
+            schema => ['array*', of=>'str*', min_len=>1],
             tags => ['category:filtering'],
             completion => \&App::lcpan::_complete_cpanid,
         },
-        #mentioner_authors_arent => {
-        mentioner_author_isnt => {
-            #'x.name.is_plural' => 1,
-            #'x.name.singular' => 'mentioner_author_isnt',
+
+        mentioner_modules => {
+            'x.name.is_plural' => 1,
+            summary => 'Filter by module(s) that do the mentioning',
+            schema => ['array*', of=>'str*', min_len=>1],
+            element_completion => \&App::lcpan::_complete_mod,
+            tags => ['category:filtering'],
+        },
+        mentioner_scripts => {
+            'x.name.is_plural' => 1,
+            summary => 'Filter by script(s) that do the mentioning',
+            schema => ['array*', of=>'str*', min_len=>1],
+            element_completion => \&App::lcpan::_complete_script,
+            tags => ['category:filtering'],
+        },
+        mentioner_authors => {
+            'x.name.is_plural' => 1,
+            summary => 'Filter by author(s) of POD that does the mentioning',
+            schema => ['array*', of=>'str*', min_len=>1],
+            tags => ['category:filtering'],
+            completion => \&App::lcpan::_complete_cpanid,
+        },
+        mentioner_authors_arent => {
+            'x.name.is_plural' => 1,
+            'x.name.singular' => 'mentioner_author_isnt',
             schema => ['array*', of=>'str*'],
             tags => ['category:filtering'],
             element_completion => \&App::lcpan::_complete_cpanid,
@@ -74,12 +94,17 @@ sub handle_cmd {
     my $dbh = $state->{dbh};
 
     my $type = $args{type} // 'any';
-    my $mentioned_module = $args{mentioned_module};
-    my $mentioned_script = $args{mentioned_script};
-    my $mentioned_author = $args{mentioned_author};
-    my $mentioner_author = $args{mentioner_author};
-    my $mentioner_authors_arent = $args{mentioner_author_isnt}; #$args{mentioner_authors_arent};
 
+    my $mentioned_modules = $args{mentioned_modules} // [];
+    my $mentioned_scripts = $args{mentioned_scripts} // [];
+    my $mentioned_authors = $args{mentioned_authors} // [];
+
+    my $mentioner_modules = $args{mentioner_modules} // [];
+    my $mentioner_scripts = $args{mentioner_scripts} // [];
+    my $mentioner_authors = $args{mentioner_authors} // [];
+    my $mentioner_authors_arent = $args{mentioner_authors_arent} // [];
+
+    my @extra_join;
     my @bind;
     my @where;
     #my @having;
@@ -94,60 +119,69 @@ sub handle_cmd {
         push @where, "mention.module_name IS NOT NULL";
     }
 
-    if (defined $mentioned_module) {
-        push @where, "(module.name=? OR mention.module_name=?)";
-        push @bind, $mentioned_module, $mentioned_module;
+    if (@$mentioned_modules) {
+        my $mods_s = join(",", map { $dbh->quote($_) } @$mentioned_modules);
+        push @where, "(m1.name IN ($mods_s) OR mention.module_name IN ($mods_s))";
     }
 
-    if (defined $mentioned_script) {
-        push @where, "mention.script_name=?";
-        push @bind, $mentioned_script;
+    if (@$mentioned_scripts) {
+        my $scripts_s = join(",", map { $dbh->quote($_) } @$mentioned_scripts);
+        push @where, "mention.script_name IN ($scripts_s)";
     }
 
-    if (defined $mentioned_author) {
-        $mentioned_author = uc($mentioned_author); # just to be sure
-        push @where, "(module_author=? OR script_author=?)";
-        push @bind, $mentioned_author, $mentioned_author;
+    if (@$mentioned_authors) {
+        my $authors_s = join(",", map { $dbh->quote(uc $_) } @$mentioned_authors);
+        push @where, "(module_author IN ($authors_s) OR script_author IN ($authors_s))";
     }
 
-    if (defined $mentioner_author) {
-        $mentioner_author = uc($mentioner_author); # just to be sure
-        push @where, "mentioner_author=?";
-        push @bind, $mentioner_author;
+    if (@$mentioner_modules) {
+        my $mods_s = join(",", map { $dbh->quote($_) } @$mentioner_modules);
+        push @where, "content.package IN ($mods_s)";
     }
 
-    if (defined($mentioner_authors_arent) && @$mentioner_authors_arent) {
-        for my $author (@$mentioner_authors_arent) {
-            $author = uc($author); # just to be sure
-            push @where, "mentioner_author <> ?";
-            push @bind, $author;
-        }
+    if (@$mentioner_scripts) {
+        my $scripts_s = join(",", map { $dbh->quote($_) } @$mentioner_scripts);
+        push @extra_join, "LEFT JOIN script s2 ON content.id=s2.content_id -- mentioner script";
+        push @where, "s2.name IN ($scripts_s)";
+    }
+
+    if (@$mentioner_authors) {
+        my $authors_s = join(",", map { $dbh->quote(uc $_) } @$mentioner_authors);
+        push @where, "mentioner_authors IN ($authors_s)";
+    }
+
+    if (@$mentioner_authors_arent) {
+        my $authors_s = join(",", map { $dbh->quote(uc $_) } @$mentioner_authors_arent);
+        push @where, "mentioner_author NOT IN ($authors_s)";
     }
 
     my $sql = "SELECT
   file.name release,
   content.path content_path,
-  CASE WHEN module.name IS NOT NULL THEN module.name ELSE mention.module_name END AS module,
-  module.cpanid module_author,
+  CASE WHEN m1.name IS NOT NULL THEN m1.name ELSE mention.module_name END AS module,
+  m1.cpanid module_author,
   mention.script_name script,
-  (SELECT cpanid FROM script WHERE name=mention.script_name LIMIT 1) script_author,
+  s1.cpanid script_author,
   file.cpanid mentioner_author
 FROM mention
 LEFT JOIN file ON file.id=mention.source_file_id
 LEFT JOIN content ON content.id=mention.source_content_id
-LEFT JOIN module ON module.id=mention.module_id".
-    (@where ? " WHERE ".join(" AND ", @where) : "");#.
-    #(@having ? " HAVING ".join(" AND ", @having) : "");
+LEFT JOIN module m1 ON mention.module_id=m1.id -- mentioned script
+LEFT JOIN script s1 ON mention.script_name=s1.name -- mentioned script
+".
+    (@extra_join ? join("", map {"$_\n"} @extra_join) : "").
+    (@where ? "\nWHERE ".join(" AND ", @where) : "");#.
+    #(@having ? "\nHAVING ".join(" AND ", @having) : "");
 
     my @res;
     my $sth = $dbh->prepare($sql);
     $sth->execute(@bind);
     while (my $row = $sth->fetchrow_hashref) {
-        if (defined($mentioned_module) || $type =~ /module/) {
+        if (@$mentioned_modules || $type =~ /module/) {
             delete $row->{script};
             delete $row->{script_author};
         }
-        if (defined($mentioned_script) || $type eq 'script') {
+        if (@$mentioned_scripts || $type eq 'script') {
             delete $row->{module};
             delete $row->{module_author};
         }
@@ -156,11 +190,11 @@ LEFT JOIN module ON module.id=mention.module_id".
     my $resmeta = {};
     $resmeta->{'table.fields'} = [qw/module module_author script script_author release mentioner_author content_path/];
 
-    if (defined($mentioned_module) || $type =~ /module/) {
+    if (@$mentioned_modules || $type =~ /module/) {
         $resmeta->{'table.fields'} =
             [grep {$_ ne 'script' && $_ ne 'script_author'} @{$resmeta->{'table.fields'}}];
     }
-    if (defined($mentioned_script) || $type eq 'script') {
+    if (@$mentioned_scripts || $type eq 'script') {
         $resmeta->{'table.fields'} =
             [grep {$_ ne 'module' && $_ ne 'module_author'} @{$resmeta->{'table.fields'}}];
     }
