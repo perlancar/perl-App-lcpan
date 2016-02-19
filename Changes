@@ -4,7 +4,7 @@ Revision history for App-lcpan
 
 	- Add subcommand: related-mods.
 
-	- [opt] mentions: No need to include both clause when
+	- [Optimization] mentions: No need to include both clause when
 	  type=known-module or type=unknown-module.
 
 	- mentions: Allow multiple --mentioned-{module,script,author}, add
