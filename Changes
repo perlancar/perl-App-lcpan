@@ -152,7 +152,8 @@ Revision history for App-lcpan
 
         - New subcommands: contents, scripts, mentions, authors-by-script-count,
           authors-by-mod-mention-count, scripts-from-same-dist, distscripts,
-          author-scripts.
+          author-scripts. UPDATE 2016-02-20: distscripts now renamed to
+          dist-scripts.
 
 
 0.66    2016-02-07 (PERLANCAR)
@@ -697,7 +698,9 @@ Revision history for App-lcpan
         [ENHANCEMENTS]
 
         - New subcommands: releases, mod2dist, mod2rel, dist2rel, distmods,
-          authormods, authordists, authorrels.
+          authormods, authordists, authorrels. UPDATE 2015-12-06: authormods now
+          renamed to author-mods, authordists -> author-dists, authorrels ->
+          author-rels. UPDATE 2016-02-20: distmods now renamed to dist-mods.
 
         [DATABASE CHANGES]
 

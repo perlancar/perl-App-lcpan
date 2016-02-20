@@ -1,4 +1,4 @@
-package App::lcpan::Cmd::distmods;
+package App::lcpan::Cmd::dist_mods;
 
 # DATE
 # VERSION

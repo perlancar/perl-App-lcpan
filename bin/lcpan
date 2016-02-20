@@ -171,11 +171,13 @@ B<Some other utilities>:
  % lcpan dist2rel Text-ANSITable             ;# -> Text-ANSITable-0.39.tar.gz
  % lcpan dist2rel Text-ANSITable --full-path ;# -> /cpan/authors/id/P/PE/PERLANCAR/Text-ANSITable-0.39.tar.gz
 
- % lcpan distmods Text-ANSITable ;# list modules in a distribution
+ % lcpan dist-mods Text-ANSITable ;# list modules in a distribution
  Text::ANSITable
  Text::ANSITable::BorderStyle::Default
  Text::ANSITable::ColorTheme::Default
  Text::ANSITable::StyleSet::AltRow
+
+ % lcpan dist-scripts Text-ANSITable ;# list scripts in a distribution
 
  % lcpan author-mods PERLANCAR   ;# list an author's modules
  % lcpan author-dists PERLANCAR  ;# list an author's dists

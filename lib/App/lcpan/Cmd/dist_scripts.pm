@@ -1,4 +1,4 @@
-package App::lcpan::Cmd::distscripts;
+package App::lcpan::Cmd::dist_scripts;
 
 # DATE
 # VERSION
