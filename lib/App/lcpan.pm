@@ -2987,7 +2987,8 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
             }
         }
 
-        $row->{is_core} = Module::CoreList::More->is_still_core($row->{module}, $row->{version}, version->parse($plver)->numify);
+        $row->{is_core} = $row->{module} eq 'perl' ||
+            Module::CoreList::More->is_still_core($row->{module}, $row->{version}, version->parse($plver)->numify);
         next if !$include_core && $row->{is_core};
         next unless defined $row->{module}; # BUG? we can encounter case where module is undef
         if (defined $memory_by_mod_name->{$row->{module}}) {
