@@ -2919,7 +2919,7 @@ sub _get_prereqs {
     require Version::Util;
 
     my ($mods, $dbh, $memory_by_mod_name, $memory_by_dist_id,
-        $level, $max_level, $phase, $rel, $include_core, $plver, $flatten) = @_;
+        $level, $max_level, $phase, $rel, $include_core, $include_noncore, $plver, $flatten) = @_;
 
     $log->tracef("Finding dependencies for module(s) %s (level=%i) ...", $mods, $level);
 
@@ -2989,7 +2989,8 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
 
         $row->{is_core} = $row->{module} eq 'perl' ||
             Module::CoreList::More->is_still_core($row->{module}, $row->{version}, version->parse($plver)->numify);
-        next if !$include_core && $row->{is_core};
+        next if !$include_core    &&  $row->{is_core};
+        next if !$include_noncore && !$row->{is_core};
         next unless defined $row->{module}; # BUG? we can encounter case where module is undef
         if (defined $memory_by_mod_name->{$row->{module}}) {
             if (Version::Util::version_gt($row->{version}, $memory_by_mod_name->{$row->{module}})) {
@@ -3008,7 +3009,7 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
         my $subres = _get_prereqs([map { {mod=>$_->{module}, dist_id=>$_->{module_dist_id}} } @res], $dbh,
                                   $memory_by_mod_name,
                                   $memory_by_dist_id,
-                                  $level+1, $max_level, $phase, $rel, $include_core, $plver, $flatten);
+                                  $level+1, $max_level, $phase, $rel, $include_core, $include_noncore, $plver, $flatten);
         return $subres if $subres->[0] != 200;
         if ($flatten) {
             my %deps; # key = module name
@@ -3221,7 +3222,14 @@ _
     },
     include_core => {
         summary => 'Include Perl core modules',
-        'summary.alt.bool.not' => 'Exclude Perl core modules',
+        'summary.alt.bool.not' => 'Exclude core modules',
+        schema  => 'bool',
+        default => 1,
+        tags => ['category:filter'],
+    },
+    include_noncore => {
+        summary => 'Include non-core modules',
+        'summary.alt.bool.not' => 'Exclude non-core modules',
         schema  => 'bool',
         default => 1,
         tags => ['category:filter'],
@@ -3280,18 +3288,19 @@ sub deps {
     my $rel     = $args{rel} // 'requires';
     my $plver   = $args{perl_version} // "$^V";
     my $level   = $args{level} // 1;
-    my $include_core = $args{include_core} // 0;
+    my $include_core    = $args{include_core} // 1;
+    my $include_noncore = $args{include_noncore} // 1;
     my $with_xs_or_pp = $args{with_xs_or_pp};
 
     my $res = _get_prereqs($mods, $dbh, {}, {}, 1, $level, $phase, $rel,
-                           $include_core, $plver, $args{flatten});
+                           $include_core, $include_noncore, $plver, $args{flatten});
 
     return $res unless $res->[0] == 200;
     my @cols;
     push @cols, (qw/module/);
     push @cols, "dist" if @$mods > 1;
     push @cols, (qw/author version/);
-    push @cols, "is_core" if $include_core;
+    push @cols, "is_core";
     push @cols, "xs_or_pp" if $with_xs_or_pp;
     for (@{$res->[2]}) {
         if ($with_xs_or_pp) {
@@ -3303,7 +3312,6 @@ sub deps {
         delete $_->{dist} unless @$mods > 1;
         delete $_->{dependant_dist_id};
         delete $_->{module_dist_id};
-        delete $_->{is_core} unless $include_core;
     }
 
     my $resmeta = {};
