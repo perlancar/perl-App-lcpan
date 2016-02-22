@@ -3006,7 +3006,7 @@ sub _get_prereqs {
 
     # fetch the dependency information
     my $sth = $dbh->prepare("SELECT
-  dp.dist_id dependant_dist_id,
+  dp.dist_id dependent_dist_id,
   (SELECT name   FROM dist   WHERE id=dp.dist_id) AS dist,
   CASE
      WHEN module_name IS NOT NULL THEN module_name
@@ -3082,8 +3082,8 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
             for my $s (@{$subres->[2]}) {
                 for my $i (0..@res-1) {
                     my $r = $res[$i];
-                    if (defined($s->{dependant_dist_id}) && defined($r->{module_dist_id}) &&
-                            $s->{dependant_dist_id} == $r->{module_dist_id}) {
+                    if (defined($s->{dependent_dist_id}) && defined($r->{module_dist_id}) &&
+                            $s->{dependent_dist_id} == $r->{module_dist_id}) {
                         splice @res, $i+1, 0, $s;
                         next SUBRES_TO_INSERT;
                     }
@@ -3358,7 +3358,7 @@ sub deps {
             unless $args{flatten};
         delete $_->{level};
         delete $_->{dist} unless @$mods > 1;
-        delete $_->{dependant_dist_id};
+        delete $_->{dependent_dist_id};
         delete $_->{module_dist_id};
     }
 
