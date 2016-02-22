@@ -156,6 +156,35 @@ our %flatest_args = (
     },
 );
 
+our %finclude_core_args = (
+    include_core => {
+        summary => 'Include core modules',
+        'summary.alt.bool.not' => 'Exclude core modules',
+        schema  => 'bool',
+        default => 1,
+        tags => ['category:filtering'],
+    },
+);
+
+our %finclude_noncore_args = (
+    include_noncore => {
+        summary => 'Include non-core modules',
+        'summary.alt.bool.not' => 'Exclude non-core modules',
+        schema  => 'bool',
+        default => 1,
+        tags => ['category:filtering'],
+    },
+);
+
+our %perl_version_args = (
+    perl_version => {
+        summary => 'Set base Perl version for determining core modules',
+        schema  => 'str*',
+        default => "$^V",
+        cmdline_aliases => {V=>{}},
+    },
+);
+
 our %sort_args_for_mods = (
     sort => {
         summary => 'Sort the result',
@@ -2463,6 +2492,9 @@ $SPEC{modules} = {
         %fauthor_args,
         %fdist_args,
         %flatest_args,
+        %finclude_core_args,
+        %finclude_noncore_args,
+        %perl_version_args,
         namespaces => {
             'x.name.is_plural' => 1,
             summary => 'Select modules belonging to certain namespace(s)',
@@ -2482,6 +2514,8 @@ _
     },
 };
 sub modules {
+    require Module::CoreList::More;
+
     my %args = @_;
 
     my $state = _init(\%args, 'ro');
@@ -2491,6 +2525,9 @@ sub modules {
     my $author = uc($args{author} // '');
     my $qt = $args{query_type} // 'any';
     my $sort = $args{sort} // ['module'];
+    my $include_core    = $args{include_core} // 1;
+    my $include_noncore = $args{include_noncore} // 1;
+    my $plver   = $args{perl_version} // "$^V";
 
     my @cols = (
         ['module.name', 'module'],
@@ -2567,11 +2604,18 @@ LEFT JOIN dist ON file.id=dist.file_id
     my $sth = $dbh->prepare($sql);
     $sth->execute(@bind);
     while (my $row = $sth->fetchrow_hashref) {
+        $row->{is_core} = $row->{module} eq 'perl' ||
+            Module::CoreList::More->is_still_core(
+                $row->{module}, $row->{version}, version->parse($plver)->numify);
+        next if !$include_core    &&  $row->{is_core};
+        next if !$include_noncore && !$row->{is_core};
         push @res, $detail ? $row : $row->{module};
     }
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [map {ref($_) ? $_->[1] : $_} grep {!ref($_) || !$_->[2]} @cols]
-        if $detail;
+    $resmeta->{'table.fields'} = [
+        (map {ref($_) ? $_->[1] : $_} grep {!ref($_) || !$_->[2]} @cols),
+        ("is_core"),
+    ] if $detail;
     [200, "OK", \@res, $resmeta];
 }
 
@@ -3234,26 +3278,9 @@ Note that `Bar`'s required version is already 0.45 in the above example.
 
 _
     },
-    include_core => {
-        summary => 'Include Perl core modules',
-        'summary.alt.bool.not' => 'Exclude core modules',
-        schema  => 'bool',
-        default => 1,
-        tags => ['category:filtering'],
-    },
-    include_noncore => {
-        summary => 'Include non-core modules',
-        'summary.alt.bool.not' => 'Exclude non-core modules',
-        schema  => 'bool',
-        default => 1,
-        tags => ['category:filtering'],
-    },
-    perl_version => {
-        summary => 'Set base Perl version for determining core modules',
-        schema  => 'str*',
-        default => "$^V",
-        cmdline_aliases => {V=>{}},
-    },
+    %finclude_core_args,
+    %finclude_noncore_args,
+    %perl_version_args,
     with_xs_or_pp => {
         summary => 'Check each dependency as XS/PP',
         schema  => ['bool*', is=>1],
