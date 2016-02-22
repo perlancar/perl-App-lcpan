@@ -18,8 +18,8 @@ $SPEC{'handle_cmd'} = {
     summary => 'List authors ranked by number of distributions using one of his/her modules',
     args => {
         %App::lcpan::common_args,
-        clone_list(%App::lcpan::deps_phase_arg),
-        clone_list(%App::lcpan::deps_rel_arg),
+        clone_list(%App::lcpan::deps_phase_args),
+        clone_list(%App::lcpan::deps_rel_args),
     },
 };
 delete $SPEC{'handle_cmd'}{args}{phase}{default};

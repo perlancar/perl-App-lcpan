@@ -312,7 +312,7 @@ our %sort_args_for_rels = (
     },
 );
 
-our %overwrite_arg = (
+our %overwrite_args = (
     overwrite => {
         summary => 'Whether to overwrite existing file',
         schema => ['bool*', is=>1],
@@ -3192,7 +3192,7 @@ ORDER BY dist".($level > 1 ? " DESC" : ""));
     [200, "OK", \@res];
 }
 
-our %deps_phase_arg = (
+our %deps_phase_args = (
     phase => {
         schema => ['str*' => {
             in => [qw/develop configure build runtime test ALL/],
@@ -3209,10 +3209,10 @@ our %deps_phase_arg = (
     },
 );
 
-our %rdeps_phase_arg = %{clone(\%deps_phase_arg)};
-$rdeps_phase_arg{phase}{default} = 'ALL';
+our %rdeps_phase_args = %{clone(\%deps_phase_args)};
+$rdeps_phase_args{phase}{default} = 'ALL';
 
-our %deps_rel_arg = (
+our %deps_rel_args = (
     rel => {
         schema => ['str*' => {
             in => [qw/requires recommends suggests conflicts ALL/],
@@ -3222,12 +3222,12 @@ our %deps_rel_arg = (
     },
 );
 
-our %rdeps_rel_arg = %{clone(\%deps_rel_arg)};
-$rdeps_rel_arg{rel}{default} = 'ALL';
+our %rdeps_rel_args = %{clone(\%deps_rel_args)};
+$rdeps_rel_args{rel}{default} = 'ALL';
 
 our %deps_args = (
-    %deps_phase_arg,
-    %deps_rel_arg,
+    %deps_phase_args,
+    %deps_rel_args,
     level => {
         summary => 'Recurse for a number of levels (-1 means unlimited)',
         schema  => 'int*',
@@ -3371,8 +3371,8 @@ sub deps {
 my %rdeps_args = (
     %common_args,
     %mods_args,
-    %rdeps_rel_arg,
-    %rdeps_phase_arg,
+    %rdeps_rel_args,
+    %rdeps_phase_args,
     level => {
         summary => 'Recurse for a number of levels (-1 means unlimited)',
         schema  => ['int*', min=>1, max=>10],

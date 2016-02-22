@@ -19,8 +19,8 @@ $SPEC{'handle_cmd'} = {
     args => {
         %App::lcpan::common_args,
         %App::lcpan::fauthor_args,
-        clone_list(%App::lcpan::deps_phase_arg),
-        clone_list(%App::lcpan::deps_rel_arg),
+        clone_list(%App::lcpan::deps_phase_args),
+        clone_list(%App::lcpan::deps_rel_args),
     },
 };
 delete $SPEC{'handle_cmd'}{args}{phase}{default};

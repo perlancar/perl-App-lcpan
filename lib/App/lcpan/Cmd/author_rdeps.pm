@@ -17,8 +17,8 @@ $SPEC{'handle_cmd'} = {
     args => {
         %App::lcpan::common_args,
         %App::lcpan::author_args,
-        %App::lcpan::rdeps_rel_arg,
-        %App::lcpan::rdeps_phase_arg,
+        %App::lcpan::rdeps_rel_args,
+        %App::lcpan::rdeps_phase_args,
         user_authors => {
             'x.name.is_plural' => 1,
             'x.name.singular' => 'user_author',

@@ -19,7 +19,7 @@ $SPEC{'handle_cmd'} = {
     args => {
         %App::lcpan::common_args,
         %App::lcpan::script_args,
-        %App::lcpan::overwrite_arg,
+        %App::lcpan::overwrite_args,
         %App::lcpan::all_args,
     },
     tags => ['write-to-fs'],
