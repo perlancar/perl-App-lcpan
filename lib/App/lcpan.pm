@@ -1837,19 +1837,19 @@ _
         max_file_size => {
             summary => 'If set, skip downloading files larger than this',
             schema => 'int',
-            tags => ['category:filter'],
+            tags => ['category:filtering'],
         },
         include_author => {
             summary => 'Only include files from certain author(s)',
             'summary.alt.plurality.singular' => 'Only include files from certain author',
             schema => ['array*', of=>['str*', match=>qr/\A[A-Z]{2,9}\z/]],
-            tags => ['category:filter'],
+            tags => ['category:filtering'],
         },
         exclude_author => {
             summary => 'Exclude files from certain author(s)',
             'summary.alt.plurality.singular' => 'Exclude files from certain author',
             schema => ['array*', of=>['str*', match=>qr/\A[A-Z]{2,9}\z/]],
-            tags => ['category:filter'],
+            tags => ['category:filtering'],
         },
         remote_url => {
             summary => 'Select CPAN mirror to download from',
@@ -2919,7 +2919,7 @@ sub _get_prereqs {
     require Version::Util;
 
     my ($mods, $dbh, $memory_by_mod_name, $memory_by_dist_id,
-        $level, $max_level, $phase, $rel, $include_core, $include_noncore, $plver, $flatten) = @_;
+        $level, $max_level, $filters, $plver, $flatten, $phase, $rel) = @_;
 
     $log->tracef("Finding dependencies for module(s) %s (level=%i) ...", $mods, $level);
 
@@ -2946,6 +2946,20 @@ sub _get_prereqs {
     }
     return [200, "OK", []] unless @dist_ids;
 
+    my @wheres = ("dp.dist_id IN (".join(",",grep {defined} @dist_ids).")");
+    my @binds = ();
+
+    if ($filters->{authors}) {
+        push @wheres, '('.join(' OR ', ('author=?') x @{$filters->{authors}}).')';
+        push @binds, @{$filters->{authors}};
+    }
+    if ($filters->{authors_arent}) {
+        for (@{ $filters->{authors_arent} }) {
+            push @wheres, 'author <> ?';
+            push @binds, $_;
+        }
+    }
+
     # fetch the dependency information
     my $sth = $dbh->prepare("SELECT
   dp.dist_id dependant_dist_id,
@@ -2960,9 +2974,9 @@ sub _get_prereqs {
   rel,
   version
 FROM dep dp
-WHERE dp.dist_id IN (".join(",",grep {defined} @dist_ids).")
+WHERE ".join(" AND ", @wheres)."
 ORDER BY module".($level > 1 ? " DESC" : ""));
-    $sth->execute;
+    $sth->execute(@binds);
     my @res;
   MOD:
     while (my $row = $sth->fetchrow_hashref) {
@@ -2989,8 +3003,8 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
 
         $row->{is_core} = $row->{module} eq 'perl' ||
             Module::CoreList::More->is_still_core($row->{module}, $row->{version}, version->parse($plver)->numify);
-        next if !$include_core    &&  $row->{is_core};
-        next if !$include_noncore && !$row->{is_core};
+        next if !$filters->{include_core}    &&  $row->{is_core};
+        next if !$filters->{include_noncore} && !$row->{is_core};
         next unless defined $row->{module}; # BUG? we can encounter case where module is undef
         if (defined $memory_by_mod_name->{$row->{module}}) {
             if (Version::Util::version_gt($row->{version}, $memory_by_mod_name->{$row->{module}})) {
@@ -3009,7 +3023,7 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
         my $subres = _get_prereqs([map { {mod=>$_->{module}, dist_id=>$_->{module_dist_id}} } @res], $dbh,
                                   $memory_by_mod_name,
                                   $memory_by_dist_id,
-                                  $level+1, $max_level, $phase, $rel, $include_core, $include_noncore, $plver, $flatten);
+                                  $level+1, $max_level, $filters, $plver, $flatten, $phase, $rel);
         return $subres if $subres->[0] != 200;
         if ($flatten) {
             my %deps; # key = module name
@@ -3066,12 +3080,12 @@ sub _get_revdeps {
     my @wheres = ('module_id IN ('.join(",", @mod_ids).')');
     my @binds  = ();
 
-    if ($filters->{author}) {
-        push @wheres, '('.join(' OR ', ('author=?') x @{$filters->{author}}).')';
-        push @binds, ($_) x @{$filters->{author}};
+    if ($filters->{authors}) {
+        push @wheres, '('.join(' OR ', ('author=?') x @{$filters->{authors}}).')';
+        push @binds, @{$filters->{authors}};
     }
-    if ($filters->{author_isnt}) {
-        for (@{ $filters->{author_isnt} }) {
+    if ($filters->{authors_arent}) {
+        for (@{ $filters->{authors_arent} }) {
             push @wheres, 'author <> ?';
             push @binds, $_;
         }
@@ -3147,7 +3161,7 @@ our %deps_phase_arg = (
                 code => sub { $_[0]{phase} = 'ALL'; $_[0]{rel} = 'ALL' },
             },
         },
-        tags => ['category:filter'],
+        tags => ['category:filtering'],
     },
 );
 
@@ -3160,7 +3174,7 @@ our %deps_rel_arg = (
             in => [qw/requires recommends suggests conflicts ALL/],
         }],
         default => 'requires',
-        tags => ['category:filter'],
+        tags => ['category:filtering'],
     },
 );
 
@@ -3225,14 +3239,14 @@ _
         'summary.alt.bool.not' => 'Exclude core modules',
         schema  => 'bool',
         default => 1,
-        tags => ['category:filter'],
+        tags => ['category:filtering'],
     },
     include_noncore => {
         summary => 'Include non-core modules',
         'summary.alt.bool.not' => 'Exclude non-core modules',
         schema  => 'bool',
         default => 1,
-        tags => ['category:filter'],
+        tags => ['category:filtering'],
     },
     perl_version => {
         summary => 'Set base Perl version for determining core modules',
@@ -3243,7 +3257,7 @@ _
     with_xs_or_pp => {
         summary => 'Check each dependency as XS/PP',
         schema  => ['bool*', is=>1],
-        tags => ['category:filter'],
+        tags => ['category:filtering'],
     },
 );
 
@@ -3292,8 +3306,15 @@ sub deps {
     my $include_noncore = $args{include_noncore} // 1;
     my $with_xs_or_pp = $args{with_xs_or_pp};
 
-    my $res = _get_prereqs($mods, $dbh, {}, {}, 1, $level, $phase, $rel,
-                           $include_core, $include_noncore, $plver, $args{flatten});
+    my $filters = {
+        include_core => $include_core,
+        include_noncore => $include_noncore,
+        authors => $args{authors},
+        authors_arent => $args{authors_arent},
+    };
+
+    my $res = _get_prereqs($mods, $dbh, {}, {},
+                           1, $level, $filters, $plver, $args{flatten}, $phase, $rel);
 
     return $res unless $res->[0] == 200;
     my @cols;
@@ -3338,7 +3359,8 @@ my %rdeps_args = (
             },
         },
     },
-    author => {
+    authors => {
+        'x.name.is_plural' => 1,
         summary => 'Filter certain author',
         schema => ['array*', of=>'str*'],
         description => <<'_',
@@ -3347,9 +3369,11 @@ This can be used to select certain author(s).
 
 _
         completion => \&_complete_cpanid,
-        tags => ['category:filter'],
+        tags => ['category:filtering'],
     },
-    author_isnt => {
+    authors_arent => {
+        'x.name.is_plural' => 1,
+        'x.name.singular' => 'author_isnt',
         summary => 'Filter out certain author',
         schema => ['array*', of=>'str*'],
         description => <<'_',
@@ -3360,7 +3384,7 @@ herself.
 
 _
         completion => \&_complete_cpanid,
-        tags => ['category:filter'],
+        tags => ['category:filtering'],
     },
 );
 
@@ -3379,12 +3403,12 @@ sub rdeps {
 
     my $mods    = $args{modules};
     my $level   = $args{level} // 1;
-    my $author =  $args{author} ? [map {uc} @{$args{author}}] : undef;
-    my $author_isnt = $args{author_isnt} ? [map {uc} @{$args{author_isnt}}] : undef;
+    my $authors =  $args{authors} ? [map {uc} @{$args{authors}}] : undef;
+    my $authors_arent = $args{authors_arent} ? [map {uc} @{$args{authors_arent}}] : undef;
 
     my $filters = {
-        author => $author,
-        author_isnt => $author_isnt,
+        authors => $authors,
+        authors_arent => $authors_arent,
     };
 
     my $res = _get_revdeps($mods, $dbh, {}, {}, 1, $level, $filters, $args{phase}, $args{rel});
