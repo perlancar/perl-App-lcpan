@@ -153,7 +153,7 @@ sub handle_cmd {
 
     if (@$mentioner_authors) {
         my $authors_s = join(",", map { $dbh->quote(uc $_) } @$mentioner_authors);
-        push @where, "mentioner_authors IN ($authors_s)";
+        push @where, "mentioner_author IN ($authors_s)";
     }
 
     if (@$mentioner_authors_arent) {
