@@ -6,6 +6,7 @@
 use 5.010;
 use strict;
 use warnings;
+require Log::Any unless $ENV{COMP_LINE};
 
 use PERLANCAR::Module::List;
 use Perinci::CmdLine::Any;
@@ -36,7 +37,8 @@ for my $mod (keys %$mods) {
 
 my $cli = Perinci::CmdLine::Any->new(
     url => $prefix,
-    log => 1,
+    log => 1, # XXX doesn't work? we still need to add 'require Log::Any' line above
+    log_level => 'info',
     subcommands => $subcommands,
 );
 $cli->common_opts->{naked_res}{default} = 1;
