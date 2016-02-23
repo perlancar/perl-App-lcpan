@@ -35,6 +35,20 @@ _
         %App::lcpan::finclude_noncore_args,
         %App::lcpan::perl_version_args,
         # XXX with_xs_or_pp
+        authors => {
+            'x.name.is_plural' => 1,
+            'x.name.singular' => 'author',
+            schema => ['array*', of=>'str*', min_len=>1],
+            tags => ['category:filtering'],
+            element_completion => \&App::lcpan::_complete_cpanid,
+        },
+        authors_arent => {
+            'x.name.is_plural' => 1,
+            'x.name.singular' => 'author_isnt',
+            schema => ['array*', of=>'str*', min_len=>1],
+            tags => ['category:filtering'],
+            element_completion => \&App::lcpan::_complete_cpanid,
+        },
     },
 };
 sub handle_cmd {
@@ -83,6 +97,16 @@ sub handle_cmd {
     if ($rel ne 'ALL') {
         push @wheres, "dep.rel=?";
         push @binds, $rel;
+    }
+    if ($args{authors}) {
+        push @wheres, "(".join(" OR ", map {"author=?"} @{$args{authors}}).")";
+        push @binds, map {uc $_} @{ $args{authors} };
+    }
+    if ($args{authors_arent}) {
+        for (@{ $args{authors_arent} }) {
+            push @wheres, "author<>?";
+            push @binds, uc $_;
+        }
     }
 
     my $sth = $dbh->prepare("SELECT
