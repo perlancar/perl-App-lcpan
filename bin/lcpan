@@ -3,6 +3,8 @@
 # DATE
 # VERSION
 
+BEGIN { $ENV{VERBOSE} //= 1 }
+
 use 5.010;
 use strict;
 use warnings;
@@ -38,7 +40,7 @@ for my $mod (keys %$mods) {
 my $cli = Perinci::CmdLine::Any->new(
     url => $prefix,
     log => 1, # XXX doesn't work? we still need to add 'require Log::Any' line above
-    log_level => 'info',
+    #log_level => 'info',
     subcommands => $subcommands,
 );
 $cli->common_opts->{naked_res}{default} = 1;
