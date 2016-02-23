@@ -121,7 +121,6 @@ ORDER BY COUNT(*) DESC, m.name
 
     my @rows;
     while (my $row = $sth->fetchrow_hashref) {
-        $log->errorf("TMP: row=%s", $row) if !$row->{module};
         $row->{is_core} = $row->{module} eq 'perl' ||
             Module::CoreList::More->is_still_core(
                 $row->{module}, $row->{version},
