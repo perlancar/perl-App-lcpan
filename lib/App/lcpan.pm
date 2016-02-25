@@ -242,6 +242,7 @@ our %mods_args = (
         req => 1,
         pos => 0,
         greedy => 1,
+        cmdline_src => 'stdin_or_args',
         element_completion => \&_complete_mod,
     },
 );
@@ -262,6 +263,7 @@ our %scripts_args = (
         req => 1,
         pos => 0,
         greedy => 1,
+        cmdline_src => 'stdin_or_args',
         element_completion => \&_complete_script,
     },
 );
@@ -291,6 +293,7 @@ our %dists_args = (
         req => 1,
         pos => 0,
         greedy => 1,
+        cmdline_src => 'stdin_or_args',
         element_completion => \&_complete_dist,
     },
 );
