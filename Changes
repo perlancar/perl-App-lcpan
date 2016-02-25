@@ -1,5 +1,35 @@
 Revision history for App-lcpan
 
+0.80    2016-02-25 (PERLANCAR)
+
+	[Enhancements]
+
+        - Add subcommands: mentions-by-mod, mentions-by-script,
+          mentions-for-mod, mentions-for-script, author-deps,
+          author-deps-by-dependent-count, deps-by-dependent-count.
+
+	- mods: Add options --include-core, --include-noncore.
+
+	- deps: Add options --module-author, --module-author-isnt,
+	  --include-noncore; various small fixes.
+
+        - [ux] Set default log level to 'info' (verbose) so 'lcpan update' by
+          default can see indexing process.
+
+	[Bug fixes]
+
+        - Fix a typo in SQL.
+
+	[Incompatible changes]
+
+        - Rename subcommand distmods -> dist-mods, distscripts ->
+	  dist-scripts.
+
+	[Others]
+
+        - deps: Assume 'perl' is a core dependency instead of non-core.
+
+
 0.79    2016-02-19 (PERLANCAR)
 
 	- Add subcommand: related-mods.
