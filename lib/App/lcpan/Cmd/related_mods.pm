@@ -35,6 +35,11 @@ _
             schema => ['array*', of=>['str*', in=>[map {($_,"-$_")} qw/score num_mentions num_mentions_together pct_mentions_together module/]], min_len=>1],
             default => ['-score', '-num_mentions'],
         },
+        skip_same_dist => {
+            summary => 'Skip modules from the same distribution',
+            schema => 'bool*',
+            tags => ['category:filtering'],
+        },
     },
 };
 sub handle_cmd {
@@ -62,6 +67,27 @@ sub handle_cmd {
 
     $log->debugf("min_score: %f", $min_score);
 
+    my @join = (
+        "LEFT JOIN module m2 ON mtn1.module_id=m2.id",
+        "LEFT JOIN dist d ON m2.file_id=d.file_id",
+    );
+
+    my @where = (
+        "mtn1.source_content_id IN (SELECT source_content_id FROM mention mtn2 WHERE  module_id IN (SELECT id FROM module m2 WHERE name IN ($modules_s)))",
+        "m2.name NOT IN ($modules_s)",
+    );
+
+    my @dist_ids;
+    if ($args{skip_same_dist}) {
+        my $sth = $dbh->prepare(
+            "SELECT id FROM dist WHERE file_id IN (SELECT file_id FROM module WHERE name IN ($modules_s))");
+        $sth->execute;
+        while (my ($id) = $sth->fetchrow_array) {
+            push @dist_ids, $id;
+        }
+        push @where, "d.id NOT IN (".join(", ", @dist_ids).")";
+    }
+
     my @order = map {/(-?)(.+)/; $2 . ($1 ? " DESC" : "")} @{$args{sort}};
 
     # sql parts, to make SQL statement readable
@@ -75,15 +101,14 @@ sub handle_cmd {
   COUNT(*) num_mentions_together,
   ($sp_pct_mentions_together) pct_mentions_together,
   (COUNT(*) * COUNT(*) * ($sp_pct_mentions_together)) score,
+  d.name dist,
   m2.cpanid author
 FROM mention mtn1
-LEFT JOIN module m2 ON mtn1.module_id=m2.id
-WHERE
-  mtn1.source_content_id IN (SELECT source_content_id FROM mention mtn2 WHERE  module_id IN (SELECT id FROM module m2 WHERE name IN ($modules_s))) AND
-  m2.name NOT IN ($modules_s)
+".join("\n", @join)."
+WHERE ".join(" AND ", @where)."
 GROUP BY m2.name
-HAVING score >= $min_score".
-    (@order ? "\nORDER BY ".join(", ", @order) : "");
+HAVING score >= $min_score
+    ".(@order ? "\nORDER BY ".join(", ", @order) : "");
 
     my @res;
     my $sth = $dbh->prepare($sql);
@@ -92,7 +117,7 @@ HAVING score >= $min_score".
         push @res, $row;
     }
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/module abstract num_mentions num_mentions_together pct_mentions_together score author/];
+    $resmeta->{'table.fields'} = [qw/module abstract num_mentions num_mentions_together pct_mentions_together score dist author/];
 
     [200, "OK", \@res, $resmeta];
 }
