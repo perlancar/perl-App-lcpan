@@ -7,6 +7,8 @@ use 5.010;
 use strict;
 use warnings;
 
+use Encode qw(decode);
+
 require App::lcpan;
 
 our %SPEC;
@@ -224,6 +226,10 @@ LIMIT 1", {}, @bind);
         $content = $obj->get_content;
     }
 
+    if ($content =~ /^=encoding\s+(utf-?8)/im) {
+        $content = decode('utf8', $content, Encode::FB_CROAK);
+    }
+
     if ($args{format} eq 'raw') {
         return [200, "OK", $content, {'cmdline.skip_format'=>1}];
     } elsif ($args{format} eq 'html') {
@@ -238,7 +244,7 @@ LIMIT 1", {}, @bind);
         my ($infh, $infile) = File::Temp::tempfile(
             "$name.XXXXXXXX", DIR=>$tmpdir, SUFFIX=>".pod");
         my $outfile = "$infile.html";
-        File::Slurper::write_text($infile, $content);
+        File::Slurper::write_binary($infile, $content);
         system(
             "pod2html",
             "--infile", $infile,
@@ -252,7 +258,7 @@ LIMIT 1", {}, @bind);
     } else {
         return [200, "OK", $content, {
             "cmdline.page_result"=>1,
-            "cmdline.pager"=>"pod2man | man -l -"}];
+            "cmdline.pager"=>"pod2man -u | man -l -"}];
     }
 }
 
