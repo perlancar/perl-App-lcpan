@@ -1,5 +1,16 @@
 Revision history for App-lcpan
 
+0.81    2016-03-02 (PERLANCAR)
+
+	- doc: Encoding fixes (use pod2man -u option).
+
+	- related-mods: Add option --skip-same-dist.
+
+	- Use Rinci 1.1.79's cmdline_src=stdin_or_args to allow subcommands
+	  like 'mods' to get arguments from stdin, e.g. 'cpan-outdated -p |
+	  lcpan mod2dist'.
+
+
 0.80    2016-02-25 (PERLANCAR)
 
 	[Enhancements]
