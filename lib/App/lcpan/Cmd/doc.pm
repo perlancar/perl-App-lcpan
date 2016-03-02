@@ -148,6 +148,7 @@ sub handle_cmd {
             } elsif ($ext eq 'pod') {
                 push @where, "path LIKE '%.pod'";
             }
+            push @where, ("NOT(file.name LIKE '%-Lumped-%')"); # tmp
             $row = $dbh->selectrow_hashref("SELECT
   content.path content_path,
   file.cpanid author,
@@ -164,6 +165,7 @@ LIMIT 1", {}, @bind);
                 # from content path
                 $name =~ s!::!/!g; $name .= ".pod";
                 @where = ("content.path LIKE ?");
+                push @where, ("NOT(file.name LIKE '%-Lumped-%')"); # tmp
                 @bind = ("%$name");
 
                 my $sth = $dbh->prepare("SELECT
@@ -186,6 +188,7 @@ ORDER BY content.size DESC");
         } elsif ($look eq 'script') {
 
             push @where, "script.name=?";
+            push @where, ("NOT(file.name LIKE '%-Lumped-%')"); # tmp
             $row = $dbh->selectrow_hashref("SELECT
   content.path content_path,
   file.cpanid author,
@@ -219,7 +222,7 @@ LIMIT 1", {}, @bind);
         my $tar;
         eval {
             $tar = Archive::Tar->new;
-            $tar->read($path); # can still die untrapped when out of mem
+            $content = $tar->read($path); # can still die untrapped when out of mem
         };
         return [500, "Can't read tar file '$path': $@"] if $@;
         my ($obj) = $tar->get_files($row->{content_path});
@@ -227,7 +230,8 @@ LIMIT 1", {}, @bind);
     }
 
     if ($content =~ /^=encoding\s+(utf-?8)/im) {
-        $content = decode('utf8', $content, Encode::FB_CROAK);
+        # doesn't seem necessary
+        #$content = decode('utf8', $content, Encode::FB_CROAK);
     }
 
     if ($args{format} eq 'raw') {
