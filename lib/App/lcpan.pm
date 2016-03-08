@@ -2491,6 +2491,16 @@ $SPEC{modules} = {
         query_type => {
             schema => ['str*', in=>[qw/any name exact-name abstract/]],
             default => 'any',
+            cmdline_aliases => {
+                exact_name => {
+                    summary => 'Shortcut --query-type exact-name',
+                    code => sub { $_[0]{query_type} = 'exact-name' },
+                },
+                x => {
+                    summary => 'Shortcut --query-type exact-name',
+                    code => sub { $_[0]{query_type} = 'exact-name' },
+                },
+            },
         },
         %fauthor_args,
         %fdist_args,
