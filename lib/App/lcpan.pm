@@ -2494,10 +2494,12 @@ $SPEC{modules} = {
             cmdline_aliases => {
                 exact_name => {
                     summary => 'Shortcut --query-type exact-name',
+                    is_flag => 1,
                     code => sub { $_[0]{query_type} = 'exact-name' },
                 },
                 x => {
                     summary => 'Shortcut --query-type exact-name',
+                    is_flag => 1,
                     code => sub { $_[0]{query_type} = 'exact-name' },
                 },
             },
