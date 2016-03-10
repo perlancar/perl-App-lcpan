@@ -1,5 +1,21 @@
 Revision history for App-lcpan
 
+0.82    2016-03-10 (PERLANCAR)
+
+        - Add subcommand: mentions-for-all-mods.
+
+        - [ux] mods: Add shortcut options -x (for --query-type=exact-name), -n
+          (for --query-type=name), -N (for --namespace).
+
+        - [ux] authors, dists, rels: Also add shortcut options -x & -n.
+
+        - [ux] [completion] mods, dists, authors, rels: Do completion on query
+          when query type is exact name.
+
+        - [ux] [completion] Don't do completion when word is empty, to avoid
+          slow response.
+
+
 0.81    2016-03-02 (PERLANCAR)
 
 	- doc: Encoding fixes (use pod2man -u option).
