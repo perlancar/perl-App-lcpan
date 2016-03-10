@@ -2079,6 +2079,9 @@ sub _complete_mod {
 
     my $word = $args{word} // '';
 
+    # because it might be very slow, don't complete empty word
+    return [] unless length $word;
+
     # only run under pericmd
     my $cmdline = $args{cmdline} or return undef;
     my $r = $args{r};
@@ -2122,6 +2125,9 @@ sub _complete_ns {
     my %args = @_;
 
     my $word = $args{word} // '';
+
+    # because it might be very slow, don't complete empty word
+    return [] unless length $word;
 
     # only run under pericmd
     my $cmdline = $args{cmdline} or return undef;
@@ -2167,6 +2173,9 @@ sub _complete_script {
 
     my $word = $args{word} // '';
 
+    # because it might be very slow, don't complete empty word
+    return [] unless length $word;
+
     # only run under pericmd
     my $cmdline = $args{cmdline} or return undef;
     my $r = $args{r};
@@ -2204,6 +2213,9 @@ sub _complete_dist {
     my %args = @_;
 
     my $word = $args{word} // '';
+
+    # because it might be very slow, don't complete empty word
+    return [] unless length $word;
 
     # only run under pericmd
     my $cmdline = $args{cmdline} or return undef;
@@ -2249,6 +2261,9 @@ sub _complete_cpanid {
 
     my $word = $args{word} // '';
 
+    # because it might be very slow, don't complete empty word
+    return [] unless length $word;
+
     # only run under pericmd
     my $cmdline = $args{cmdline} or return undef;
     my $r = $args{r};
@@ -2287,6 +2302,9 @@ sub _complete_rel {
 
     my $word = $args{word} // '';
 
+    # because it might be very slow, don't complete empty word
+    return [] unless length $word;
+
     # only run under pericmd
     my $cmdline = $args{cmdline} or return undef;
     my $r = $args{r};
@@ -2324,6 +2342,9 @@ sub _complete_content_package_or_script {
     my %args = @_;
 
     my $word = $args{word} // '';
+
+    # because it might be very slow, don't complete empty word
+    return [] unless length $word;
 
     # only run under pericmd
     my $cmdline = $args{cmdline} or return undef;
