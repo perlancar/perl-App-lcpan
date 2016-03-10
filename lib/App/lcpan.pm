@@ -8,7 +8,7 @@ use strict;
 use warnings;
 use Log::Any::IfLOG '$log';
 
-use Function::Fallback::CoreOrPP qw(clone);
+use Clone::Util qw(clone modclone);
 use List::Util qw(first);
 
 use Exporter;
@@ -2410,10 +2410,37 @@ $SPEC{authors} = {
     summary => 'List authors',
     args => {
         %common_args,
-        %query_multi_args,
+        %{( modclone {
+            $_->{query}{element_completion} = sub {
+                my %args = @_;
+                my $r = $args{r};
+                return undef unless $r;
+                my $cmdline = $args{cmdline};
+                my $res = $cmdline->parse_argv($r);
+                return undef unless $res->[0] == 200;
+
+                # provide completion for modules if query_type is exact-name
+                my $qt = $res->[2]{query_type} // '';
+                return _complete_cpanid(%args) if $qt eq 'exact-cpanid';
+
+                undef;
+            };
+        } \%query_multi_args )},
         query_type => {
             schema => ['str*', in=>[qw/any cpanid exact-cpanid fullname email exact-email/]],
             default => 'any',
+            cmdline_aliases => {
+                x => {
+                    summary => 'Shortcut --query-type exact-cpanid',
+                    is_flag => 1,
+                    code => sub { $_[0]{query_type} = 'exact-cpanid' },
+                },
+                n => {
+                    summary => 'Shortcut --query-type cpanid',
+                    is_flag => 1,
+                    code => sub { $_[0]{query_type} = 'cpanid' },
+                },
+            },
         },
     },
     result => {
@@ -2508,16 +2535,26 @@ $SPEC{modules} = {
     summary => 'List modules/packages',
     args => {
         %common_args,
-        %query_multi_args,
+        %{( modclone {
+            $_->{query}{element_completion} = sub {
+                my %args = @_;
+                my $r = $args{r};
+                return undef unless $r;
+                my $cmdline = $args{cmdline};
+                my $res = $cmdline->parse_argv($r);
+                return undef unless $res->[0] == 200;
+
+                # provide completion for modules if query_type is exact-name
+                my $qt = $res->[2]{query_type} // '';
+                return _complete_mod(%args) if $qt eq 'exact-name';
+
+                undef;
+            };
+        } \%query_multi_args )},
         query_type => {
             schema => ['str*', in=>[qw/any name exact-name abstract/]],
             default => 'any',
             cmdline_aliases => {
-                exact_name => {
-                    summary => 'Shortcut --query-type exact-name',
-                    is_flag => 1,
-                    code => sub { $_[0]{query_type} = 'exact-name' },
-                },
                 x => {
                     summary => 'Shortcut --query-type exact-name',
                     is_flag => 1,
@@ -2669,10 +2706,37 @@ $SPEC{dists} = {
     summary => 'List distributions',
     args => {
         %common_args,
-        %query_multi_args,
+        %{( modclone {
+            $_->{query}{element_completion} = sub {
+                my %args = @_;
+                my $r = $args{r};
+                return undef unless $r;
+                my $cmdline = $args{cmdline};
+                my $res = $cmdline->parse_argv($r);
+                return undef unless $res->[0] == 200;
+
+                # provide completion for dists if query_type is exact-name
+                my $qt = $res->[2]{query_type} // '';
+                return _complete_dist(%args) if $qt eq 'exact-name';
+
+                undef;
+            };
+        } \%query_multi_args )},
         query_type => {
             schema => ['str*', in=>[qw/any name exact-name abstract/]],
             default => 'any',
+            cmdline_aliases => {
+                x => {
+                    summary => 'Shortcut --query-type exact-name',
+                    is_flag => 1,
+                    code => sub { $_[0]{query_type} = 'exact-name' },
+                },
+                n => {
+                    summary => 'Shortcut --query-type name',
+                    is_flag => 1,
+                    code => sub { $_[0]{query_type} = 'name' },
+                },
+            },
         },
         %fauthor_args,
         %flatest_args,
@@ -2875,10 +2939,37 @@ $SPEC{'releases'} = {
     args => {
         %common_args,
         %fauthor_args,
-        %query_multi_args,
+        %{( modclone {
+            $_->{query}{element_completion} = sub {
+                my %args = @_;
+                my $r = $args{r};
+                return undef unless $r;
+                my $cmdline = $args{cmdline};
+                my $res = $cmdline->parse_argv($r);
+                return undef unless $res->[0] == 200;
+
+                # provide completion for releases if query_type is exact-name
+                my $qt = $res->[2]{query_type} // '';
+                return _complete_rel(%args) if $qt eq 'exact-name';
+
+                undef;
+            };
+        } \%query_multi_args )},
         query_type => {
             schema => ['str*', in=>[qw/any name exact-name/]],
             default => 'any',
+            cmdline_aliases => {
+                x => {
+                    summary => 'Shortcut --query-type exact-name',
+                    is_flag => 1,
+                    code => sub { $_[0]{query_type} = 'exact-name' },
+                },
+                n => {
+                    summary => 'Shortcut --query-type name',
+                    is_flag => 1,
+                    code => sub { $_[0]{query_type} = 'name' },
+                },
+            },
         },
         has_metajson   => {schema=>'bool'},
         has_metayml    => {schema=>'bool'},
