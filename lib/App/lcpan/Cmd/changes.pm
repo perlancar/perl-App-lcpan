@@ -15,7 +15,7 @@ our %SPEC;
 
 $SPEC{'handle_cmd'} = {
     v => 1.1,
-    summary => 'Show POD documentation of module/.pod/script',
+    summary => 'Show Changes of distribution/module',
     description => <<'_',
 
 This command will find a file named Changes/CHANGES/ChangeLog or other similar
