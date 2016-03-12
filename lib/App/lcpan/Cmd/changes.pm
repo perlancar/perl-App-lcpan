@@ -59,7 +59,7 @@ sub handle_cmd {
     my @bind;
 
     if ($mod_or_dist =~ /-/) {
-        push @where, "file.id = (SELECT file_id FROM dist WHERE name=? LIMIT 1)";
+        push @where, "file.id = (SELECT file_id FROM dist WHERE name=? ORDER BY version_numified DESC LIMIT 1)";
         push @bind, $mod_or_dist;
     } else {
         push @where, "file.id = (SELECT file_id FROM module WHERE name=? LIMIT 1)";
@@ -78,10 +78,9 @@ ORDER BY content.path";
     my $sth = $dbh->prepare($sql);
     $sth->execute(@bind);
 
-    my $has_rows;
-    my $row;
-    while ($row = $sth->fetchrow_hashref) {
-        $has_rows++;
+    my $first_row;
+    while (my $row = $sth->fetchrow_hashref) {
+        $first_row //= $row;
         next unless $row->{content_path} =~ m!\A
                                               (?:[^/]+/)?
                                               (changes|changelog)
@@ -117,8 +116,8 @@ ORDER BY content.path";
         }];
     }
 
-    if ($has_rows) {
-        return [404, "No Changes file found in $row->{release}"];
+    if ($first_row) {
+        return [404, "No Changes file found in $first_row->{release}"];
     } else {
         return [404, "No such module or dist"];
     }
