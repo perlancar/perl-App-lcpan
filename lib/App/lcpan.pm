@@ -247,6 +247,16 @@ our %mods_args = (
     },
 );
 
+our %mod_or_dist_args = (
+    module_or_dist => {
+        summary => 'Module or dist name',
+        schema => ['str*', match=>qr/\A\w+(?:(?:::|-)\w+)*\z/],
+        req => 1,
+        pos => 0,
+        completion => \&App::lcpan::_complete_mod_or_dist,
+    },
+);
+
 our %script_args = (
     script => {
         schema => 'str*',
@@ -2121,6 +2131,70 @@ sub _complete_mod {
     \@res;
 };
 
+sub _complete_mod_or_dist {
+    my %args = @_;
+
+    my $word = $args{word} // '';
+
+    # because it might be very slow, don't complete empty word
+    return [] unless length $word;
+
+    # only run under pericmd
+    my $cmdline = $args{cmdline} or return undef;
+    my $r = $args{r};
+
+    # force read config file, because by default it is turned off when in
+    # completion
+    $r->{read_config} = 1;
+    my $res = $cmdline->parse_argv($r);
+    _set_args_default($res->[2]);
+
+    my $dbh;
+    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}) };
+
+    # if we can't connect (probably because database is not yet setup), bail
+    if ($@) {
+        $log->tracef("[comp] can't connect to db, bailing: %s", $@);
+        return undef;
+    }
+
+    my $sth;
+
+    my $is_dist;
+    if ($word =~ /-/) {
+        $is_dist++;
+        $sth = $dbh->prepare(
+            "SELECT name FROM dist   WHERE name LIKE ? ORDER BY name");
+    } else {
+        $sth = $dbh->prepare(
+            "SELECT name FROM module WHERE name LIKE ? ORDER BY name");
+    }
+    $sth->execute($word . '%');
+
+    # XXX follow Complete::Common::OPT_CI
+
+    my @res;
+    while (my ($e) = $sth->fetchrow_array) {
+        # only complete one level deeper at a time
+        if ($is_dist) {
+            if ($e =~ /-\z/) {
+                next unless $e =~ /\A\Q$word\E-*\w+\z/i;
+            } else {
+                next unless $e =~ /\A\Q$word\E\w*(-\w+)?\z/i;
+            }
+        } else {
+            if ($e =~ /:\z/) {
+                next unless $e =~ /\A\Q$word\E:*\w+\z/i;
+            } else {
+                next unless $e =~ /\A\Q$word\E\w*(::\w+)?\z/i;
+            }
+        }
+        push @res, $e;
+    }
+
+    \@res;
+};
+
 sub _complete_ns {
     my %args = @_;
 
@@ -2245,11 +2319,11 @@ sub _complete_dist {
     my @res;
     while (my ($dist) = $sth->fetchrow_array) {
         # only complete one level deeper at a time
-        #if ($dist =~ /-\z/) {
-        #    next unless $dist =~ /\A\Q$word\E-*\w+\z/i;
-        #} else {
-        #    next unless $dist =~ /\A\Q$word\E\w*(-\w+)?\z/i;
-        #}
+        if ($dist =~ /-\z/) {
+            next unless $dist =~ /\A\Q$word\E-*\w+\z/i;
+        } else {
+            next unless $dist =~ /\A\Q$word\E\w*(-\w+)?\z/i;
+        }
         push @res, $dist;
     }
 
