@@ -33,7 +33,7 @@ _
     examples => [
         {
             summary => 'Use module name',
-            argv => ['--parse', 'Data::CSel::Parser'],
+            argv => ['Data::CSel::Parser'],
             test => 0,
             'x.doc.show_result' => 0,
         },
