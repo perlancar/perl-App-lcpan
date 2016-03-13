@@ -52,7 +52,7 @@ sub handle_cmd {
     my $dbh = $state->{dbh};
 
     my $mod_or_dist = $args{module_or_dist};
-    $mod_or_dist =~ s!/!::!g;
+    $mod_or_dist =~ s!/!::!g; # XXX this should be done by coercer
 
     my @join;
     my @where;

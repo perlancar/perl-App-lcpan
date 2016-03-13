@@ -249,8 +249,11 @@ our %mods_args = (
 
 our %mod_or_dist_args = (
     module_or_dist => {
+        # XXX coerce rule: from string: convert / to ::
         summary => 'Module or dist name',
-        schema => ['str*', match=>qr/\A\w+(?:(?:::|-)\w+)*\z/],
+        schema => ['str*',
+                   #match=>qr/\A\w+(?:(?:::|-)\w+)*\z/
+               ],
         req => 1,
         pos => 0,
         completion => \&App::lcpan::_complete_mod_or_dist,
@@ -2096,6 +2099,9 @@ sub _complete_mod {
     my $cmdline = $args{cmdline} or return undef;
     my $r = $args{r};
 
+    # allow writing Mod::SubMod as Mod/SubMod
+    my $uses_slash = $word =~ s!/!::!g ? 1:0;
+
     # force read config file, because by default it is turned off when in
     # completion
     $r->{read_config} = 1;
@@ -2128,6 +2134,9 @@ sub _complete_mod {
         push @res, $mod;
     }
 
+    # convert back to slash if user originally typed with slash
+    if ($uses_slash) { for (@res) { s!::!/!g } }
+
     \@res;
 };
 
@@ -2142,6 +2151,9 @@ sub _complete_mod_or_dist {
     # only run under pericmd
     my $cmdline = $args{cmdline} or return undef;
     my $r = $args{r};
+
+    # allow writing Mod::SubMod as Mod/SubMod
+    my $uses_slash = $word =~ s!/!::!g ? 1:0;
 
     # force read config file, because by default it is turned off when in
     # completion
@@ -2191,6 +2203,9 @@ sub _complete_mod_or_dist {
         }
         push @res, $e;
     }
+
+    # convert back to slash if user originally typed with slash
+    if ($uses_slash) { for (@res) { s!::!/!g } }
 
     \@res;
 };
