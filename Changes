@@ -1,5 +1,12 @@
 Revision history for App-lcpan
 
+0.84    2016-03-12 (PERLANCAR)
+
+	- [Bug fixes] Some fixes for subcommand 'changes'.
+
+        - [ux] Tweak completion for module names (allow / as path separator).
+
+
 0.83    2016-03-12 (PERLANCAR)
 
 	- Add subcommand: changes.
