@@ -24,7 +24,7 @@ name in the top-level directory inside the release tarballs and show it.
 _
     args => {
         %App::lcpan::common_args,
-        %App::lcpan::mod_or_dist_args,
+        %App::lcpan::mod_or_dist_or_script_args,
         #parse => {
         #    summary => 'Parse with CPAN::Changes',
         #    schema => 'bool',
@@ -51,19 +51,44 @@ sub handle_cmd {
     my $state = App::lcpan::_init(\%args, 'ro');
     my $dbh = $state->{dbh};
 
-    my $mod_or_dist = $args{module_or_dist};
-    $mod_or_dist =~ s!/!::!g; # XXX this should be done by coercer
+    my $mod_or_dist_or_script = $args{module_or_dist_or_script};
+    $mod_or_dist_or_script =~ s!/!::!g; # XXX this should be done by coercer
 
     my @join;
     my @where;
     my @bind;
 
-    if ($mod_or_dist =~ /-/) {
-        push @where, "file.id = (SELECT file_id FROM dist WHERE name=? ORDER BY version_numified DESC LIMIT 1)";
-        push @bind, $mod_or_dist;
-    } else {
-        push @where, "file.id = (SELECT file_id FROM module WHERE name=? LIMIT 1)";
-        push @bind, $mod_or_dist;
+    my @file_ids;
+    {
+        # search in module first
+        unless ($mod_or_dist_or_script =~ /-/) {
+            my $sth = $dbh->prepare("SELECT file_id FROM module WHERE name=?");
+            $sth->execute($mod_or_dist_or_script);
+            while (my ($e) = $sth->fetchrow_array) {
+                push @file_ids, $e;
+            }
+        }
+        # search in dist or script
+        unless ($mod_or_dist_or_script =~ /::/) {
+            my $dist_found;
+            my $sth = $dbh->prepare("SELECT file_id FROM dist WHERE name=? ORDER BY version_numified DESC LIMIT 1");
+            $sth->execute($mod_or_dist_or_script);
+            while (my ($e) = $sth->fetchrow_array) {
+                $dist_found++;
+                push @file_ids, $e;
+            }
+
+            unless ($dist_found) {
+                my $sth = $dbh->prepare("SELECT file_id FROM script WHERE name=?");
+                $sth->execute($mod_or_dist_or_script);
+                while (my ($e) = $sth->fetchrow_array) {
+                    push @file_ids, $e;
+                }
+            }
+        }
+
+        return [404, "No such module/dist/script"] unless @file_ids;
+        push @where, "file.id IN (".join(",", @file_ids).")";
     }
 
     my $sql = "SELECT

@@ -281,6 +281,18 @@ our %scripts_args = (
     },
 );
 
+our %mod_or_dist_or_script_args = (
+    module_or_dist_or_script => {
+        # XXX coerce rule: from string: convert / to ::
+        summary => 'Module or dist or script name',
+        schema => ['str*',
+               ],
+        req => 1,
+        pos => 0,
+        completion => \&App::lcpan::_complete_mod_or_dist_or_script,
+    },
+);
+
 our %author_args = (
     author => {
         schema => 'str*',
@@ -2202,6 +2214,86 @@ sub _complete_mod_or_dist {
             }
         }
         push @res, $e;
+    }
+
+    # convert back to slash if user originally typed with slash
+    if ($uses_slash) { for (@res) { s!::!/!g } }
+
+    \@res;
+};
+
+sub _complete_mod_or_dist_or_script {
+    my %args = @_;
+
+    my $word = $args{word} // '';
+
+    # because it might be very slow, don't complete empty word
+    return [] unless length $word;
+
+    # only run under pericmd
+    my $cmdline = $args{cmdline} or return undef;
+    my $r = $args{r};
+
+    # allow writing Mod::SubMod as Mod/SubMod
+    my $uses_slash = $word =~ s!/!::!g ? 1:0;
+
+    # force read config file, because by default it is turned off when in
+    # completion
+    $r->{read_config} = 1;
+    my $res = $cmdline->parse_argv($r);
+    _set_args_default($res->[2]);
+
+    my $dbh;
+    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}) };
+
+    # if we can't connect (probably because database is not yet setup), bail
+    if ($@) {
+        $log->tracef("[comp] can't connect to db, bailing: %s", $@);
+        return undef;
+    }
+
+    my $sth;
+
+    my $is_dist;
+    if ($word =~ /-/) {
+        $is_dist++;
+        $sth = $dbh->prepare(
+            "SELECT name FROM dist   WHERE name LIKE ? ORDER BY name");
+    } else {
+        $sth = $dbh->prepare(
+            "SELECT name FROM module WHERE name LIKE ? ORDER BY name");
+    }
+    $sth->execute($word . '%');
+
+    # XXX follow Complete::Common::OPT_CI
+
+    my @res;
+    while (my ($e) = $sth->fetchrow_array) {
+        # only complete one level deeper at a time
+        if ($is_dist) {
+            if ($e =~ /-\z/) {
+                next unless $e =~ /\A\Q$word\E-*\w+\z/i;
+            } else {
+                next unless $e =~ /\A\Q$word\E\w*(-\w+)?\z/i;
+            }
+        } else {
+            if ($e =~ /:\z/) {
+                next unless $e =~ /\A\Q$word\E:*\w+\z/i;
+            } else {
+                next unless $e =~ /\A\Q$word\E\w*(::\w+)?\z/i;
+            }
+        }
+        push @res, $e;
+    }
+
+    # also get candidates from script name
+    unless ($word =~ /::/) {
+        $sth = $dbh->prepare(
+            "SELECT DISTINCT name FROM script WHERE name LIKE ? ORDER BY name");
+        $sth->execute($word . '%');
+        while (my ($e) = $sth->fetchrow_array) {
+            push @res, $e;
+        }
     }
 
     # convert back to slash if user originally typed with slash
