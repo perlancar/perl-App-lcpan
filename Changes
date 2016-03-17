@@ -1,5 +1,10 @@
 Revision history for App-lcpan
 
+0.85    2016-03-17 (PERLANCAR)
+
+	- changes: Allow specifying script name in addition to module/dist.
+
+
 0.84    2016-03-12 (PERLANCAR)
 
 	- [Bug fixes] Some fixes for subcommand 'changes'.
