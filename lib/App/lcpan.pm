@@ -1459,16 +1459,6 @@ sub _update_index {
       FILE:
         for my $file (@files) {
 
-            if (first {$_ eq $file->{name}} @builtin_file_skip_list) {
-                $log->infof("Skipped file %s (built-in file skip list)", $file->{name});
-                next FILE;
-            }
-
-            if ($args{skip_index_files} && first {$_ eq $file->{name}} @{ $args{skip_index_files} }) {
-                $log->infof("Skipped file %s (skip_index_files)", $file->{name});
-                next FILE;
-            }
-
             # commit after every 500 files
             if ($i % 500 == 499) {
                 $log->tracef("COMMIT");
@@ -1483,6 +1473,16 @@ sub _update_index {
                 }
             }
             $i++;
+
+            if (first {$_ eq $file->{name}} @builtin_file_skip_list) {
+                $log->infof("Skipped file %s (built-in file skip list)", $file->{name});
+                next FILE;
+            }
+
+            if ($args{skip_index_files} && first {$_ eq $file->{name}} @{ $args{skip_index_files} }) {
+                $log->infof("Skipped file %s (skip_index_files)", $file->{name});
+                next FILE;
+            }
 
             my $path = _fullpath($file->{name}, $cpan, $file->{cpanid});
 
