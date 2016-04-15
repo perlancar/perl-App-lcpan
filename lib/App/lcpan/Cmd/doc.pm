@@ -235,7 +235,10 @@ LIMIT 1", {}, @bind);
     }
 
     if ($args{format} eq 'raw') {
-        return [200, "OK", $content, {'cmdline.skip_format'=>1}];
+        return [200, "OK", $content, {
+            "cmdline.page_result"=>1,
+            'cmdline.skip_format'=>1,
+        }];
     } elsif ($args{format} eq 'html') {
         require Browser::Open;
         require File::Slurper;
