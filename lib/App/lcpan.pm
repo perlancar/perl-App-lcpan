@@ -2945,7 +2945,6 @@ $SPEC{dists} = {
         },
         rel_mtime_newer_than => {
             schema => 'date*',
-            'x.perl.coerce_to' => 'int(epoch)',
             tags => ['category:filtering'],
         },
         %sort_args_for_dists,
