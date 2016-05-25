@@ -1,5 +1,13 @@
 Revision history for App-lcpan
 
+0.87    2016-05-25 (PERLANCAR)
+
+	- Try setting cache_size to 400000 (400MB), the default is 2MB.
+
+	- Update to Data::Sah 0.76+ (date/duration by default now already
+	  coerces to floats).
+
+
 0.86    2016-04-15 (PERLANCAR)
 
 	- [Bugfix] Fix misnumbering in log statement because we 'next'
