@@ -861,6 +861,7 @@ sub _connect_db {
     }
     my $dbh = DBI->connect("dbi:SQLite:dbname=$db_path", undef, undef,
                            {RaiseError=>1});
+    $dbh->do("PRAGMA cache_size = 400000"); # 400M
     _create_schema($dbh);
     $dbh;
 }
