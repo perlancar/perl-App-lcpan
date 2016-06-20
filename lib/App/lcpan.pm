@@ -2796,7 +2796,7 @@ sub modules {
         ['module.abstract', 'abstract'],
         ['dist.name', 'dist'],
         ['file.cpanid', 'author'],
-        ['file.mtime', 'rel_mtime'],
+        ['file.mtime', 'rel_mtime', 'iso8601_datetime'],
     );
 
     my @bind;
@@ -2873,10 +2873,14 @@ LEFT JOIN dist ON file.id=dist.file_id
         push @res, $detail ? $row : $row->{module};
     }
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [
-        (map {ref($_) ? $_->[1] : $_} grep {!ref($_) || !$_->[2]} @cols),
-        ("is_core"),
-    ] if $detail;
+    if ($detail) {
+        $resmeta->{'table.fields'} = [
+            (map {ref($_) ? $_->[1] : $_}    @cols),
+            ("is_core")];
+        $resmeta->{'table.field_formats'} = [
+            (map {ref($_) ? $_->[2] : undef} @cols),
+            (undef)];
+    }
     [200, "OK", \@res, $resmeta];
 }
 
@@ -3109,8 +3113,10 @@ LEFT JOIN file f ON d.file_id=f.id
         push @res, $detail ? $row : $row->{dist};
     }
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/dist author version release rel_size rel_mtime abstract/]
-        if $detail;
+    if ($detail) {
+        $resmeta->{'table.fields'}        = [qw/dist author version release rel_size rel_mtime abstract/];
+        $resmeta->{'table.field_formats'} = [undef,  undef, undef,  undef,  undef, 'iso8601_datetime',  undef];
+    }
     [200, "OK", \@res, $resmeta];
 }
 
@@ -3267,8 +3273,10 @@ LEFT JOIN dist d ON f1.id=d.file_id
         push @res, $detail ? $row : $row->{name};
     }
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/name author size mtime has_metayml has_metajson has_makefilepl has_buildpl file_status file_error meta_status meta_error pod_status/]
-        if $detail;
+    if ($detail) {
+        $resmeta->{'table.fields'}        = [qw/name author size mtime                 has_metayml has_metajson has_makefilepl has_buildpl file_status file_error meta_status meta_error pod_status/];
+        $resmeta->{'table.field_formats'} = [undef,  undef, undef, 'iso8601_datetime', undef,      undef,       undef,         undef,      undef,      undef,     undef,      undef,     undef];
+    }
     [200, "OK", \@res, $resmeta];
 }
 
