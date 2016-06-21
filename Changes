@@ -1,5 +1,10 @@
 Revision history for App-lcpan
 
+0.88    2016-06-21 (PERLANCAR)
+
+	- [ux] Format time for some subcommands.
+
+
 0.87    2016-05-25 (PERLANCAR)
 
 	- Try setting cache_size to 400000 (400MB), the default is 2MB.
