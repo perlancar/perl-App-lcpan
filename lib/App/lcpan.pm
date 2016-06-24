@@ -36,6 +36,7 @@ my @builtin_file_skip_list_sub = (
     'Encode-Detect-CJK-2.0.2.tar.gz',     # 2016-02-17 - segfaults Compiler::Lexer 0.22
     'Shipment-0.13.tar.gz',               # 2016-02-17 - segfaults Compiler::Lexer 0.22
     'Shipment-2.00.tar.gz',               # 2016-02-17 - segfaults Compiler::Lexer 0.22
+    'Shipment-2.01.tar.gz',               # 2016-06-23 - segfaults Compiler::Lexer 0.22
 );
 
 our %SPEC;
