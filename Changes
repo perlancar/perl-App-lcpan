@@ -1,5 +1,13 @@
 Revision history for App-lcpan
 
+0.89    2016-06-24 (PERLANCAR)
+
+	- No functional changes.
+
+	- Add to builtin skip list: Shipmet-2.01.tar.gz (segfaults
+	  Compiler::Lexer 0.22).
+
+
 0.88    2016-06-21 (PERLANCAR)
 
 	- [ux] Format time for some subcommands.
