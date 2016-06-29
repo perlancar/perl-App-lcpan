@@ -4,7 +4,7 @@ Revision history for App-lcpan
 
 	- No functional changes.
 
-	- Bump version to 1.000.
+	- Bump version to 1.000 to get 3 digits of minor version number.
 
         - Add to builtin skip list: Shipment-2.02.tar.gz (segfaults
 	  Compiler::Lexer 0.22).
