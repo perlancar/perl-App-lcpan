@@ -1,10 +1,20 @@
 Revision history for App-lcpan
 
+1.000   2016-06-29 (PERLANCAR)
+
+	- No functional changes.
+
+	- Bump version to 1.000.
+
+        - Add to builtin skip list: Shipment-2.02.tar.gz (segfaults
+	  Compiler::Lexer 0.22).
+
+
 0.89    2016-06-24 (PERLANCAR)
 
 	- No functional changes.
 
-	- Add to builtin skip list: Shipmet-2.01.tar.gz (segfaults
+	- Add to builtin skip list: Shipment-2.01.tar.gz (segfaults
 	  Compiler::Lexer 0.22).
 
 
