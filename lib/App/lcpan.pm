@@ -26,18 +26,18 @@ our @EXPORT_OK = qw(
 # XXX also add author instead of just release name, since PAUSE allows 2
 # different authors to have the same filename.
 
-my @builtin_file_skip_list = (
-    'Perl-ToPerl6-0.031.tar.gz', # 2016-02-10 - too big, causes Archive::Tar to go out of mem
+my %builtin_file_skip_list = (
+    'Perl-ToPerl6-0.031.tar.gz' => 'too big, causes Archive::Tar to go out of mem', # 2016-02-10
 );
 
-my @builtin_file_skip_list_sub = (
-    'CharsetDetector-2.0.2.tar.gz',       # 2016-02-17 - segfaults Compiler::Lexer 0.22
-    'Crypt-GeneratePassword-0.05.tar.gz', # 2016-02-17 - segfaults Compiler::Lexer 0.22
-    'Encode-Detect-CJK-2.0.2.tar.gz',     # 2016-02-17 - segfaults Compiler::Lexer 0.22
-    'Shipment-0.13.tar.gz',               # 2016-02-17 - segfaults Compiler::Lexer 0.22
-    'Shipment-2.00.tar.gz',               # 2016-02-17 - segfaults Compiler::Lexer 0.22
-    'Shipment-2.01.tar.gz',               # 2016-06-23 - segfaults Compiler::Lexer 0.22
-    'Shipment-2.02.tar.gz',               # 2016-06-29 - segfaults Compiler::Lexer 0.22
+my %builtin_file_skip_list_sub = (
+    'CharsetDetector-2.0.2.tar.gz'        => 'segfaults Compiler::Lexer 0.22', # 2016-02-17
+    'Crypt-GeneratePassword-0.05.tar.gz'  => 'segfaults Compiler::Lexer 0.22', # 2016-02-17
+    'Encode-Detect-CJK-2.0.2.tar.gz'      => 'segfaults Compiler::Lexer 0.22', # 2016-02-17
+    'Shipment-0.13.tar.gz'                => 'segfaults Compiler::Lexer 0.22', # 2016-02-17
+    'Shipment-2.00.tar.gz'                => 'segfaults Compiler::Lexer 0.22', # 2016-02-17
+    'Shipment-2.01.tar.gz'                => 'segfaults Compiler::Lexer 0.22', # 2016-06-23
+    'Shipment-2.02.tar.gz'                => 'segfaults Compiler::Lexer 0.22', # 2016-06-29
 );
 
 our %SPEC;
@@ -1477,8 +1477,8 @@ sub _update_index {
             }
             $i++;
 
-            if (first {$_ eq $file->{name}} @builtin_file_skip_list) {
-                $log->infof("Skipped file %s (built-in file skip list)", $file->{name});
+            if (my $reason = $builtin_file_skip_list{ $file->{name} }) {
+                $log->infof("Skipped file %s (built-in file skip list: %s)", $file->{name}, $reason);
                 next FILE;
             }
 
@@ -1782,8 +1782,8 @@ sub _update_index {
             {
                 last if $pass != 3;
 
-                if (first {$_ eq $file->{name}} @builtin_file_skip_list_sub) {
-                    $log->infof("Skipped file %s (built-in file skip list for sub)", $file->{name});
+                if (my $reason = $builtin_file_skip_list_sub{ $file->{name} }) {
+                    $log->infof("Skipped file %s (built-in file skip list for sub: %s)", $file->{name}, $reason);
                     last;
                 }
 
