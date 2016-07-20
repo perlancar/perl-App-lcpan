@@ -1,5 +1,18 @@
 Revision history for App-lcpan
 
+1.001   2016-07-20 (PERLANCAR)
+
+	- Use more specific schemas (e.g. perl::distname, perl::modname,
+	  dirname, filename instead of just str) to get coercion rules
+	  benefits, e.g. now you can say 'lcpan dist-scripts App::MTPUtils'
+	  and it will be normalized to 'lcpan dist-scripts App-MTPUtils'.
+
+	- [dist] Edit Changes, mention reason for bumping version to 1.000.
+
+	- [Internal] Change builtin skip list from array to hash to store
+	  reason, and show the reason in the log.
+
+
 1.000   2016-06-29 (PERLANCAR)
 
 	- No functional changes.
