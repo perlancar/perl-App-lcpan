@@ -44,7 +44,7 @@ our %SPEC;
 
 our %common_args = (
     cpan => {
-        schema => 'str*',
+        schema => 'dirname*',
         summary => 'Location of your local CPAN mirror, e.g. /path/to/cpan',
         description => <<'_',
 
@@ -55,7 +55,7 @@ _
     },
     index_name => {
         summary => 'Filename of index',
-        schema  => 'str*',
+        schema  => 'filename*',
         default => 'index.db',
         tags => ['common'],
         completion => sub {
@@ -144,7 +144,7 @@ our %fauthor_args = (
 our %fdist_args = (
     dist => {
         summary => 'Filter by distribution',
-        schema => 'str*',
+        schema => 'perl::distname*',
         cmdline_aliases => {d=>{}},
         completion => \&_complete_dist,
         tags => ['category:filtering'],
@@ -230,7 +230,7 @@ our %no_path_args = (
 
 our %mod_args = (
     module => {
-        schema => 'str*',
+        schema => 'perl::modname*',
         req => 1,
         pos => 0,
         completion => \&_complete_mod,
@@ -239,7 +239,7 @@ our %mod_args = (
 
 our %mods_args = (
     modules => {
-        schema => ['array*', of=>'str*', min_len=>1],
+        schema => ['array*', of=>'perl::modname*', min_len=>1],
         'x.name.is_plural' => 1,
         req => 1,
         pos => 0,
@@ -251,10 +251,8 @@ our %mods_args = (
 
 our %mod_or_dist_args = (
     module_or_dist => {
-        # XXX coerce rule: from string: convert / to ::
         summary => 'Module or dist name',
-        schema => ['str*',
-                   #match=>qr/\A\w+(?:(?:::|-)\w+)*\z/
+        schema => ['str*', # XXX perl::mod_or_distname
                ],
         req => 1,
         pos => 0,
@@ -306,7 +304,7 @@ our %author_args = (
 
 our %dist_args = (
     dist => {
-        schema => 'str*',
+        schema => 'perl::distname*',
         req => 1,
         pos => 0,
         completion => \&_complete_dist,
@@ -315,7 +313,7 @@ our %dist_args = (
 
 our %dists_args = (
     dists => {
-        schema => ['array*', of=>'str*', min_len=>1],
+        schema => ['array*', of=>'perl::distname*', min_len=>1],
         'x.name.is_plural' => 1,
         req => 1,
         pos => 0,
@@ -327,7 +325,7 @@ our %dists_args = (
 
 our %rel_args = (
     release => {
-        schema => 'str*',
+        schema => 'str*', # XXX perl::relname
         req => 1,
         pos => 0,
         completion => \&_complete_rel,
