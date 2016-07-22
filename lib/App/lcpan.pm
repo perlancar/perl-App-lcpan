@@ -1,4 +1,4 @@
-<package App::lcpan;
+package App::lcpan;
 
 # DATE
 # VERSION
@@ -74,13 +74,17 @@ _
             _set_args_default($args);
 
             require Complete::File;
-            Complete::File::complete_file(
-                word => $word,
-                starting_path => $args->{cpan},
-                filter => sub {
-                    # file or index.db*
-                    (-d $_[0]) || $_[0] =~ /index\.db/;
-                },
+            require Complete::Util;
+            Complete::Util::hashify_answer(
+                Complete::File::complete_file(
+                    word => $word,
+                    starting_path => $args->{cpan},
+                    filter => sub {
+                        # file or index.db*
+                        (-d $_[0]) || $_[0] =~ /index\.db/;
+                    },
+                ),
+                {path_sep=>'/'},
             );
         },
     },
