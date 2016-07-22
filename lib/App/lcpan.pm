@@ -1,4 +1,4 @@
-package App::lcpan;
+<package App::lcpan;
 
 # DATE
 # VERSION
@@ -1476,12 +1476,12 @@ sub _update_index {
             $i++;
 
             if (my $reason = $builtin_file_skip_list{ $file->{name} }) {
-                $log->infof("Skipped file %s (built-in file skip list: %s)", $file->{name}, $reason);
+                $log->infof("Skipped file %s (reason: built-in file skip list: %s)", $file->{name}, $reason);
                 next FILE;
             }
 
             if ($args{skip_index_files} && first {$_ eq $file->{name}} @{ $args{skip_index_files} }) {
-                $log->infof("Skipped file %s (skip_index_files)", $file->{name});
+                $log->infof("Skipped file %s (reason: skip_index_files)", $file->{name});
                 next FILE;
             }
 
@@ -1781,7 +1781,7 @@ sub _update_index {
                 last if $pass != 3;
 
                 if (my $reason = $builtin_file_skip_list_sub{ $file->{name} }) {
-                    $log->infof("Skipped file %s (built-in file skip list for sub: %s)", $file->{name}, $reason);
+                    $log->infof("Skipped file %s (reason: built-in file skip list for sub: %s)", $file->{name}, $reason);
                     last;
                 }
 
@@ -1974,14 +1974,14 @@ sub update {
     my $packages_path = "$cpan/modules/02packages.details.txt.gz";
     my @st1 = stat($packages_path);
     if (!$args{update_files}) {
-        $log->infof("Skipped updating files (option)");
+        $log->infof("Skipped updating files (reason: option update_files=0)");
     } else {
         _update_files(%args); # it only returns 200 or dies
     }
     my @st2 = stat($packages_path);
 
     if (!$args{update_index} && !$args{force_update_index}) {
-        $log->infof("Skipped updating index (option)");
+        $log->infof("Skipped updating index (reason: option update_index=0)");
     } elsif (!$args{force_update_index} && $args{update_files} &&
                  @st1 && @st2 && $st1[9] == $st2[9] && $st1[7] == $st2[7]) {
         $log->infof("%s doesn't change mtime/size, skipping updating index",
