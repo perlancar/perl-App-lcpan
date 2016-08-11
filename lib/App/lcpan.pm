@@ -2871,7 +2871,8 @@ LEFT JOIN dist ON file.id=dist.file_id
     while (my $row = $sth->fetchrow_hashref) {
         $row->{is_core} = $row->{module} eq 'perl' ||
             Module::CoreList::More->is_still_core(
-                $row->{module}, $row->{version}, version->parse($plver)->numify);
+                $row->{module}, undef,
+                version->parse($plver)->numify);
         next if !$include_core    &&  $row->{is_core};
         next if !$include_noncore && !$row->{is_core};
         push @res, $detail ? $row : $row->{module};
@@ -3372,7 +3373,7 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
         }
 
         $row->{is_core} = $row->{module} eq 'perl' ||
-            Module::CoreList::More->is_still_core($row->{module}, $row->{version}, version->parse($plver)->numify);
+            Module::CoreList::More->is_still_core($row->{module}, undef, version->parse($plver)->numify);
         next if !$filters->{include_core}    &&  $row->{is_core};
         next if !$filters->{include_noncore} && !$row->{is_core};
         next unless defined $row->{module}; # BUG? we can encounter case where module is undef

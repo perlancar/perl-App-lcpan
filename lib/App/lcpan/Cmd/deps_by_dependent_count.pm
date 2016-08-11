@@ -123,7 +123,7 @@ ORDER BY COUNT(*) DESC, m.name
     while (my $row = $sth->fetchrow_hashref) {
         $row->{is_core} = $row->{module} eq 'perl' ||
             Module::CoreList::More->is_still_core(
-                $row->{module}, $row->{version},
+                $row->{module}, undef,
                 version->parse($plver)->numify);
         next if !$include_core    &&  $row->{is_core};
         next if !$include_noncore && !$row->{is_core};
