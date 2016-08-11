@@ -1,5 +1,22 @@
 Revision history for App-lcpan
 
+1.002   2016-08-11 (PERLANCAR)
+
+	- When checking if a module is core (using
+	  Module::CoreList::More->is_still_core), use version=0 instead of the
+	  currently indexed version. Using currently indexed version might
+	  result in a false negative for dual-life modules that has a newer
+	  release on CPAN. For example, as of this writing, for List::Util the
+	  currently indexed version is 1.42. If we use perl 5.22.2 as the base,
+	  it only has 1.41. Thus, is_still_core("List::Util", "1.42", 5.022002)
+	  returns false. While we generally want it to return true. So now we
+	  use is_still_core("List::Util", undef, 5.022002).
+
+	- [ux] Tweak completion: enable path-mode in --index-name.
+
+	- [ux] Tweak wording in log when skipping, show the word 'reason:'.
+
+
 1.001   2016-07-20 (PERLANCAR)
 
 	- Use more specific schemas (e.g. perl::distname, perl::modname,
