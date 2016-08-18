@@ -1,5 +1,13 @@
 Revision history for App-lcpan
 
+1.003   2016-08-18 (PERLANCAR)
+
+	- No functional changes.
+
+	- Add to builtin skip list: App-IndonesianBankingUtils-0.07.tar.gz
+	  (segfaults at phase 3/3).
+
+
 1.002   2016-08-11 (PERLANCAR)
 
 	- When checking if a module is core (using
