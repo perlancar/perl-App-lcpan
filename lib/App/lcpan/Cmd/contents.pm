@@ -23,6 +23,7 @@ _
         %App::lcpan::common_args,
         %App::lcpan::fauthor_args,
         %App::lcpan::fdist_args,
+        %App::lcpan::file_id_args,
         "package" => {
             schema => 'str*',
             tags => ['category:filtering'],
@@ -46,6 +47,7 @@ sub handle_cmd {
     my $detail = $args{detail};
     my $author = uc($args{author} // '');
     my $dist = $args{dist};
+    my $file_id = $args{file_id};
     my $package = $args{package};
     my $qt = $args{query_type} // 'any';
 
@@ -91,6 +93,10 @@ sub handle_cmd {
     if ($package) {
         push @where, "content.package=?";
         push @bind, $package;
+    }
+    if ($file_id) {
+        push @where, "file.id=?";
+        push @bind, $file_id;
     }
 
     my $sql = "SELECT

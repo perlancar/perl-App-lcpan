@@ -163,6 +163,15 @@ our %flatest_args = (
     },
 );
 
+our %file_id_args = (
+    dist => {
+        summary => 'Filter by file ID',
+        schema => 'posint*',
+        #completion => \&_complete_file_id,
+        tags => ['category:filtering'],
+    },
+);
+
 our %finclude_core_args = (
     include_core => {
         summary => 'Include core modules',
