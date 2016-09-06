@@ -1,5 +1,10 @@
 Revision history for App-lcpan
 
+1.005   2016-09-06 (PERLANCAR)
+
+	- D'oh, screwed up last commit.
+
+
 1.004   2016-09-06 (PERLANCAR)
 
 	- Add to builtin skip list: Shipment-2.03.tar.gz (segfaults
