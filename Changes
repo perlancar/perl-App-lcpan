@@ -1,5 +1,13 @@
 Revision history for App-lcpan
 
+1.004   2016-09-06 (PERLANCAR)
+
+	- Add to builtin skip list: Shipment-2.03.tar.gz (segfaults
+	  Compiler::Lexer 0.22).
+
+	- Add subcommands: dist-contents, mod-contents.
+
+
 1.003   2016-08-18 (PERLANCAR)
 
 	- No functional changes.
