@@ -65,6 +65,20 @@ used to answer various queries.
 
 You can run the above command e.g. daily to keep your mirror up-to-date.
 
+=head2 Inject additional modules to your local CPAN mirror
+
+Sometimes, you only want to add one or a few modules to the local CPAN mirror.
+For example, you are on a bad/expensive Internet connection and cannot afford a
+full mirror update. Or, you have a module that is not indexed on CPAN but want
+to add to your local mirror. To do that:
+
+ % lcpan inject --pause SOMEPAUSE Foo-0.01.tar.gz Bar-Baz-2.34.tar.gz
+
+where C<SOMEPAUSE> is a PAUSE ID (does not need to already exist) that you
+choose to put the modules under.
+
+This will add the files to the local mirror as well as update the index.
+
 =head2 Using your local CPAN mirror to install modules
 
  % lcpanm -n Some::Module
