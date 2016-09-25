@@ -3313,7 +3313,10 @@ sub _get_prereqs {
             $mod = $mod0->{mod};
             $dist_id = $mod0->{dist_id};
             if (!$dist_id) {
-                $log->warnf("module '$mod' is not indexed (does not have dist ID), skipped");
+                # some special names need not be warned
+                unless ($mod =~ /\A(perl|Config)\z/) {
+                    $log->warnf("module '$mod' is not indexed (does not have dist ID), skipped");
+                }
                 next;
             }
         } else {
