@@ -1,5 +1,13 @@
 Revision history for App-lcpan
 
+1.006   2016-09-25 (PERLANCAR)
+
+	- Add subcommand: inject.
+
+	- [ux] No need to warn that 'perl' and 'Config' does not have dist
+	  ID.
+
+
 1.005   2016-09-06 (PERLANCAR)
 
 	- D'oh, screwed up last commit.

@@ -72,9 +72,9 @@ For example, you are on a bad/expensive Internet connection and cannot afford a
 full mirror update. Or, you have a module that is not indexed on CPAN but want
 to add to your local mirror. To do that:
 
- % lcpan inject --pause SOMEPAUSE Foo-0.01.tar.gz Bar-Baz-2.34.tar.gz
+ % lcpan inject --author SOMEONE Foo-0.01.tar.gz Bar-Baz-2.34.tar.gz
 
-where C<SOMEPAUSE> is a PAUSE ID (does not need to already exist) that you
+where C<SOMEONE> is an author ID (does not need to already exist) that you
 choose to put the modules under.
 
 This will add the files to the local mirror as well as update the index.
