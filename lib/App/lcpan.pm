@@ -3643,7 +3643,7 @@ By default only runtime requires are displayed. To see prereqs for other phases
 or ALL), use the `--phase` and `--rel` options.
 
 Note that dependencies information are taken from `META.json` or `META.yml`
-files. Not all releases (especially older ones) contain them. `lcpan` (like
+files. Not all releases (especially older ones) contain them. <prog:lcpan> (like
 MetaCPAN) does not extract information from `Makefile.PL` or `Build.PL` because
 that requires running (untrusted) code.
 

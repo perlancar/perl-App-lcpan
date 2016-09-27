@@ -16,8 +16,8 @@ $SPEC{handle_cmd} = {
     summary => 'Return last index time of mirror',
     description => <<'_',
 
-This is mostly to support `App::lcpan::Call`. See also `stats` subcommand which
-gives a more complete statistics, but can be much slower.
+This is mostly to support <pm:App::lcpan::Call>. See also `stats` subcommand
+which gives a more complete statistics, but can be much slower.
 
 _
     args => {
