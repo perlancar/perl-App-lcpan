@@ -1,5 +1,11 @@
 Revision history for App-lcpan
 
+1.007   2016-10-07 (PERLANCAR)
+
+        - [Bugfix] Trap POD parsing errors to avoid dying (thanks Norbert
+          Csongradi) [GH#1] [GH#2].
+
+
 1.006   2016-09-25 (PERLANCAR)
 
 	- Add subcommand: inject.
