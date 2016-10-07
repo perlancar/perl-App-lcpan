@@ -1046,7 +1046,12 @@ sub _index_pod {
         $pod_parser->{scripts_re} = $scripts_re;
         $pod_parser->{sth_ins_mention} = $sth_ins_mention;
 
-        $pod_parser->parse_string_document($ct);
+        eval {
+            $pod_parser->parse_string_document($ct);
+        };
+        if ($@) {
+            $log->errorf("Can't parse POD for file '%s', skipped", $content_path);
+        }
     }
 }
 
