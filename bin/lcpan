@@ -15,10 +15,15 @@ use Perinci::CmdLine::Any;
 
 my $prefix = '/App/lcpan/';
 my $mods = do {
-    # if we are called during building by dzil, don't include subcommands
-    # installed outside our dist. otherwise we'll be documenting and depending
-    # on extraneous subcommands.
-    local @INC = ("lib") if $ENV{DZIL};
+    # if we are being called during the building of our own dist by dzil (e.g.
+    # by Pod::Weaver::Plugin::Rinci), don't include subcommands installed
+    # outside our dist. otherwise we'll be documenting and depending on
+    # extraneous subcommands.
+    local @INC = ("lib")
+        if $ENV{DZIL} &&
+            # DZP:SetEnv always sets DZIL=1 so we need to know if it's our own
+            # dist that we're building
+            (!defined($ENV{DZIL_NAME}) || $ENV{DZIL_NAME} eq 'App-lcpan');
 
     PERLANCAR::Module::List::list_modules(
         "App::lcpan::Cmd::", {list_modules=>1});
