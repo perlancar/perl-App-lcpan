@@ -36,6 +36,10 @@ sub handle_cmd {
         my ($time) = $dbh->selectrow_array("SELECT value FROM meta WHERE name='last_index_time'");
         $stat->{raw_last_index_time} = $time;
         $stat->{last_index_time} = App::lcpan::_fmt_time($time);
+
+        # extra information
+        $stat->{cpan}       = $state->{cpan};
+        $stat->{index_name} = $state->{index_name};
     }
 
     [200, "OK", $stat];
