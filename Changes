@@ -1,5 +1,11 @@
 Revision history for App-lcpan
 
+1.009   2016-10-09 (PERLANCAR)
+
+	- stats-last-index-time: Return CPAN mirror information (path and
+	  index name) to be more useful for CLI users.
+
+
 1.008   2016-10-08 (PERLANCAR)
 
 	- Make it work when SetEnv dzil plugin is used.
