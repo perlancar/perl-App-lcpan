@@ -39,3 +39,25 @@ exec @cmd;
 
 # ABSTRACT: cpanm wrapper (set mirror to local CPAN by default)
 # PODNAME:
+
+=head1 SYNOPSIS
+
+Use like you would use L<cpanm>:
+
+ % lcpanm -n Some::Module ...
+ % cpan-outdated --mirror file:$HOME/cpan | lcpanm -n
+
+
+=head1 DESCRIPTION
+
+C<lcpanm> is just a thin wrapper for L<cpanm>. It executes C<cpanm>, passing the
+arguments it receives to C<cpanm>, but also adds C<--mirror $cpan> and
+C<--mirror-only>, where I<$cpan> is path to the local CPAN mirror read from
+F<lcpan.conf>.
+
+
+=head1 SEE ALSO
+
+L<cpanm>
+
+L<App::lcpan> and L<lcpan>
