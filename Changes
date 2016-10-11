@@ -568,6 +568,7 @@ Revision history for App-lcpan
 0.41    2015-06-17 (PERLANCAR)
 
 	- [Bugfix] authorrdeps: Fix completion for --user-author-{is,isnt}.
+          UPDATE: Renamed to author-rdeps in 0.58.
 
 	- [Bugfix] modules: Forgot to give default SQL order.
 
