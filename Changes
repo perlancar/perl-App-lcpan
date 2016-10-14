@@ -1,5 +1,15 @@
 Revision history for App-lcpan
 
+1.010   2016-10-14 (PERLANCAR)
+
+
+        - authors-by-rdep-count: fix SQL which caused duplicated author rows,
+          include author name in the result, only count latest distributions,
+          add options --exclude-same-author.
+
+        - [doc] Add Synopsis and Description for lcpanm.
+
+
 1.009   2016-10-09 (PERLANCAR)
 
 	- stats-last-index-time: Return CPAN mirror information (path and
