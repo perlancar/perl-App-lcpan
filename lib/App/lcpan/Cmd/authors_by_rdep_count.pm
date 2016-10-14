@@ -50,7 +50,7 @@ sub handle_cmd {
     my $sql = "SELECT
   m.cpanid id,
   a.fullname name,
-  COUNT(*) AS rdep_count
+  COUNT(DISTINCT d.id) AS rdep_count
 FROM module m
 JOIN dep dp ON dp.module_id=m.id
 LEFT JOIN author a ON a.cpanid=m.cpanid
