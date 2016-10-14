@@ -20,6 +20,9 @@ $SPEC{'handle_cmd'} = {
         %App::lcpan::common_args,
         clone_list(%App::lcpan::deps_phase_args),
         clone_list(%App::lcpan::deps_rel_args),
+        exclude_same_author => {
+            schema => 'bool',
+        },
     },
 };
 delete $SPEC{'handle_cmd'}{args}{phase}{default};
@@ -40,6 +43,8 @@ sub handle_cmd {
         push @where, "(rel=?)";
         push @binds, $args{rel};
     }
+    push @where, "d.is_latest";
+    push @where, "d.cpanid <> m.cpanid" if $args{exclude_same_author};
     @where = (1) if !@where;
 
     my $sql = "SELECT
@@ -47,6 +52,7 @@ sub handle_cmd {
   COUNT(*) AS rdep_count
 FROM module m
 JOIN dep dp ON dp.module_id=m.id
+LEFT JOIN dist d ON d.id=dp.dist_id
 WHERE ".join(" AND ", @where)."
 GROUP BY m.cpanid
 ORDER BY rdep_count DESC
