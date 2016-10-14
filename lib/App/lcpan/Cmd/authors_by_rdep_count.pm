@@ -49,9 +49,11 @@ sub handle_cmd {
 
     my $sql = "SELECT
   m.cpanid id,
+  a.fullname name,
   COUNT(*) AS rdep_count
 FROM module m
 JOIN dep dp ON dp.module_id=m.id
+LEFT JOIN author a ON a.cpanid=m.cpanid
 LEFT JOIN dist d ON d.id=dp.dist_id
 WHERE ".join(" AND ", @where)."
 GROUP BY m.cpanid
@@ -65,7 +67,7 @@ ORDER BY rdep_count DESC
         push @res, $row;
     }
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/id rdep_count/];
+    $resmeta->{'table.fields'} = [qw/id name rdep_count/];
     [200, "OK", \@res, $resmeta];
 }
 
