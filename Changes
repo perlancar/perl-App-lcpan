@@ -1,5 +1,11 @@
 Revision history for App-lcpan
 
+1.011   2016-10-14 (PERLANCAR)
+
+	- authors-by-rdep-count: fix SQL again, derp (didn't really count
+	  the number of dists).
+
+
 1.010   2016-10-14 (PERLANCAR)
 
 
