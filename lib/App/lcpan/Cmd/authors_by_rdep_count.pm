@@ -48,7 +48,7 @@ sub handle_cmd {
 FROM module m
 JOIN dep dp ON dp.module_id=m.id
 WHERE ".join(" AND ", @where)."
-GROUP BY id
+GROUP BY m.cpanid
 ORDER BY rdep_count DESC
 ";
 
