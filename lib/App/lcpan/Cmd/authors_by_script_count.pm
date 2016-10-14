@@ -25,10 +25,12 @@ sub handle_cmd {
     my $dbh = $state->{dbh};
 
     my $sql = "SELECT
-  file.cpanid author,
+  file.cpanid id,
+  -- author.fullname name, -- too slow
   COUNT(*) AS script_count,
   ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM script), 4) script_count_pct
 FROM script
+-- LEFT JOIN author ON author.cpanid=file.cpanid
 LEFT JOIN file ON script.file_id=file.id
 GROUP BY file.cpanid
 ORDER BY script_count DESC
@@ -41,7 +43,8 @@ ORDER BY script_count DESC
         push @res, $row;
     }
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/author script_count script_count_pct/];
+    #$resmeta->{'table.fields'} = [qw/id name script_count script_count_pct/];
+    $resmeta->{'table.fields'} = [qw/id script_count script_count_pct/];
     [200, "OK", \@res, $resmeta];
 }
 
