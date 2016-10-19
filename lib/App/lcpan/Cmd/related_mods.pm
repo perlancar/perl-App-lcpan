@@ -28,8 +28,14 @@ _
         %App::lcpan::common_args,
         %App::lcpan::mods_args,
         #%App::lcpan::detail_args,
-        min_score => {
-            schema => 'float*',
+        limit => {
+            summary => 'Maximum number of modules to return',
+            schema => ['int*', min=>0],
+            default => 20,
+        },
+        with_scores => {
+            summary => 'Return score-related fields',
+            schema => 'bool*',
         },
         sort => {
             schema => ['array*', of=>['str*', in=>[map {($_,"-$_")} qw/score num_mentions num_mentions_together pct_mentions_together module/]], min_len=>1],
@@ -51,6 +57,8 @@ sub handle_cmd {
     my $modules = $args{modules};
     my $modules_s = join(",", map {$dbh->quote($_)} @$modules);
 
+    my $limit = $args{limit};
+
     # number of mentions of target modules
     my ($num_mentions) = $dbh->selectrow_array(
         "SELECT COUNT(*) FROM mention WHERE module_id IN (SELECT id FROM module m2 WHERE name IN ($modules_s))");
@@ -58,14 +66,6 @@ sub handle_cmd {
     return [400, "No mentions for module(s)"] if $num_mentions < 1;
 
     $log->debugf("num_mentions for %s: %d", $modules, $num_mentions);
-
-    # default min_score is currently tuned manually
-    my $min_score = $args{min_score} // (
-        $num_mentions >= 12 ? 200 :
-        $num_mentions >= 10 ? 100 :
-        $num_mentions >=  4 ?  50 : 25);
-
-    $log->debugf("min_score: %f", $min_score);
 
     my @join = (
         "LEFT JOIN module m2 ON mtn1.module_id=m2.id",
@@ -107,13 +107,17 @@ FROM mention mtn1
 ".join("\n", @join)."
 WHERE ".join(" AND ", @where)."
 GROUP BY m2.name
-HAVING score >= $min_score
-    ".(@order ? "\nORDER BY ".join(", ", @order) : "");
+    ".(@order ? "\nORDER BY ".join(", ", @order) : "")."
+LIMIT $limit
+";
 
     my @res;
     my $sth = $dbh->prepare($sql);
     $sth->execute();
     while (my $row = $sth->fetchrow_hashref) {
+        unless ($args{with_scores}) {
+            delete $row->{$_} for qw(num_mentions num_mentions_together pct_mentions_together score);
+        }
         push @res, $row;
     }
     my $resmeta = {};
