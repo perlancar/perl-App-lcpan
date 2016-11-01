@@ -1,5 +1,12 @@
 Revision history for App-lcpan
 
+1.012   2016-11-01 (PERLANCAR)
+
+        - [ux] related-mods: Instead of specifying min_score, let users just
+          specify number of result they want; hide score-related fields by
+          default in result unless user specifies --with-scores.
+
+
 1.011   2016-10-14 (PERLANCAR)
 
 	- authors-by-rdep-count: fix SQL again, derp (didn't really count
