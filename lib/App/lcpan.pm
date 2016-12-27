@@ -3541,7 +3541,7 @@ ORDER BY dist".($level > 1 ? " DESC" : ""));
 our %deps_phase_args = (
     phase => {
         schema => ['str*' => {
-            in => [qw/develop configure build runtime test ALL/],
+            match => qr/\A(develop|configure|build|runtime|test|ALL|x_\w+)\z/,
         }],
         default => 'runtime',
         cmdline_aliases => {
@@ -3551,6 +3551,7 @@ our %deps_phase_args = (
                 code => sub { $_[0]{phase} = 'ALL'; $_[0]{rel} = 'ALL' },
             },
         },
+        completion => [qw/develop configure build runtime test ALL/],
         tags => ['category:filtering'],
     },
 );
@@ -3561,9 +3562,10 @@ $rdeps_phase_args{phase}{default} = 'ALL';
 our %deps_rel_args = (
     rel => {
         schema => ['str*' => {
-            in => [qw/requires recommends suggests conflicts ALL/],
+            match => qr/\A(requires|recommends|suggests|conflicts|ALL|x_\w+)\z/,
         }],
         default => 'requires',
+        completion => [qw/requires recommends suggests conflicts ALL/],
         tags => ['category:filtering'],
     },
 );
