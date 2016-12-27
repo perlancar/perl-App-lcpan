@@ -1,5 +1,13 @@
 Revision history for App-lcpan
 
+1.013   2016-12-28 (PERLANCAR)
+
+	- [dist] Fix expressing follow-spec prereq relationship with
+	  x_spec.
+
+	- Allow phase and rel with values /^x_/.
+
+
 1.012   2016-11-01 (PERLANCAR)
 
         - [ux] related-mods: Instead of specifying min_score, let users just
