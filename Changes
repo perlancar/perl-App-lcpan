@@ -1,5 +1,14 @@
 Revision history for App-lcpan
 
+1.014   2016-12-28 (PERLANCAR)
+
+	- [Bugfix] Prefer getting META from META.json over META.yml (e.g. to get
+	  x_* prereqs). A full reindex is recommended (`lcpan reset` follows by
+	  `lcpan update`).
+
+	- Add subcommand: delete-rel.
+
+
 1.013   2016-12-28 (PERLANCAR)
 
 	- [dist] Fix expressing follow-spec prereq relationship with
