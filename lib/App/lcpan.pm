@@ -1124,6 +1124,59 @@ sub _update_files {
     [200];
 }
 
+sub _delete_releases_records {
+    my ($dbh, @file_ids) = @_;
+
+    $log->tracef("  Deleting dep records");
+    $dbh->do("DELETE FROM dep WHERE file_id IN (".join(",",@file_ids).")");
+
+    {
+        my $sth = $dbh->prepare("SELECT name FROM module WHERE file_id IN (".join(",",@file_ids).")");
+        $sth->execute;
+        my @mods;
+        while (my ($mod) = $sth->fetchrow_array) {
+            push @mods, $mod;
+        }
+
+        my $sth_upd_ns_dec_num_mod = $dbh->prepare("UPDATE namespace SET num_modules=num_modules-1 WHERE name=?");
+        for my $mod (@mods) {
+            while (1) {
+                $sth_upd_ns_dec_num_mod->execute($mod);
+                $mod =~ s/::\w+\z// or last;
+            }
+        }
+        $dbh->do("DELETE FROM namespace WHERE num_modules <= 0");
+
+        $log->tracef("  Deleting module records");
+        $dbh->do("DELETE FROM module WHERE file_id IN (".join(",",@file_ids).")");
+    }
+
+    my %changed_dists;
+    {
+        my $sth = $dbh->prepare("SELECT name FROM dist WHERE file_id IN (".join(",",@file_ids).")");
+        $sth->execute;
+        while (my @row = $sth->fetchrow_array) {
+            $changed_dists{$row[0]}++;
+        }
+        $log->tracef("  Deleting dist records");
+        $dbh->do("DELETE FROM dist WHERE file_id IN (".join(",",@file_ids).")");
+    }
+
+    $log->tracef("  Deleting mention records");
+    $dbh->do("DELETE FROM mention WHERE source_file_id IN (".join(",",@file_ids).")");
+
+    $log->tracef("  Deleting script records");
+    $dbh->do("DELETE FROM script WHERE file_id IN (".join(",",@file_ids).")");
+
+    $log->tracef("  Deleting sub records");
+    $dbh->do("DELETE FROM sub WHERE file_id IN (".join(",",@file_ids).")");
+
+    $log->tracef("  Deleting content records");
+    $dbh->do("DELETE FROM content WHERE file_id IN (".join(",",@file_ids).")");
+
+    $dbh->do("DELETE FROM file WHERE id IN (".join(",",@file_ids).")");
+}
+
 sub _update_index {
     require DBI;
     require File::Temp;
@@ -1311,54 +1364,8 @@ sub _update_index {
             }
             last CLEANUP unless @old_file_ids;
 
-            $log->tracef("  Deleting old dep records");
-            $dbh->do("DELETE FROM dep WHERE file_id IN (".join(",",@old_file_ids).")");
-
-            {
-                my $sth = $dbh->prepare("SELECT name FROM module WHERE file_id IN (".join(",",@old_file_ids).")");
-                $sth->execute;
-                my @mods;
-                while (my ($mod) = $sth->fetchrow_array) {
-                    push @mods, $mod;
-                }
-
-                my $sth_upd_ns_dec_num_mod = $dbh->prepare("UPDATE namespace SET num_modules=num_modules-1 WHERE name=?");
-                for my $mod (@mods) {
-                    while (1) {
-                        $sth_upd_ns_dec_num_mod->execute($mod);
-                        $mod =~ s/::\w+\z// or last;
-                    }
-                }
-                $dbh->do("DELETE FROM namespace WHERE num_modules <= 0");
-
-                $log->tracef("  Deleting old module records");
-                $dbh->do("DELETE FROM module WHERE file_id IN (".join(",",@old_file_ids).")");
-            }
-
-            {
-                my $sth = $dbh->prepare("SELECT name FROM dist WHERE file_id IN (".join(",",@old_file_ids).")");
-                $sth->execute;
-                while (my @row = $sth->fetchrow_array) {
-                    $changed_dists{$row[0]}++;
-                }
-                $log->tracef("  Deleting old dist records");
-                $dbh->do("DELETE FROM dist WHERE file_id IN (".join(",",@old_file_ids).")");
-            }
-
-            $log->tracef("  Deleting old mention records");
-            $dbh->do("DELETE FROM mention WHERE source_file_id IN (".join(",",@old_file_ids).")");
-
-            $log->tracef("  Deleting old script records");
-            $dbh->do("DELETE FROM script WHERE file_id IN (".join(",",@old_file_ids).")");
-
-            $log->tracef("  Deleting old sub records");
-            $dbh->do("DELETE FROM sub WHERE file_id IN (".join(",",@old_file_ids).")");
-
-            $log->tracef("  Deleting old content records");
-            $dbh->do("DELETE FROM content WHERE file_id IN (".join(",",@old_file_ids).")");
-
-            $log->tracef("  Deleting old file records (%d): %s", ~~@old_file_entries, \@old_file_entries);
-            $dbh->do("DELETE FROM file WHERE id IN (".join(",",@old_file_ids).")");
+            _delete_releases_records($dbh, @old_file_ids);
+            $log->tracef("  Deleted file records (%d): %s", ~~@old_file_entries, \@old_file_entries);
         }
 
         $dbh->commit;
