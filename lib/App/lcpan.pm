@@ -1177,6 +1177,26 @@ sub _delete_releases_records {
     $dbh->do("DELETE FROM file WHERE id IN (".join(",",@file_ids).")");
 }
 
+my $re_metajson = qr!^[/\\]?(?:[^/\\]+[/\\])?META\.json$!;
+my $re_metayml  = qr!^[/\\]?(?:[^/\\]+[/\\])?META\.yml$!;
+
+sub _sort_prefer_metajson_over_metayml {
+    my @members = @_;
+
+    # make sure we prefer META.json (SPEC 2.0) over .yml (SPEC 1.4)
+    sort {
+        my $a_filename = $a->{full_path} // $a->fileName;
+        my $b_filename = $b->{full_path} // $b->fileName;
+        my $a_is_metajson = $a_filename =~ $re_metajson;
+        my $b_is_metajson = $b_filename =~ $re_metajson;
+        my $a_is_metayml  = $a_filename =~ $re_metayml;
+        my $b_is_metayml  = $b_filename =~ $re_metayml;
+
+        ($a_is_metajson && $b_is_metayml) ? -1 :
+            ($a_filename cmp $b_filename);
+    } @members;
+}
+
 sub _update_index {
     require DBI;
     require File::Temp;
@@ -1653,10 +1673,13 @@ sub _update_index {
                 my $meta;
                 my ($has_metajson, $has_metayml, $has_makefilepl, $has_buildpl);
                 if ($zip) {
-                    $has_metajson   = (first {m!^[/\\]?(?:[^/\\]+[/\\])?META\.json$!} @members) ? 1:0;
-                    $has_metayml    = (first {m!^[/\\]?(?:[^/\\]+[/\\])?META\.yml$!} @members) ? 1:0;
+                    $has_metajson   = (first { $_ =~ $re_metajson } @members) ? 1:0;
+                    $has_metayml    = (first { $_ =~ $re_metayml  } @members) ? 1:0;
                     $has_makefilepl = (first {m!^[/\\]?(?:[^/\\]+[/\\])?Makefile\.PL$!} @members) ? 1:0;
                     $has_buildpl    = (first {m!^[/\\]?(?:[^/\\]+[/\\])?Build\.PL$!} @members) ? 1:0;
+
+                    @members = _sort_prefer_metajson_over_metayml(@members);
+
                     for my $member (@members) {
                         if ($member->fileName =~ m!(?:/|\\)(META\.yml|META\.json)$!) {
                             $log->tracef("  found META: %s", $member->fileName);
@@ -1682,10 +1705,13 @@ sub _update_index {
                         }
                     }
                 } else {
-                    $has_metajson   = (first {$_->{full_path} =~ m!/([^/]+)?META\.json$!} @members) ? 1:0;
-                    $has_metayml    = (first {$_->{full_path} =~ m!/([^/]+)?META\.yml$!} @members) ? 1:0;
+                    $has_metajson   = (first { $_->{full_path} =~ $re_metajson } @members) ? 1:0;
+                    $has_metayml    = (first { $_->{full_path} =~ $re_metayml  } @members) ? 1:0;
                     $has_makefilepl = (first {$_->{full_path} =~ m!/([^/]+)?Makefile\.PL$!} @members) ? 1:0;
                     $has_buildpl    = (first {$_->{full_path} =~ m!/([^/]+)?Build\.PL$!} @members) ? 1:0;
+
+                    @members = _sort_prefer_metajson_over_metayml(@members);
+
                     for my $member (@members) {
                         if ($member->{full_path} =~ m!/(META\.yml|META\.json)$!) {
                             $log->tracef("  found META %s", $member->{full_path});
