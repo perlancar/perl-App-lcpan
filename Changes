@@ -1,5 +1,3 @@
-Revision history for App-lcpan
-
 1.014   2016-12-28 (PERLANCAR)
 
 	- [Bugfix] Prefer getting META from META.json over META.yml (e.g. to get
