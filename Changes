@@ -1,3 +1,8 @@
+1.015   2017-01-19 (PERLANCAR)
+
+	- Add subcommand: dist-meta.
+
+
 1.014   2016-12-28 (PERLANCAR)
 
 	- [Bugfix] Prefer getting META from META.json over META.yml (e.g. to get
