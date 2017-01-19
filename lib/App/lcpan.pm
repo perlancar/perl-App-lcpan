@@ -1197,6 +1197,85 @@ sub _sort_prefer_metajson_over_metayml {
     } @members;
 }
 
+sub _list_archive_members {
+    my ($path, $filename, $fileid) = @_;
+
+    my ($zip, $tar);
+    my @members;
+    if ($path =~ /\.zip$/i) {
+        require Archive::Zip;
+        $zip = Archive::Zip->new;
+        $zip->read($path) == Archive::Zip::AZ_OK()
+            or do {
+                $log->errorf("Can't read zip file '%s', skipped", $filename);
+                return [500, "can't read zip '$filename', skipped", undef, {'func.file_id'=>$fileid}];
+            };
+        #$log->tracef("  listing zip members ...");
+        @members = $zip->members;
+        #$log->tracef("  members: %s", \@members);
+    } else {
+        require Archive::Tar;
+        eval {
+            $tar = Archive::Tar->new;
+            $tar->read($path); # can still die untrapped when out of mem
+            #$log->tracef("  listing tar members ...");
+            @members = $tar->list_files(["full_path","mode","mtime","size"]);
+            #$log->tracef("  members: %s", \@members);
+        };
+        if ($@) {
+            $log->errorf("Can't read tar file '%s', skipped", $filename);
+            return [500, "$@", undef, {'func.file_id'=>$fileid}];
+        }
+    }
+    [200, "OK", \@members, {'func.zip' => $zip, 'func.tar' => $tar}];
+}
+
+sub _get_meta {
+    my ($la_res) = @_;
+    my @members = _sort_prefer_metajson_over_metayml(@{$la_res->[2]});
+
+    my $zip = $la_res->[3]{'func.zip'};
+    my $tar = $la_res->[3]{'func.tar'};
+    my $meta;
+
+    if ($zip) {
+        for my $member (@members) {
+            if ($member->fileName =~ m!(?:/|\\)(META\.yml|META\.json)$!) {
+                $log->tracef("  found META: %s", $member->fileName);
+                my $type = $1;
+                #$log->tracef("content=[[%s]]", $content);
+                my $content = $zip->contents($member);
+                if ($type eq 'META.yml') {
+                    (my $metaerr, $meta) = _parse_meta_yml($content);
+                    return [500, $metaerr] if $metaerr;
+                } elsif ($type eq 'META.json') {
+                    (my $metaerr, $meta) = _parse_meta_json($content);
+                    return [500, $metaerr] if $metaerr;
+                }
+                last;
+            }
+        }
+    } else {
+        for my $member (@members) {
+            if ($member->{full_path} =~ m!/(META\.yml|META\.json)$!) {
+                $log->tracef("  found META %s", $member->{full_path});
+                my $type = $1;
+                my ($obj) = $tar->get_files($member->{full_path});
+                my $content = $obj->get_content;
+                if ($type eq 'META.yml') {
+                    (my $metaerr, $meta) = _parse_meta_yml($content);
+                    return [500, $metaerr] if $metaerr;
+                } elsif ($type eq 'META.json') {
+                    (my $metaerr, $meta) = _parse_meta_json($content);
+                    return [500, $metaerr] if $metaerr;
+                }
+                last;
+            }
+        }
+    }
+    [200, "OK", $meta];
+}
+
 sub _update_index {
     require DBI;
     require File::Temp;
@@ -1554,37 +1633,15 @@ sub _update_index {
 
             next FILE if $file->{file_status} && $file->{file_status} =~ /\A(unsupported)\z/;
 
-            my ($zip, $tar);
-            my @members;
-            if ($path =~ /\.zip$/i) {
-                require Archive::Zip;
-                $zip = Archive::Zip->new;
-                $zip->read($path) == Archive::Zip::AZ_OK()
-                    or do {
-                        $log->errorf("Can't read zip file '%s', skipped", $file->{name});
-                        $sth_set_file_status->execute("err", "can't read zip", $file->{id});
-                        $sth_set_meta_status->execute("err", "file err", $file->{id});
-                        next FILE;
-                    };
-                #$log->tracef("  listing zip members ...");
-                @members = $zip->members;
-                #$log->tracef("  members: %s", \@members);
-            } else {
-                require Archive::Tar;
-                eval {
-                    $tar = Archive::Tar->new;
-                    $tar->read($path); # can still die untrapped when out of mem
-                    #$log->tracef("  listing tar members ...");
-                    @members = $tar->list_files(["full_path","mode","mtime","size"]);
-                    #$log->tracef("  members: %s", \@members);
-                };
-                if ($@) {
-                    $log->errorf("Can't read tar file '%s', skipped", $file->{name});
-                    $sth_set_file_status->execute("err", $@, $file->{id});
-                    $sth_set_meta_status->execute("err", "file err", $file->{id});
-                    next FILE;
-                }
+            my $la_res = _list_archive_members($path, $file->{name}, $file->{id});
+            unless ($la_res->[0] == 200) {
+                $sth_set_file_status->execute("err", $la_res->[1], $la_res->[3]{'func.file_id'});
+                $sth_set_meta_status->execute("err", "file err", $la_res->[3]{'func.file_id'});
+                next FILE;
             }
+            my @members = @{ $la_res->[2] };
+            my $zip = $la_res->[3]{'func.zip'};
+            my $tar = $la_res->[3]{'func.tar'};
 
             my $code_is_script = sub {
                 my $name = shift;
@@ -1667,80 +1724,36 @@ sub _update_index {
 
             next FILE if $file->{file_status} ne 'ok';
 
+            my $meta;
           GET_META:
             {
                 last if $file->{meta_status};
-                my $meta;
                 my ($has_metajson, $has_metayml, $has_makefilepl, $has_buildpl);
                 if ($zip) {
                     $has_metajson   = (first { $_ =~ $re_metajson } @members) ? 1:0;
                     $has_metayml    = (first { $_ =~ $re_metayml  } @members) ? 1:0;
                     $has_makefilepl = (first {m!^[/\\]?(?:[^/\\]+[/\\])?Makefile\.PL$!} @members) ? 1:0;
                     $has_buildpl    = (first {m!^[/\\]?(?:[^/\\]+[/\\])?Build\.PL$!} @members) ? 1:0;
-
-                    @members = _sort_prefer_metajson_over_metayml(@members);
-
-                    for my $member (@members) {
-                        if ($member->fileName =~ m!(?:/|\\)(META\.yml|META\.json)$!) {
-                            $log->tracef("  found META: %s", $member->fileName);
-                            my $type = $1;
-                            #$log->tracef("content=[[%s]]", $content);
-                            my $content = $zip->contents($member);
-                            if ($type eq 'META.yml') {
-                                (my $metaerr, $meta) = _parse_meta_yml($content);
-                                if ($metaerr) {
-                                    $log->warnf("  error in meta: %s", $metaerr);
-                                    $sth_set_meta_status->execute("err", $metaerr, $file->{id});
-                                    last GET_META;
-                                }
-                            } elsif ($type eq 'META.json') {
-                                (my $metaerr, $meta) = _parse_meta_json($content);
-                                if ($metaerr) {
-                                    $log->warnf("  error in meta: %s", $metaerr);
-                                    $sth_set_meta_status->execute("err", $metaerr, $file->{id});
-                                    last GET_META;
-                                }
-                            }
-                            last;
-                        }
-                    }
                 } else {
                     $has_metajson   = (first { $_->{full_path} =~ $re_metajson } @members) ? 1:0;
                     $has_metayml    = (first { $_->{full_path} =~ $re_metayml  } @members) ? 1:0;
                     $has_makefilepl = (first {$_->{full_path} =~ m!/([^/]+)?Makefile\.PL$!} @members) ? 1:0;
                     $has_buildpl    = (first {$_->{full_path} =~ m!/([^/]+)?Build\.PL$!} @members) ? 1:0;
-
-                    @members = _sort_prefer_metajson_over_metayml(@members);
-
-                    for my $member (@members) {
-                        if ($member->{full_path} =~ m!/(META\.yml|META\.json)$!) {
-                            $log->tracef("  found META %s", $member->{full_path});
-                            my $type = $1;
-                            my ($obj) = $tar->get_files($member->{full_path});
-                            my $content = $obj->get_content;
-                            if ($type eq 'META.yml') {
-                                (my $metaerr, $meta) = _parse_meta_yml($content);
-                                if ($metaerr) {
-                                    $log->warnf("  error in meta: %s", $metaerr);
-                                    $sth_set_meta_status->execute("err", $metaerr, $file->{id});
-                                    last GET_META;
-                                }
-                            } elsif ($type eq 'META.json') {
-                                (my $metaerr, $meta) = _parse_meta_json($content);
-                                if ($metaerr) {
-                                    $log->warnf("  error in meta: %s", $metaerr);
-                                    $sth_set_meta_status->execute("err", $metaerr, $file->{id});
-                                    last GET_META;
-                                }
-                            }
-                            last;
-                        }
-                    }
                 }
 
+                my $gm_res = _get_meta($la_res);
+                if ($gm_res->[0] == 200) {
+                    $meta = $gm_res->[2];
+                } else {
+                    $log->warnf("  error in meta: %s", $gm_res->[1]);
+                }
                 $sth_set_meta_status->execute($meta ? "ok" : "nometa", undef, $file->{id});
                 $sth_set_meta_info->execute($has_metajson, $has_metayml, $has_makefilepl, $has_buildpl, $file->{id});
-                last GET_META unless $meta;
+            }
+
+          GET_DEPS:
+            {
+                last unless $meta;
 
                 # insert dist & dependency information from meta
 
@@ -1778,8 +1791,7 @@ sub _update_index {
                         }
                     }
                 }
-
-            } # GET_META
+            } # GET_DEPS
 
           PARSE_POD:
             {
