@@ -275,7 +275,7 @@ our %mod_or_dist_args = (
     },
 );
 
-our %mod_or_dists_args = (
+our %mods_or_dists_args = (
     modules_or_dists => {
         'x.name.is_plural' => 1,
         'x.name.singular' => 'module_or_dist',
