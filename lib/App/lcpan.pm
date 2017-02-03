@@ -275,6 +275,19 @@ our %mod_or_dist_args = (
     },
 );
 
+our %mod_or_dists_args = (
+    modules_or_dists => {
+        'x.name.is_plural' => 1,
+        'x.name.singular' => 'module_or_dist',
+        summary => 'Module or dist names',
+        schema => ['array*', of => ['str*']], # XXX perl::mod_or_distname
+        req => 1,
+        pos => 0,
+        greedy => 1,
+        element_completion => \&App::lcpan::_complete_mod_or_dist,
+    },
+);
+
 our %script_args = (
     script => {
         schema => 'str*',
