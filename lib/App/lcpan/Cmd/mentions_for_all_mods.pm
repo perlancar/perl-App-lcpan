@@ -6,7 +6,7 @@ package App::lcpan::Cmd::mentions_for_all_mods;
 use 5.010;
 use strict;
 use warnings;
-use Log::Any::IfLOG '$log';
+use Log::ger;
 
 require App::lcpan;
 require App::lcpan::Cmd::mentions_for_mod;

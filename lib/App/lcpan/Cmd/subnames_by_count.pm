@@ -6,7 +6,6 @@ package App::lcpan::Cmd::subnames_by_count;
 use 5.010;
 use strict;
 use warnings;
-use Log::Any::IfLOG '$log';
 
 require App::lcpan;
 

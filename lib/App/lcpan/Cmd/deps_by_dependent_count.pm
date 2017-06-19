@@ -6,7 +6,7 @@ package App::lcpan::Cmd::deps_by_dependent_count;
 use 5.010;
 use strict;
 use warnings;
-use Log::Any::IfLOG '$log';
+use Log::ger;
 
 require App::lcpan;
 

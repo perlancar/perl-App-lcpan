@@ -6,7 +6,7 @@ package App::lcpan::Cmd::mentions;
 use 5.010;
 use strict;
 use warnings;
-use Log::Any::IfLOG '$log';
+use Log::ger;
 
 require App::lcpan;
 

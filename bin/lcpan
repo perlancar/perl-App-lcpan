@@ -3,12 +3,10 @@
 # DATE
 # VERSION
 
-BEGIN { $ENV{VERBOSE} //= 1 }
-
 use 5.010;
 use strict;
 use warnings;
-require Log::Any unless $ENV{COMP_LINE};
+use Log::ger; BEGIN { $Log::ger::Current_Level = 4 }
 
 use PERLANCAR::Module::List;
 use Perinci::CmdLine::Any;
@@ -44,8 +42,7 @@ for my $mod (keys %$mods) {
 
 my $cli = Perinci::CmdLine::Any->new(
     url => $prefix,
-    log => 1, # XXX doesn't work? we still need to add 'require Log::Any' line above
-    #log_level => 'info',
+    log => 1,
     subcommands => $subcommands,
 );
 $cli->common_opts->{naked_res}{default} = 1;
@@ -303,9 +300,9 @@ In C<$cpan/index.db>.
 
 =head2 How do I see the SQL statements/queries being issued while running lcpan?
 
-You can try using L<Log::Any::DBI::Query>, e.g.:
+You can try using L<Log::ger::DBI::Query>, e.g.:
 
- % PERL5OPT=-MLog::Any::DBI::Query TRACE=1 lcpan ...
+ % PERL5OPT=-MLog::ger::DBI::Query TRACE=1 lcpan ...
 
 =head2 How do I reindex from scratch (without downloading the mirror)?
 
