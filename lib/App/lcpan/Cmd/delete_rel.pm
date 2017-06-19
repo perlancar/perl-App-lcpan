@@ -6,7 +6,7 @@ package App::lcpan::Cmd::delete_rel;
 use 5.010001;
 use strict;
 use warnings;
-use Log::Any::IfLOG '$log';
+use Log::ger;
 
 require App::lcpan;
 
@@ -51,7 +51,7 @@ sub handle_cmd {
     if ($args{delete_file}) {
         my $path = App::lcpan::_fullpath(
             $args{release}, $state->{cpan}, $row->{cpanid});
-        $log->infof("Deleting file %s ...", $path);
+        log_info("Deleting file %s ...", $path);
         unlink $path;
     }
 

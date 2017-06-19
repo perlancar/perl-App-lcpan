@@ -6,7 +6,7 @@ package App::lcpan::Cmd::related_mods;
 use 5.010;
 use strict;
 use warnings;
-use Log::Any::IfLOG '$log';
+use Log::ger;
 
 require App::lcpan;
 
@@ -65,7 +65,7 @@ sub handle_cmd {
 
     return [400, "No mentions for module(s)"] if $num_mentions < 1;
 
-    $log->debugf("num_mentions for %s: %d", $modules, $num_mentions);
+    log_debug("num_mentions for %s: %d", $modules, $num_mentions);
 
     my @join = (
         "LEFT JOIN module m2 ON mtn1.module_id=m2.id",
