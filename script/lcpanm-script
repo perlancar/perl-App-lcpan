@@ -54,12 +54,17 @@ WHERE script.name IN ($scripts_s)
     }
 }
 
-my @cmd = ("cpanm");
-push @cmd, "--mirror", $args{cpan}, "--mirror-only" if $args{cpan}; # should be defined
-push @cmd, map { exists $modnames{$_} ? $modnames{$_} : $_ } @ARGV;
+{
+    local $ENV{PERL5OPT} = $ENV{LCPANM_PERL5OPT}
+        if defined $ENV{LCPANM_PERL5OPT};
 
-print "lcpanm: exec: ".join(" ", @cmd), "\n" if $ENV{DEBUG};
-exec @cmd;
+    my @cmd = ("cpanm");
+    push @cmd, "--mirror", $args{cpan}, "--mirror-only" if $args{cpan}; # should be defined
+    push @cmd, map { exists $modnames{$_} ? $modnames{$_} : $_ } @ARGV;
+
+    print "lcpanm: exec: ".join(" ", @cmd), "\n" if $ENV{DEBUG};
+    exec @cmd;
+}
 
 # ABSTRACT: cpanm wrapper (set mirror to local CPAN by default, convert script names to module names)
 # PODNAME:
@@ -76,6 +81,13 @@ Use like you would use L<cpanm-script>:
 C<lcpanm-script> is just like L<cpanm-script>, but also adds C<--mirror $cpan>
 and C<--mirror-only>, where I<$cpan> is path to the local CPAN mirror read from
 F<lcpan.conf>.
+
+
+=head1 ENVIRONMENT
+
+=head2 LCPANM_PERL5OPT
+
+If set, will set C<PERL5OPT> to this value when executing L<cpanm>.
 
 
 =head1 SEE ALSO
