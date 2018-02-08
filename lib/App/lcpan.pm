@@ -39,6 +39,7 @@ my %builtin_file_skip_list_sub = (
     'Shipment-2.01.tar.gz'                => 'segfaults Compiler::Lexer 0.22', # 2016-06-23
     'Shipment-2.02.tar.gz'                => 'segfaults Compiler::Lexer 0.22', # 2016-06-29
     'Shipment-2.03.tar.gz'                => 'segfaults Compiler::Lexer 0.22', # 2016-09-06
+    'Shipment-3.01.tar.gz'                => 'segfaults Compiler::Lexer 0.22', # 2018-02-08
     'App-IndonesianBankingUtils-0.07.tar.gz' => 'segfaults at phase 3/3',      # 2016-08-18
 );
 
