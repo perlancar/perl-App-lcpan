@@ -6,7 +6,7 @@
 use 5.010;
 use strict;
 use warnings;
-use Log::ger; BEGIN { $Log::ger::Current_Level = 4 }
+use Log::ger; BEGIN { $ENV{LOG_LEVEL} //= 'info' }
 
 use PERLANCAR::Module::List;
 use Perinci::CmdLine::Any;
