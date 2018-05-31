@@ -83,7 +83,7 @@ _
                     word => $word,
                     starting_path => $args->{cpan},
                     filter => sub {
-                        # file or index.db*
+                        # dir (to dig down deeper) or index.db*
                         (-d $_[0]) || $_[0] =~ /index\.db/;
                     },
                 ),
