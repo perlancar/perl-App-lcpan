@@ -1,3 +1,8 @@
+1.024   2018-09-07 (PERLANCAR)
+
+	- [internal] Add variable '%authors_args'.
+
+
 1.023   2018-06-21 (PERLANCAR)
 
 	- Locate index solely using index_name if index_name contains path
