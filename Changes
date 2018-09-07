@@ -1,3 +1,8 @@
+1.025   2018-09-07 (PERLANCAR)
+
+	- [internal][bugfix] Fix variable name in %authors_args.
+
+
 1.024   2018-09-07 (PERLANCAR)
 
 	- [internal] Add variable '%authors_args'.
