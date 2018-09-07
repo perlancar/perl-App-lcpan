@@ -61,6 +61,14 @@ _
         schema  => 'filename*',
         default => 'index.db',
         tags => ['common'],
+        description => <<'_',
+
+If `index_name` is a filename without any path, e.g. `index.db` then index will
+be located in the top-level of `cpan`. If `index_name` contains a path, e.g.
+`./index.db` or `/home/ujang/lcpan.db` then the index will be located solely
+using the `index_name`.
+
+_
         completion => sub {
             my %args = @_;
             my $word    = $args{word} // '';
@@ -885,7 +893,7 @@ sub _create_schema {
 
 sub _db_path {
     my ($cpan, $index_name) = @_;
-    "$cpan/$index_name";
+    $index_name =~ m!/|\\! ? $index_name : "$cpan/$index_name";
 }
 
 sub _connect_db {
