@@ -340,7 +340,7 @@ our %author_args = (
 );
 
 our %authors_args = (
-    author => {
+    authors => {
         schema => ['array*', of=>'str*', min_len=>1],
         'x.name.is_plural' => 1,
         req => 1,
