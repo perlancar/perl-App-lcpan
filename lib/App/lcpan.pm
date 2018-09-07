@@ -331,6 +331,18 @@ our %author_args = (
     },
 );
 
+our %authors_args = (
+    author => {
+        schema => ['array*', of=>'str*', min_len=>1],
+        'x.name.is_plural' => 1,
+        req => 1,
+        pos => 0,
+        greedy => 1,
+        cmdline_src => 'stdin_or_args',
+        element_completion => \&_complete_cpanid,
+    },
+);
+
 our %dist_args = (
     dist => {
         schema => 'perl::distname*',
