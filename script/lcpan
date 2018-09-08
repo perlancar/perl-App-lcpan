@@ -53,26 +53,33 @@ $cli->run;
 
 =head1 SYNOPSIS
 
-=head2 Update (download and index) your local CPAN mirror
+=head2 Creating/updating your local CPAN mirror
 
- % lcpan update
+The first step to use C<lcpan> is to create/update your local CPAN mirror:
 
-A mini CPAN mirror will be downloaded in your C<~/cpan> directory. This will
-take a while (it downloads ~3.5GB of files, as of 2016-01-21; subsequent updates
-will of course take shorter time.)
+ % lcpan update --trace
 
-A SQLite database is also created/updated in C<~/cpan/index.db> which contains
-information about authors, modules/packages, distributions. This database is
-used to answer various queries.
+A mini CPAN mirror will be downloaded/updated in your C<~/cpan> directory. This
+will take a while, e.g. a couple of hours to download files depending on your
+Internet connection speed (as of 2018-09-08 the size of a mini CPAN mirror is
+~10GB). Subsequent updates will of course take significantly shorter time.
 
-You can run the above command e.g. daily to keep your mirror up-to-date.
+After download, a SQLite database will also be created/updated in
+C<~/cpan/index.db> which contains information about authors, modules/packages,
+distributions. This database is used to answer various queries. Creating the
+database will again take a couple of hours the first time, but subsequent
+updates will be much faster.
 
-=head2 Inject additional modules to your local CPAN mirror
+You can run the above command e.g. daily to keep your mirror up-to-date. Omit
+the C<--trace> option to see less debugging messages.
+
+=head2 Injecting additional modules to your local CPAN mirror
 
 Sometimes, you only want to add one or a few modules to the local CPAN mirror.
 For example, you are on a bad/expensive Internet connection and cannot afford a
 full mirror update. Or, you have a module that is not indexed on CPAN but want
-to add to your local mirror. To do that:
+to add to your local mirror (creating a so-called DarkPAN based on an existing
+mini CPAN mirror). To do that:
 
  % lcpan inject --author SOMEONE Foo-0.01.tar.gz Bar-Baz-2.34.tar.gz
 
@@ -296,7 +303,18 @@ the C<--cpan> option everytime:
 
 =head2 Where is the SQLite database (the index) located?
 
-In C<$cpan/index.db>.
+By default at C<$cpan/index.db>. You can customize the name of the database
+using the C<--index-name> command-line option or the Cindex_name> configuration,
+e.g.:
+
+ --index-name lcpan.db
+
+which will create the database at C<$cpan/lcpan.db>. If you want to put the
+database file somewhere else (e.g. outside the CPAN repository structure),
+prepend a path (something that contains "/") to the index name, e.g. in
+configuration:
+
+ index_name = /home/ujang/lcpan.db
 
 =head2 How do I see the SQL statements/queries being issued while running lcpan?
 
@@ -311,10 +329,10 @@ Run C<lcpan reset> (or delete C<index.db>) and run C<lcpan update
 
 =head2 Indexing error: Out of memory!
 
-Could happen when there is a corrupt archive or an archive that is too big. To
-see which file is the culprit, try running C<lcpan update --noupdate-files> with
-C<--verbose> (or even C<--debug> or C<--trace>). Then, you can skip the file by
-using C<-F> or adding this entry to your C<lcpan.conf>:
+This could happen when there is a corrupt archive or an archive that is too big.
+To see which file is the culprit, try running C<lcpan update --noupdate-files>
+with C<--verbose> (or even C<--debug> or C<--trace>). Then, you can skip the
+file by using C<-F> or adding this entry to your C<lcpan.conf>:
 
  [update]
  skip_index_files=The-Culprit-1.23.tar.gz
@@ -327,11 +345,19 @@ Run C<lcpan update --noupdate-index>.
 
 =head2 How do I see how recent the mirror or the index is?
 
-Use C<lcpan stats>.
+Use C<lcpan stats> or C<lcpan stats-last-index-time>.
+
+=head2 Can I use lcpan with a DarkPAN?
+
+Yes. You can use C<lcpan> to index any CPAN-like repository. This include a mini
+CPAN mirror, a mini CPAN mirror with a few injected private modules, or a
+repository created by L<OrePAN> (or similar tools).
 
 
 =head1 SEE ALSO
 
-L<setop>
+L<CPAN::Mini>
 
 L<cpan-outdated>
+
+L<lcpanm>
