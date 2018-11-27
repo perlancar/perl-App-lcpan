@@ -1141,7 +1141,12 @@ sub _update_files {
     }
     push @filter_args, "-verbose", 1 if log_is_info();
 
-    my @cmd = ("minicpan", "-l", $cpan, "-r", $remote_url);
+    my @cmd = (
+        "minicpan",
+        (log_is_warn() ? () : ("-q")),
+        "-l", $cpan,
+        "-r", $remote_url,
+    );
     my $env = {};
     $env->{PERL5OPT} = "-MLWP::UserAgent::Patch::FilterLcpan=".join(",", @filter_args)
         if @filter_args;
