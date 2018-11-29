@@ -1650,6 +1650,11 @@ sub _update_index {
                 next FILE;
             }
 
+            if ($args{skip_index_file_patterns} && first {$file->{name} =~ $_} @{ $args{skip_index_file_patterns} }) {
+                log_info("Skipped file %s (reason: skip_index_file_patterns)", $file->{name});
+                next FILE;
+            }
+
             my $path = _fullpath($file->{name}, $cpan, $file->{cpanid});
 
             log_info("[pass %d/3][#%i/%d] Processing file %s ...",
@@ -2047,6 +2052,16 @@ _
                     },
                 },
             },
+            examples => ['Foo-Bar-1.23.tar.gz'],
+        },
+        skip_index_file_patterns => {
+            summary => 'Skip one or more file patterns from being indexed',
+            'x.name.is_plural' => 1,
+            'summary.alt.plurality.singular' => 'Skip a file pattern from being indexed',
+            schema => ['array*', of=>'re*'],
+            cmdline_aliases => {
+            },
+            examples => ['^Foo-Bar-\d'],
         },
         skip_file_indexing_pass_1 => {
             schema => ['bool', is=>1],
