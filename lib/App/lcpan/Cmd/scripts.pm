@@ -38,6 +38,18 @@ _
         query_type => {
             schema => ['str*', in=>[qw/any name exact-name abstract/]],
             default => 'any',
+            cmdline_aliases => {
+                x => {
+                    summary => 'Shortcut --query-type exact-name',
+                    is_flag => 1,
+                    code => sub { $_[0]{query_type} = 'exact-name' },
+                },
+                n => {
+                    summary => 'Shortcut --query-type name',
+                    is_flag => 1,
+                    code => sub { $_[0]{query_type} = 'name' },
+                },
+            },
         },
         #%App::lcpan::dist_args,
         # all=>1
