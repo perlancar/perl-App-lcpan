@@ -3033,12 +3033,12 @@ $SPEC{dists} = {
             default => 'any',
             cmdline_aliases => {
                 x => {
-                    summary => 'Shortcut --query-type exact-name',
+                    summary => 'Shortcut for --query-type exact-name',
                     is_flag => 1,
                     code => sub { $_[0]{query_type} = 'exact-name' },
                 },
                 n => {
-                    summary => 'Shortcut --query-type name',
+                    summary => 'Shortcut for --query-type name',
                     is_flag => 1,
                     code => sub { $_[0]{query_type} = 'name' },
                 },
@@ -3267,12 +3267,12 @@ $SPEC{'releases'} = {
             default => 'any',
             cmdline_aliases => {
                 x => {
-                    summary => 'Shortcut --query-type exact-name',
+                    summary => 'Shortcut for --query-type exact-name',
                     is_flag => 1,
                     code => sub { $_[0]{query_type} = 'exact-name' },
                 },
                 n => {
-                    summary => 'Shortcut --query-type name',
+                    summary => 'Shortcut for --query-type name',
                     is_flag => 1,
                     code => sub { $_[0]{query_type} = 'name' },
                 },
