@@ -896,12 +896,40 @@ sub _db_path {
     $index_name =~ m!/|\\! ? $index_name : "$cpan/$index_name";
 }
 
+sub _use_db_bootstrap {
+    require File::ShareDir;
+    require File::Which;
+    require IPC::System::Options;
+
+    my $db_path = shift;
+    return if -f $db_path;
+
+    my $dist_dir;
+    eval { $dist_dir = File::ShareDir::dist_dir("App-lcpan-Bootstrap") };
+    if ($@) {
+        log_warn "Could not find bootstrap database, consider installing ".
+            "App::lcpan::Bootstrap for faster index creation";
+        return;
+    }
+    unless (File::Which::which("xz")) {
+        log_warn "Could not use bootstrap database, the 'xz' utility ".
+            "is not available to decompress the bootstrap";
+        return;
+    }
+    log_info "Decompressing bootstrap database ...";
+    IPC::System::Options::system(
+        {shell=>1, die=>1, log=>1},
+        "xz", "-cd", "$dist_dir/db/index.db.xz", \">", $db_path,
+    );
+}
+
 sub _connect_db {
     require DBI;
 
     my ($mode, $cpan, $index_name) = @_;
 
     my $db_path = _db_path($cpan, $index_name);
+    _use_db_bootstrap($db_path);
     log_trace("Connecting to SQLite database at %s ...", $db_path);
     if ($mode eq 'ro') {
         # avoid creating the index file automatically if we are only in
