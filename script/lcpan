@@ -55,7 +55,12 @@ $cli->run;
 
 =head2 Creating/updating your local CPAN mirror
 
-The first step to use C<lcpan> is to create/update your local CPAN mirror:
+The first step to use C<lcpan> is to create/update your local CPAN mirror. You
+can install the bootstrap database first to avoid doing indexing from scratch:
+
+ % cpanm -n App::lcpan::Bootstrap
+
+Then run:
 
  % lcpan update --trace
 
@@ -69,11 +74,12 @@ C<~/cpan/index.db> which will contain information about authors,
 modules/packages, distributions. This database will be used to answer queries
 you might issue later. During this "indexing" process, release files will be
 extracted to temporary directory and the source codes will be scanned. This
-process will again take a while for the first time, e.g. a few hours, depending
-on your computer and disk speed, but subsequent updates will be much faster.
+process will again take a while for the first time, e.g. under an hour (if you
+are using a fairly recent bootstrap database) or a few hours (if you are
+indexing from scratch). Subsequent updates will be much faster.
 
-You can run the above command e.g. daily to keep your mirror up-to-date. Omit
-the C<--trace> option to see less debugging messages.
+You can run the above "update" command e.g. daily to keep your mirror
+up-to-date. Omit the C<--trace> option to see less debugging messages.
 
 =head2 Using your local CPAN mirror to install modules
 
