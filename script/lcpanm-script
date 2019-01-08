@@ -29,7 +29,7 @@ $res = Perinci::CmdLine::Util::Config::get_args_from_config(
 die "Can't set lcpan function argument from config: $res->[0] - $res->[1]\n"
     unless $res->[0] == 200;
 App::lcpan::_set_args_default(\%args);
-my $dbh = App::lcpan::_connect_db('ro', $args{cpan}, $args{index_name});
+my $dbh = App::lcpan::_connect_db('ro', $args{cpan}, $args{index_name}, $args{use_bootstrap});
 
 my %modnames; # key = scriptname
 {

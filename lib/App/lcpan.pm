@@ -99,6 +99,18 @@ _
             );
         },
     },
+    use_bootstrap => {
+        summary => 'Whether to use bootstrap database from App-lcpan-Bootstrap',
+        schema => 'bool*',
+        default => 1,
+        description => <<'_',
+
+If you are indexing your private CPAN-like repository, you want to turn this
+off.
+
+_
+        tags => ['common'],
+    },
 );
 
 our %all_args = (
@@ -926,10 +938,10 @@ sub _use_db_bootstrap {
 sub _connect_db {
     require DBI;
 
-    my ($mode, $cpan, $index_name) = @_;
+    my ($mode, $cpan, $index_name, $use_bootstrap) = @_;
 
     my $db_path = _db_path($cpan, $index_name);
-    _use_db_bootstrap($db_path);
+    _use_db_bootstrap($db_path) if $use_bootstrap;
     log_trace("Connecting to SQLite database at %s ...", $db_path);
     if ($mode eq 'ro') {
         # avoid creating the index file automatically if we are only in
@@ -953,7 +965,7 @@ sub _init {
     unless ($App::lcpan::state) {
         _set_args_default($args);
         my $state = {
-            dbh => _connect_db($mode, $args->{cpan}, $args->{index_name}),
+            dbh => _connect_db($mode, $args->{cpan}, $args->{index_name}, $args->{use_bootstrap}),
             cpan => $args->{cpan},
             index_name => $args->{index_name},
         };
@@ -1184,7 +1196,7 @@ sub _update_files {
         @cmd,
     );
 
-    my $dbh = _connect_db('rw', $cpan, $index_name);
+    my $dbh = _connect_db('rw', $cpan, $index_name, $args{use_bootstrap});
     $dbh->do("INSERT OR REPLACE INTO meta (name,value) VALUES (?,?)",
              {}, 'last_mirror_time', time());
 
@@ -1368,7 +1380,7 @@ sub _update_index {
               or return [500, "Copy $db_path.1 -> $db_path failed: $!"];
     }
 
-    my $dbh  = _connect_db('rw', $cpan, $index_name);
+    my $dbh  = _connect_db('rw', $cpan, $index_name, $args{use_bootstrap});
 
     # check whether we need to reindex if a sufficiently old (and possibly
     # incorrect) version of us did the reindexing
@@ -2269,7 +2281,7 @@ sub _complete_mod {
     _set_args_default($res->[2]);
 
     my $dbh;
-    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}) };
+    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}, 0) };
 
     # if we can't connect (probably because database is not yet setup), bail
     if ($@) {
@@ -2322,7 +2334,7 @@ sub _complete_mod_or_dist {
     _set_args_default($res->[2]);
 
     my $dbh;
-    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}) };
+    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}, 0) };
 
     # if we can't connect (probably because database is not yet setup), bail
     if ($@) {
@@ -2392,7 +2404,7 @@ sub _complete_mod_or_dist_or_script {
     _set_args_default($res->[2]);
 
     my $dbh;
-    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}) };
+    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}, 0) };
 
     # if we can't connect (probably because database is not yet setup), bail
     if ($@) {
@@ -2469,7 +2481,7 @@ sub _complete_ns {
     _set_args_default($res->[2]);
 
     my $dbh;
-    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}) };
+    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}, 0) };
 
     # if we can't connect (probably because database is not yet setup), bail
     if ($@) {
@@ -2516,7 +2528,7 @@ sub _complete_script {
     _set_args_default($res->[2]);
 
     my $dbh;
-    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}) };
+    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}, 0) };
 
     # if we can't connect (probably because database is not yet setup), bail
     if ($@) {
@@ -2557,7 +2569,7 @@ sub _complete_dist {
     _set_args_default($res->[2]);
 
     my $dbh;
-    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}) };
+    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}, 0) };
 
     # if we can't connect (probably because database is not yet setup), bail
     if ($@) {
@@ -2604,7 +2616,7 @@ sub _complete_cpanid {
     _set_args_default($res->[2]);
 
     my $dbh;
-    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}) };
+    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}, 0) };
 
     # if we can't connect (probably because database is not yet setup), bail
     if ($@) {
@@ -2645,7 +2657,7 @@ sub _complete_rel {
     _set_args_default($res->[2]);
 
     my $dbh;
-    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}) };
+    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}, 0) };
 
     # if we can't connect (probably because database is not yet setup), bail
     if ($@) {
@@ -2686,7 +2698,7 @@ sub _complete_content_package_or_script {
     _set_args_default($res->[2]);
 
     my $dbh;
-    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}) };
+    eval { $dbh = _connect_db('ro', $res->[2]{cpan}, $res->[2]{index_name}, 0) };
 
     # if we can't connect (probably because database is not yet setup), bail
     if ($@) {
