@@ -4061,4 +4061,11 @@ parse distribution names from it but instead uses C<META.json> and C<META.yml>
 files extracted from the release files. If no C<META.*> files exist, then it
 will use the module name.
 
+
+=head1 SEE ALSO
+
+L<CPAN::SQLite>
+
+L<CPAN::Mini>
+
 =cut
