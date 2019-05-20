@@ -66,7 +66,7 @@ Then run:
 
 A mini CPAN mirror will be downloaded/updated in your C<~/cpan> directory. This
 will take a while, e.g. a couple of hours, depending on your Internet connection
-speed (as of 2018-09-08 the size of a mini CPAN mirror is ~10GB). Subsequent
+speed (as of 2019-05-20 the size of a mini CPAN mirror is ~7GB). Subsequent
 updates will of course take significantly shorter time.
 
 After download, a SQLite database will also be created/updated at
