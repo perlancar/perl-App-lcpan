@@ -8,8 +8,9 @@ use strict;
 use warnings;
 use Log::ger; BEGIN { $ENV{LOG_LEVEL} //= 'info' }
 
-use PERLANCAR::Module::List;
 use Perinci::CmdLine::Any;
+use Perinci::CmdLineX::CommonOptions::SelfUpgrade;
+use PERLANCAR::Module::List;
 
 my $prefix = '/App/lcpan/';
 my $mods = do {
@@ -46,6 +47,7 @@ my $cli = Perinci::CmdLine::Any->new(
     subcommands => $subcommands,
 );
 $cli->common_opts->{naked_res}{default} = 1;
+Perinci::CmdLineX::CommonOptions::SelfUpgrade->apply_to_object($cli);
 $cli->run;
 
 # ABSTRACT: Manage your local CPAN mirror
