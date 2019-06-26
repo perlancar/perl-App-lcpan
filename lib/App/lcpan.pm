@@ -2264,8 +2264,9 @@ sub _complete_mod {
 
     my $word = $args{word} // '';
 
-    # because it might be very slow, don't complete empty word
-    return [] unless length $word;
+    # completing from an empty word is very slow
+    return {message=>"Please enter a few characters of module name first", static=>1}
+        unless length $word;
 
     # only run under pericmd
     my $cmdline = $args{cmdline} or return undef;
@@ -2317,8 +2318,9 @@ sub _complete_mod_or_dist {
 
     my $word = $args{word} // '';
 
-    # because it might be very slow, don't complete empty word
-    return [] unless length $word;
+    # completing from an empty word is very slow
+    return {message=>"Please enter a few characters of module/distro name first", static=>1}
+        unless length $word;
 
     # only run under pericmd
     my $cmdline = $args{cmdline} or return undef;
@@ -2387,8 +2389,9 @@ sub _complete_mod_or_dist_or_script {
 
     my $word = $args{word} // '';
 
-    # because it might be very slow, don't complete empty word
-    return [] unless length $word;
+    # completing from an empty word is very slow
+    return {message=>"Please enter a few characters of module/distro/script name first", static=>1}
+        unless length $word;
 
     # only run under pericmd
     my $cmdline = $args{cmdline} or return undef;
@@ -2467,8 +2470,9 @@ sub _complete_ns {
 
     my $word = $args{word} // '';
 
-    # because it might be very slow, don't complete empty word
-    return [] unless length $word;
+    # completing from an empty word is very slow
+    return {message=>"Please enter a few characters of namespace first", static=>1}
+        unless length $word;
 
     # only run under pericmd
     my $cmdline = $args{cmdline} or return undef;
@@ -2514,8 +2518,9 @@ sub _complete_script {
 
     my $word = $args{word} // '';
 
-    # because it might be very slow, don't complete empty word
-    return [] unless length $word;
+    # completing from an empty word is very slow
+    return {message=>"Please enter a few characters of script name first", static=>1}
+        unless length $word;
 
     # only run under pericmd
     my $cmdline = $args{cmdline} or return undef;
@@ -2555,8 +2560,9 @@ sub _complete_dist {
 
     my $word = $args{word} // '';
 
-    # because it might be very slow, don't complete empty word
-    return [] unless length $word;
+    # completing from an empty word is very slow
+    return {message=>"Please enter a few characters of distro name first", static=>1}
+        unless length $word;
 
     # only run under pericmd
     my $cmdline = $args{cmdline} or return undef;
@@ -2602,8 +2608,9 @@ sub _complete_cpanid {
 
     my $word = $args{word} // '';
 
-    # because it might be very slow, don't complete empty word
-    return [] unless length $word;
+    # completing from an empty word is very slow
+    return {message=>"Please enter a few characters of PAUSE ID first", static=>1}
+        unless length $word;
 
     # only run under pericmd
     my $cmdline = $args{cmdline} or return undef;
@@ -2643,8 +2650,9 @@ sub _complete_rel {
 
     my $word = $args{word} // '';
 
-    # because it might be very slow, don't complete empty word
-    return [] unless length $word;
+    # completing from an empty word is very slow
+    return {message=>"Please enter a few characters of release name first", static=>1}
+        unless length $word;
 
     # only run under pericmd
     my $cmdline = $args{cmdline} or return undef;
@@ -2684,8 +2692,9 @@ sub _complete_content_package_or_script {
 
     my $word = $args{word} // '';
 
-    # because it might be very slow, don't complete empty word
-    return [] unless length $word;
+    # completing from an empty word is very slow
+    return {message=>"Please enter a few characters of content/package/script name first", static=>1}
+        unless length $word;
 
     # only run under pericmd
     my $cmdline = $args{cmdline} or return undef;
