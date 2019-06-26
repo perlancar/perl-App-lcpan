@@ -2632,14 +2632,14 @@ sub _complete_cpanid {
     }
 
     my $sth = $dbh->prepare(
-        "SELECT cpanid FROM author WHERE cpanid LIKE ? ORDER BY cpanid");
+        "SELECT cpanid,fullname FROM author WHERE cpanid LIKE ? ORDER BY cpanid");
     $sth->execute($word . '%');
 
     # XXX follow Complete::Common::OPT_CI
 
     my @res;
-    while (my ($cpanid) = $sth->fetchrow_array) {
-        push @res, $cpanid;
+    while (my ($cpanid, $fullname) = $sth->fetchrow_array) {
+        push @res, {word=>$cpanid, summary=>$fullname};
     }
 
     \@res;
