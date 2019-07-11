@@ -393,6 +393,15 @@ our %rel_args = (
     },
 );
 
+our %dist_or_rel_args = (
+    dist_or_release => {
+        schema => 'str*', # XXX [any, of=>[perl::relname, perl::distname]]
+        req => 1,
+        pos => 0,
+        completion => \&_complete_dist, # XXX dist/release
+    },
+);
+
 our %sort_args_for_rels = (
     sort => {
         schema => ['array*', of=>['str*', in=>[qw/author -author size -size name -name mtime -mtime/]]],
@@ -2769,7 +2778,7 @@ $SPEC{authors} = {
                 my $res = $cmdline->parse_argv($r);
                 return undef unless $res->[0] == 200;
 
-                # provide completion for modules if query_type is exact-name
+                # provide completion for modules if query_type is exact-cpanid
                 my $qt = $res->[2]{query_type} // '';
                 return _complete_cpanid(%args) if $qt eq 'exact-cpanid';
 
@@ -2777,13 +2786,18 @@ $SPEC{authors} = {
             };
         } \%query_multi_args )},
         query_type => {
-            schema => ['str*', in=>[qw/any cpanid exact-cpanid fullname email exact-email/]],
+            schema => ['str*', in=>[qw/any cpanid exact-cpanid fullname regexp-fullname email exact-email/]],
             default => 'any',
             cmdline_aliases => {
                 x => {
                     summary => 'Shortcut --query-type exact-cpanid',
                     is_flag => 1,
                     code => sub { $_[0]{query_type} = 'exact-cpanid' },
+                },
+                r => {
+                    summary => 'Shortcut --query-type regexp-fullname',
+                    is_flag => 1,
+                    code => sub { $_[0]{query_type} = 'regexp-fullname' },
                 },
                 n => {
                     summary => 'Shortcut --query-type cpanid',
@@ -2845,6 +2859,9 @@ sub authors {
                 my $q = uc($q0 =~ /%/ ? $q0 : '%'.$q0.'%');
                 push @q_where, "(fullname LIKE ?)";
                 push @bind, $q;
+            } elsif ($qt eq 'regexp-fullname') {
+                push @q_where, "(fullname REGEXP ?)";
+                push @bind, $q0;
             } elsif ($qt eq 'email') {
                 my $q = uc($q0 =~ /%/ ? $q0 : '%'.$q0.'%');
                 push @q_where, "(email LIKE ?)";
@@ -2902,13 +2919,18 @@ $SPEC{modules} = {
             };
         } \%query_multi_args )},
         query_type => {
-            schema => ['str*', in=>[qw/any name exact-name abstract/]],
+            schema => ['str*', in=>[qw/any name exact-name regexp-name abstract/]],
             default => 'any',
             cmdline_aliases => {
                 x => {
                     summary => 'Shortcut --query-type exact-name',
                     is_flag => 1,
                     code => sub { $_[0]{query_type} = 'exact-name' },
+                },
+                r => {
+                    summary => 'Shortcut --query-type regexp-name',
+                    is_flag => 1,
+                    code => sub { $_[0]{query_type} = 'regexp-name' },
                 },
                 n => {
                     summary => 'Shortcut --query-type name',
@@ -2982,6 +3004,9 @@ sub modules {
                 push @bind, $q;
             } elsif ($qt eq 'exact-name') {
                 push @q_where, "(module.name=?)";
+                push @bind, $q0;
+            } elsif ($qt eq 'regexp-name') {
+                push @q_where, "(module.name REGEXP ?)";
                 push @bind, $q0;
             } elsif ($qt eq 'abstract') {
                 my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
@@ -3078,13 +3103,18 @@ $SPEC{dists} = {
             };
         } \%query_multi_args )},
         query_type => {
-            schema => ['str*', in=>[qw/any name exact-name abstract/]],
+            schema => ['str*', in=>[qw/any name exact-name regexp-name abstract/]],
             default => 'any',
             cmdline_aliases => {
                 x => {
                     summary => 'Shortcut for --query-type exact-name',
                     is_flag => 1,
                     code => sub { $_[0]{query_type} = 'exact-name' },
+                },
+                r => {
+                    summary => 'Shortcut for --query-type regexp-name',
+                    is_flag => 1,
+                    code => sub { $_[0]{query_type} = 'regexp-name' },
                 },
                 n => {
                     summary => 'Shortcut for --query-type name',
@@ -3201,6 +3231,9 @@ sub dists {
             } elsif ($qt eq 'exact-name') {
                 push @q_where, "(d.name=?)";
                 push @bind, $q0;
+            } elsif ($qt eq 'regexp-name') {
+                push @q_where, "(d.name REGEXP ?)";
+                push @bind, $q0;
             } elsif ($qt eq 'abstract') {
                 my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
                 push @q_where, "(abstract LIKE ?)";
@@ -3312,13 +3345,18 @@ $SPEC{'releases'} = {
             };
         } \%query_multi_args )},
         query_type => {
-            schema => ['str*', in=>[qw/any name exact-name/]],
+            schema => ['str*', in=>[qw/any name exact-name regexp-name/]],
             default => 'any',
             cmdline_aliases => {
                 x => {
                     summary => 'Shortcut for --query-type exact-name',
                     is_flag => 1,
                     code => sub { $_[0]{query_type} = 'exact-name' },
+                },
+                r => {
+                    summary => 'Shortcut for --query-type regexp-name',
+                    is_flag => 1,
+                    code => sub { $_[0]{query_type} = 'regexp-name' },
                 },
                 n => {
                     summary => 'Shortcut for --query-type name',
@@ -3372,6 +3410,9 @@ sub releases {
                 push @bind, $q;
             } elsif ($qt eq 'exact-name') {
                 push @q_where, "(f1.name=?)";
+                push @bind, $q0;
+            } elsif ($qt eq 'regexp-name') {
+                push @q_where, "(f1.name REGEXP ?)";
                 push @bind, $q0;
             }
         }
@@ -3959,8 +4000,25 @@ $SPEC{namespaces} = {
         %common_args,
         %query_multi_args,
         query_type => {
-            schema => ['str*', in=>[qw/any name exact-name/]],
+            schema => ['str*', in=>[qw/any name exact-name regexp-name/]],
             default => 'any',
+            cmdline_aliases => {
+                x => {
+                    summary => 'Shortcut --query-type exact-name',
+                    is_flag => 1,
+                    code => sub { $_[0]{query_type} = 'exact-name' },
+                },
+                r => {
+                    summary => 'Shortcut --query-type regexp-name',
+                    is_flag => 1,
+                    code => sub { $_[0]{query_type} = 'regexp-name' },
+                },
+                n => {
+                    summary => 'Shortcut --query-type name',
+                    is_flag => 1,
+                    code => sub { $_[0]{query_type} = 'name' },
+                },
+            },
         },
         from_level => {
             schema => ['int*', min=>0],
@@ -4001,6 +4059,9 @@ sub namespaces {
                 push @bind, $q;
             } elsif ($qt eq 'exact-name') {
                 push @q_where, "(name=?)";
+                push @bind, $q0;
+            } elsif ($qt eq 'regexp-name') {
+                push @q_where, "(name REGEXP ?)";
                 push @bind, $q0;
             }
         }
