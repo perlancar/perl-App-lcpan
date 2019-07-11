@@ -1,3 +1,12 @@
+1.036   2019-07-11  Released-By: PERLANCAR; Urgency: medium
+
+	- mods, dists, authors, rels, namespaces: Add --query-type
+	  regexp-name (-r).
+
+	- [ux][completion] Show full names as summaries when completing
+	  CPAN IDs.
+
+
 1.035   2019-06-26 (PERLANCAR)
 
 	- [ux] Show completion message/hint when user hasn't typed any
