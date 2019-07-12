@@ -311,7 +311,7 @@ our %mods_or_dists_args = (
 
 our %script_args = (
     script => {
-        schema => 'str*',
+        schema => 'filename::unix*',
         req => 1,
         pos => 0,
         completion => \&_complete_script,
@@ -320,7 +320,7 @@ our %script_args = (
 
 our %scripts_args = (
     scripts => {
-        schema => ['array*', of=>'str*', min_len=>1],
+        schema => ['array*', of=>'filename::unix*', min_len=>1],
         'x.name.is_plural' => 1,
         req => 1,
         pos => 0,
