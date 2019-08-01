@@ -286,6 +286,19 @@ our %mods_args = (
     },
 );
 
+our %pods_args = (
+    pods => {
+        schema => ['array*', of=>'perl::modname*', min_len=>1],
+        'x.name.is_plural' => 1,
+        'x.name.singular' => 'pod',
+        req => 1,
+        pos => 0,
+        greedy => 1,
+        cmdline_src => 'stdin_or_args',
+        #element_completion => \&_complete_pod, # will be too slow with the current schema
+    },
+);
+
 our %mod_or_dist_args = (
     module_or_dist => {
         summary => 'Module or dist name',
