@@ -28,7 +28,7 @@ $SPEC{'handle_cmd'} = {
             'x.name.is_plural' => 1,
             req => 1,
             pos => 0,
-            greedy => 1,
+            slurpy => 1,
         },
     },
     deps => {
