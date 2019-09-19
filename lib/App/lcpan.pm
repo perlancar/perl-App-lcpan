@@ -3776,6 +3776,22 @@ our %deps_rel_args = (
 our %rdeps_rel_args = %{clone(\%deps_rel_args)};
 $rdeps_rel_args{rel}{default} = 'ALL';
 
+our %rdeps_level_args = (
+    level => {
+        summary => 'Recurse for a number of levels (-1 means unlimited)',
+        schema  => ['int*', min=>1, max=>10],
+        default => 1,
+        cmdline_aliases => {
+            l => {},
+            R => {
+                summary => 'Recurse (alias for `--level 10`)',
+                is_flag => 1,
+                code => sub { $_[0]{level} = 10 },
+            },
+        },
+    },
+);
+
 our %deps_args = (
     %deps_phase_args,
     %deps_rel_args,
@@ -3924,19 +3940,7 @@ my %rdeps_args = (
     %mods_args,
     %rdeps_rel_args,
     %rdeps_phase_args,
-    level => {
-        summary => 'Recurse for a number of levels (-1 means unlimited)',
-        schema  => ['int*', min=>1, max=>10],
-        default => 1,
-        cmdline_aliases => {
-            l => {},
-            R => {
-                summary => 'Recurse (alias for `--level 10`)',
-                is_flag => 1,
-                code => sub { $_[0]{level} = 10 },
-            },
-        },
-    },
+    %rdeps_level_args,
     authors => {
         'x.name.is_plural' => 1,
         summary => 'Filter certain author',
