@@ -1,3 +1,9 @@
+1.041   2019-10-05  Released-By: PERLANCAR; Urgency: medium
+
+	- [bugfix] Typo in variable package name, causing shown total
+	  downloaded data to be 0.
+
+
 1.040   2019-10-05  Released-By: PERLANCAR; Urgency: medium
 
 	- [ux] Show total downloaded data after mirroring.
