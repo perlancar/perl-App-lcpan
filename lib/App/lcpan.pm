@@ -1211,7 +1211,7 @@ sub _update_files {
         "-r", $remote_url,
     );
     my $env = {};
-    $env->{PERL5OPT} = "-MLWP::UserAgent::Patch::FilterLcpan=".join(",", @filter_args)
+    $env->{PERL5OPT} = "-MLWP::Protocol::Patch::CountBytesIn -MEnd::PrintBytesIn -MLWP::UserAgent::Patch::FilterLcpan=".join(",", @filter_args)
         if @filter_args;
 
     IPC::System::Options::system(
