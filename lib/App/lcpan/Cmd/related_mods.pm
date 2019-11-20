@@ -51,7 +51,7 @@ _
 sub handle_cmd {
     my %args = @_;
 
-    my $state = App::lcpan::_init(\%args, 'rw');
+    my $state = App::lcpan::_init(\%args, 'ro');
     my $dbh = $state->{dbh};
 
     my $modules = $args{modules};
