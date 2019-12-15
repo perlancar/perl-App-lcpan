@@ -2985,7 +2985,7 @@ $SPEC{modules} = {
         namespaces => {
             'x.name.is_plural' => 1,
             summary => 'Select modules belonging to certain namespace(s)',
-            schema => ['array*', of=>'str*'],
+            schema => ['array*', of=>'perl::modname*'],
             tags => ['category:filtering'],
             element_completion => \&_complete_ns,
             cmdline_aliases => {N => {}},
