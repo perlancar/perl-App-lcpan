@@ -619,7 +619,7 @@
           bin/lcpan's POD.
 
 
-0.60    2015-12-25 (PERLANCAR) (It's *this* Christmas!)
+0.60    2015-12-25  Released-By: PERLANCAR; Message: It's *this* Christmas!
 
 	- Replace --exact-match with the more general --query-type to be
 	  able to search certain fields only or exact match on certain
