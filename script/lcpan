@@ -8,9 +8,9 @@ use strict;
 use warnings;
 use Log::ger; BEGIN { $ENV{LOG_LEVEL} //= 'info' }
 
+use Module::List::Tiny;
 use Perinci::CmdLine::Any;
 use Perinci::CmdLineX::CommonOptions::SelfUpgrade;
-use PERLANCAR::Module::List;
 
 my $prefix = '/App/lcpan/';
 my $mods = do {
@@ -24,7 +24,7 @@ my $mods = do {
             # dist that we're building
             (!defined($ENV{DZIL_NAME}) || $ENV{DZIL_NAME} eq 'App-lcpan');
 
-    PERLANCAR::Module::List::list_modules(
+    Module::List::Tiny::list_modules(
         "App::lcpan::Cmd::", {list_modules=>1});
 };
 my $subcommands = {};
