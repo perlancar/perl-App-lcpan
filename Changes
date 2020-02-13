@@ -1,3 +1,13 @@
+1.044   2020-02-13  Released-By: PERLANCAR; Urgency: low
+
+	- Add subcommand: x-mentions-for-mod.
+
+	- [internal] Replace PERLANCAR::Module::List with Module::List::Tiny.
+
+	- [mods subcommand] Tweak schema of 'namespaces' argument for better tab
+	  completion.
+
+
 1.043   2019-11-29  Released-By: PERLANCAR; Urgency: medium
 
 	- deps: Add --{include,exclude}-{,un}registered options.
