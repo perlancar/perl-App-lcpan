@@ -42,6 +42,7 @@ my %builtin_file_skip_list_sub = (
     'Shipment-3.01.tar.gz'                => 'segfaults Compiler::Lexer 0.22', # 2018-02-08
     'Shipment-3.02.tar.gz'                => 'segfaults Compiler::Lexer 0.22', # 2019-07-23
     'App-IndonesianBankingUtils-0.07.tar.gz' => 'segfaults at phase 3/3',      # 2016-08-18
+    'Bencher-Scenarios-HashSlicing-0.003.tar.gz' => 'eats memory',             # 2020-03-04
 );
 
 our %SPEC;
