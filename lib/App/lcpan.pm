@@ -1,6 +1,8 @@
 package App::lcpan;
 
+# AUTHORITY
 # DATE
+# DIST
 # VERSION
 
 use 5.010001;
@@ -1977,7 +1979,17 @@ sub _update_index {
                 last if $pass != 3;
 
                 if (my $reason = $builtin_file_skip_list_sub{ $file->{name} }) {
-                    log_info("Skipped file %s (reason: built-in file skip list for sub: %s)", $file->{name}, $reason);
+                    log_info("Skipped indexing subs for file %s (reason: built-in file skip list for sub: %s)", $file->{name}, $reason);
+                    last;
+                }
+
+                if ($args{skip_sub_indexing_files} && first {$_ eq $file->{name}} @{ $args{skip_sub_indexing_files} }) {
+                    log_info("Skipped indexing subs for file %s (reason: skip_sub_indexing_files)", $file->{name});
+                    last;
+                }
+
+                if ($args{skip_sub_indexing_file_patterns} && first {$file->{name} =~ $_} @{ $args{skip_sub_indexing_file_patterns} }) {
+                    log_info("Skipped indexing subs for file %s (reason: skip_sub_indexing_file_patterns)", $file->{name});
                     last;
                 }
 
@@ -2144,7 +2156,25 @@ _
         skip_index_file_patterns => {
             summary => 'Skip one or more file patterns from being indexed',
             'x.name.is_plural' => 1,
-            'summary.alt.plurality.singular' => 'Skip a file pattern from being indexed',
+            'summary.alt.plurality.singular' => 'Specify a file pattern to skip from being indexed',
+            schema => ['array*', of=>'re*'],
+            cmdline_aliases => {
+            },
+            examples => ['^Foo-Bar-\d'],
+        },
+        skip_sub_indexing_files => {
+            summary => 'Skip one or more files from being parsed for subs',
+            'x.name.is_plural' => 1,
+            'x.name.singular' => 'skip_sub_indexing_file',
+            'summary.alt.plurality.singular' => 'Skip a file from being parsed for subs',
+            schema => ['array*', of=>'str*'],
+            examples => ['Foo-Bar-1.23.tar.gz'],
+        },
+        skip_sub_indexing_file_patterns => {
+            summary => 'Skip one or more file patterns from being parsed for subs',
+            'x.name.is_plural' => 1,
+            'x.name.singular' => 'skip_sub_indexing_file_pattern',
+            'summary.alt.plurality.singular' => 'Specify a file pattern to skip being parsed for subs',
             schema => ['array*', of=>'re*'],
             cmdline_aliases => {
             },
