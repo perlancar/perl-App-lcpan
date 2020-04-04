@@ -18,7 +18,9 @@ $SPEC{'handle_cmd'} = {
     summary => 'List scripts that depend on specified modules',
     description => <<'_',
 
-This is basically rdeps + dist_scripts.
+This is basically rdeps + dist_scripts. Equivalent to something like:
+
+    % lcpan rdeps Some::Module | td select dist | xargs lcpan dist-scripts Some::Module
 
 _
     args => {
