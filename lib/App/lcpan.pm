@@ -3704,7 +3704,7 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
 
 sub _get_revdeps {
     my ($mods, $dbh, $memory_by_dist_name, $memory_by_mod_id,
-        $level, $max_level, $filters, $phase, $rel) = @_;
+        $level, $max_level, $filters, $flatten, $phase, $rel) = @_;
 
     log_trace("Finding reverse dependencies for module(s) %s ...", $mods);
 
@@ -3779,7 +3779,7 @@ ORDER BY dist".($level > 1 ? " DESC" : ""));
         }
         my $subres = _get_revdeps(\@mods, $dbh,
                                   $memory_by_dist_name, $memory_by_mod_id,
-                                  $level+1, $max_level, $filters, $phase, $rel);
+                                  $level+1, $max_level, $filters, $flatten, $phase, $rel);
         return $subres if $subres->[0] != 200;
         # insert to res in appropriate places
       SUBRES_TO_INSERT:
@@ -4004,6 +4004,15 @@ my %rdeps_args = (
     %rdeps_rel_args,
     %rdeps_phase_args,
     %rdeps_level_args,
+    flatten => {
+        summary => 'Instead of showing tree-like information, flatten it',
+        schema => 'bool',
+        description => <<'_',
+
+See deps' *flatten* argument for more details.
+
+_
+    },
     authors => {
         'x.name.is_plural' => 1,
         summary => 'Filter certain author',
@@ -4033,12 +4042,17 @@ _
     },
 );
 
+our $rdeps_args_rels = {
+    dep_any => [flatten => ['level']],
+};
+
 $SPEC{'rdeps'} = {
     v => 1.1,
     summary => 'List reverse dependencies',
     args => {
         %rdeps_args,
     },
+    args_rels => $rdeps_args_rels,
 };
 sub rdeps {
     my %args = @_;
@@ -4056,11 +4070,12 @@ sub rdeps {
         authors_arent => $authors_arent,
     };
 
-    my $res = _get_revdeps($mods, $dbh, {}, {}, 1, $level, $filters, $args{phase}, $args{rel});
+    my $res = _get_revdeps($mods, $dbh, {}, {}, 1, $level, $filters, $args{flatten}, $args{phase}, $args{rel});
 
     return $res unless $res->[0] == 200;
     for (@{$res->[2]}) {
-        $_->{dist} = ("  " x ($_->{level}-1)) . $_->{dist};
+        $_->{dist} = ("  " x ($_->{level}-1)) . $_->{dist}
+            unless $args{flatten};
         delete $_->{level};
         delete $_->{dist_id};
         delete $_->{module_dist_id};
