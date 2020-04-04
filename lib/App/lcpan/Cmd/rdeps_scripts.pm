@@ -22,7 +22,7 @@ This is basically rdeps + dist_scripts.
 
 If you want to find scripts that depend on a module indirectly, you can do:
 
-    % lcpan rdeps -R --flatten Some::Module | td select dist | xargs lcpan dists-scripts
+    % lcpan rdeps -R --flatten Some::Module | td select dist | xargs lcpan dist-scripts
 
 _
     args => {
