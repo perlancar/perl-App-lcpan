@@ -20,16 +20,13 @@ $SPEC{'handle_cmd'} = {
 
 This is basically rdeps + dist_scripts.
 
-If you want to find scripts that depend on a module indirectly, you can do:
-
-    % lcpan rdeps -R --flatten Some::Module | td select dist | xargs lcpan dist-scripts
-
 _
     args => {
         %App::lcpan::common_args,
         %App::lcpan::mods_args,
         %App::lcpan::rdeps_rel_args,
         %App::lcpan::rdeps_phase_args,
+        %App::lcpan::rdeps_level_args,
     },
 };
 sub handle_cmd {
@@ -53,7 +50,7 @@ sub handle_cmd {
     }
     return [404, "No dists found for the module(s) specified"] unless @dists;
 
-    $res = App::lcpan::rdeps(%args);
+    $res = App::lcpan::rdeps(%args, flatten=>1);
     return [500, "Can't mod2dist: $res->[0] - $res->[1]"]
         unless $res->[0] == 200;
     push @dists, $_->{dist} for @{ $res->[2] };
