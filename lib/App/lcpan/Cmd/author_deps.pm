@@ -1,6 +1,8 @@
 package App::lcpan::Cmd::author_deps;
 
+# AUTHORITY
 # DATE
+# DIST
 # VERSION
 
 use 5.010;
@@ -14,6 +16,20 @@ our %SPEC;
 $SPEC{'handle_cmd'} = {
     v => 1.1,
     summary => "List dependencies for all of the dists of an author",
+    description => <<'_',
+
+For a CPAN author, this subcommand is a shortcut for doing:
+
+    % lcpan deps Your-Dist
+
+for all of your distributions.
+
+To find whether there are any prerequisites that you mention in your
+distributions that are currently broken (not indexed on CPAN):
+
+    % lcpan author-deps YOURCPANID --broken
+
+_
     args => {
         %App::lcpan::common_args,
         %App::lcpan::author_args,
