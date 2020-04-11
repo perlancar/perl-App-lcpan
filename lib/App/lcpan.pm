@@ -3576,7 +3576,7 @@ sub _get_prereqs {
     require Version::Util;
 
     my ($mods, $dbh, $memory_by_mod_name, $memory_by_dist_id,
-        $level, $max_level, $filters, $plver, $flatten, $phase, $rel) = @_;
+        $level, $max_level, $filters, $plver, $flatten, $dont_uniquify, $phase, $rel) = @_;
 
     log_trace("Finding dependencies for module(s) %s (level=%i) ...", $mods, $level);
 
@@ -3599,7 +3599,7 @@ sub _get_prereqs {
             ($dist_id) = $dbh->selectrow_array("SELECT id FROM dist WHERE is_latest AND file_id=(SELECT file_id FROM module WHERE name=?)", {}, $mod)
                 or return [404, "No such module: $mod"];
         }
-        unless ($memory_by_dist_id->{$dist_id}) {
+        unless ($memory_by_dist_id->{$dist_id} || !$dont_uniquify) {
             push @dist_ids, $dist_id;
             $memory_by_dist_id->{$dist_id} = $mod;
         }
@@ -3652,7 +3652,7 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
             next;
         }
 
-        if (exists $memory_by_mod_name->{$row->{module}}) {
+        if ((exists $memory_by_mod_name->{$row->{module}}) && !$dont_uniquify) {
             if ($flatten) {
                 $memory_by_mod_name->{$row->{module}} = $row->{version}
                     if version->parse($row->{version}) > version->parse($memory_by_mod_name->{$row->{module}});
@@ -3673,7 +3673,7 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
             if (Version::Util::version_gt($row->{version}, $memory_by_mod_name->{$row->{module}})) {
                 $memory_by_mod_name->{$row->{version}} = $row->{version};
             }
-            next;
+            next unless $dont_uniquify;
         }
         delete $row->{phase} unless $phase eq 'ALL';
         delete $row->{rel}   unless $rel   eq 'ALL';
@@ -3686,7 +3686,7 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
         my $subres = _get_prereqs([map { {mod=>$_->{module}, dist_id=>$_->{module_dist_id}} } @res], $dbh,
                                   $memory_by_mod_name,
                                   $memory_by_dist_id,
-                                  $level+1, $max_level, $filters, $plver, $flatten, $phase, $rel);
+                                  $level+1, $max_level, $filters, $plver, $flatten, $dont_uniquify, $phase, $rel);
         return $subres if $subres->[0] != 200;
         if ($flatten) {
             my %deps; # key = module name
@@ -3717,7 +3717,7 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
 
 sub _get_revdeps {
     my ($mods, $dbh, $memory_by_dist_name, $memory_by_mod_id,
-        $level, $max_level, $filters, $flatten, $phase, $rel) = @_;
+        $level, $max_level, $filters, $flatten, $dont_uniquify, $phase, $rel) = @_;
 
     log_trace("Finding reverse dependencies for module(s) %s ...", $mods);
 
@@ -3733,7 +3733,7 @@ sub _get_revdeps {
             ($mod_id) = $dbh->selectrow_array("SELECT id FROM module WHERE name=?", {}, $mod)
                 or return [404, "No such module: $mod"];
         }
-        unless ($memory_by_mod_id->{$mod_id}) {
+        unless ($memory_by_mod_id->{$mod_id} || !$dont_uniquify) {
             push @mod_ids, $mod_id;
             $memory_by_mod_id->{$mod_id} = $mod;
         }
@@ -3775,7 +3775,7 @@ ORDER BY dist".($level > 1 ? " DESC" : ""));
     while (my $row = $sth->fetchrow_hashref) {
         next unless $phase eq 'ALL' || $row->{phase} eq $phase;
         next unless $rel   eq 'ALL' || $row->{rel}   eq $rel;
-        next if exists $memory_by_dist_name->{$row->{dist}};
+        next if exists($memory_by_dist_name->{$row->{dist}}) && !$dont_uniquify;
         $memory_by_dist_name->{$row->{dist}} = $row->{dist_version};
         delete $row->{phase} unless $phase eq 'ALL';
         delete $row->{rel} unless $rel eq 'ALL';
@@ -3792,7 +3792,7 @@ ORDER BY dist".($level > 1 ? " DESC" : ""));
         }
         my $subres = _get_revdeps(\@mods, $dbh,
                                   $memory_by_dist_name, $memory_by_mod_id,
-                                  $level+1, $max_level, $filters, $flatten, $phase, $rel);
+                                  $level+1, $max_level, $filters, $flatten, $dont_uniquify, $phase, $rel);
         return $subres if $subres->[0] != 200;
         # insert to res in appropriate places
       SUBRES_TO_INSERT:
@@ -3915,6 +3915,10 @@ Note that `Bar`'s required version is already 0.45 in the above example.
 
 _
     },
+    dont_uniquify => {
+        summary => 'Allow showing multiple modules for different dists',
+        schema => 'bool*',
+    },
     %finclude_core_args,
     %finclude_noncore_args,
     %perl_version_args,
@@ -3984,7 +3988,7 @@ sub deps {
     };
 
     my $res = _get_prereqs($mods, $dbh, {}, {},
-                           1, $level, $filters, $plver, $args{flatten}, $phase, $rel);
+                           1, $level, $filters, $plver, $args{flatten}, $args{dont_uniquify}, $phase, $rel);
 
     return $res unless $res->[0] == 200;
     my @cols;
@@ -4025,6 +4029,10 @@ my %rdeps_args = (
 See deps' *flatten* argument for more details.
 
 _
+    },
+    dont_uniquify => {
+        summary => 'Allow showing multiple modules for different dists',
+        schema => 'true*',
     },
     authors => {
         'x.name.is_plural' => 1,
@@ -4083,7 +4091,7 @@ sub rdeps {
         authors_arent => $authors_arent,
     };
 
-    my $res = _get_revdeps($mods, $dbh, {}, {}, 1, $level, $filters, $args{flatten}, $args{phase}, $args{rel});
+    my $res = _get_revdeps($mods, $dbh, {}, {}, 1, $level, $filters, $args{flatten}, $args{dont_uniquify}, $args{phase}, $args{rel});
 
     return $res unless $res->[0] == 200;
     for (@{$res->[2]}) {

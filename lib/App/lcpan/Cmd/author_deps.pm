@@ -36,7 +36,7 @@ To show how many of your own modules you are depending in your own distros:
 To find whether there are any prerequisites that you mention in your
 distributions that are currently broken (not indexed on CPAN):
 
-    % lcpan author-deps YOURCPANID --broken
+    % lcpan author-deps YOURCPANID --broken --dont-uniquify
 
 _
     args => {
