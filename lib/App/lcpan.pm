@@ -889,7 +889,7 @@ our $db_schema_spec = {
 
     ],
 
-    update_to_v11 => [
+    upgrade_to_v11 => [
         # forgot to add indices because FOREIGN KEY does not automatically
         # create indexes
         'CREATE INDEX ix_dep__file_id ON dep(file_id)',
