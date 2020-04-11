@@ -22,7 +22,16 @@ For a CPAN author, this subcommand is a shortcut for doing:
 
     % lcpan deps Your-Dist
 
-for all of your distributions.
+for all of your distributions. It shows just how many modules are you currently
+using in one of your distros on CPAN.
+
+To show how many modules from other authors you are depending:
+
+    % lcpan author-deps YOURCPANID --module-author-isnt YOURCPANID
+
+To show how many of your own modules you are depending in your own distros:
+
+    % lcpan author-deps YOURCPANID --module-author-is YOURCPANID
 
 To find whether there are any prerequisites that you mention in your
 distributions that are currently broken (not indexed on CPAN):
