@@ -3599,7 +3599,7 @@ sub _get_prereqs {
             ($dist_id) = $dbh->selectrow_array("SELECT id FROM dist WHERE is_latest AND file_id=(SELECT file_id FROM module WHERE name=?)", {}, $mod)
                 or return [404, "No such module: $mod"];
         }
-        unless ($memory_by_dist_id->{$dist_id} || !$dont_uniquify) {
+        unless ($memory_by_dist_id->{$dist_id} && $dont_uniquify) {
             push @dist_ids, $dist_id;
             $memory_by_dist_id->{$dist_id} = $mod;
         }
@@ -3733,7 +3733,7 @@ sub _get_revdeps {
             ($mod_id) = $dbh->selectrow_array("SELECT id FROM module WHERE name=?", {}, $mod)
                 or return [404, "No such module: $mod"];
         }
-        unless ($memory_by_mod_id->{$mod_id} || !$dont_uniquify) {
+        unless ($memory_by_mod_id->{$mod_id} && $dont_uniquify) {
             push @mod_ids, $mod_id;
             $memory_by_mod_id->{$mod_id} = $mod;
         }
