@@ -1,3 +1,10 @@
+1.047   2020-04-11  Released-By: PERLANCAR; Urgency: medium
+
+        - [deps] [Incompatible change] deps: Rename
+          --{include,exclude}-{,un}registered options to
+          --{include,exclude}-{,un}indexed to be more consistent with PAUSE/CPAN
+          terminology.
+
 1.046   2020-04-04  Released-By: PERLANCAR; Urgency: medium
 
 	- Add subcommand: rdeps-scripts.
@@ -28,7 +35,10 @@
 
 1.043   2019-11-29  Released-By: PERLANCAR; Urgency: medium
 
-	- deps: Add --{include,exclude}-{,un}registered options.
+	- deps: Add --{include,exclude}-{,un}registered options. UPDATE
+          2020-04-11: In 1.047, these options are now renamed to
+          --{include,exclude}-{,un}indexed to be consistent with PAUSE/CPAN
+          terminology.
 
 	- Add subcommand: dist-rdeps.
 
