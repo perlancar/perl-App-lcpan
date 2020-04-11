@@ -3648,8 +3648,8 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
             }
         }
 
-        next if !$filters->{include_registered}   &&  defined $row->{author};
-        next if !$filters->{include_unregistered} && !defined $row->{author};
+        next if !$filters->{include_registered}   && ( defined $row->{author} || $row->{module} eq 'perl');
+        next if !$filters->{include_unregistered} && (!defined $row->{author} && $row->{module} ne 'perl');
 
         $row->{is_core} = $row->{module} eq 'perl' ||
             Module::CoreList::More->is_still_core($row->{module}, undef, version->parse($plver)->numify);
