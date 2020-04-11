@@ -236,6 +236,8 @@ B<Some other utilities>:
 More subcommands are available. lcpan is plugin-based, see/install
 C<App::lcpan::CmdBundle::*> modules for more subcommands.
 
+See L<App::lcpan::Manual> for more tips, cookcooks, tutorials.
+
 =head2 Injecting additional modules to your local CPAN mirror
 
 Sometimes, you only want to add one or a few modules to the local CPAN mirror.
@@ -366,6 +368,8 @@ repository created by L<OrePAN> (or similar tools).
 
 
 =head1 SEE ALSO
+
+L<App::lcpan::Manual>
 
 L<CPAN::Mini>
 

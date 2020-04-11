@@ -4230,6 +4230,8 @@ will use the module name.
 
 =head1 SEE ALSO
 
+L<App::lcpan::Manual>
+
 L<CPAN::SQLite>
 
 L<CPAN::Mini>
