@@ -1,3 +1,11 @@
+1.048   2020-04-11  Released-By: PERLANCAR; Urgency: medium
+
+	- Bump database schema version to v11 to add some indices on dep
+	  table.
+
+	- [subcommands deps, rdeps] Add option --dont-uniquify.
+
+
 1.047   2020-04-11  Released-By: PERLANCAR; Urgency: medium
 
         - [doc] Mention App::lcpan::Manual.
