@@ -550,7 +550,7 @@ sub _set_namespace {
 }
 
 our $db_schema_spec = {
-    latest_v => 10,
+    latest_v => 11,
 
     install => [
         'CREATE TABLE author (
@@ -684,7 +684,12 @@ our $db_schema_spec = {
              FOREIGN KEY (module_id) REFERENCES module(id)
          )',
         'CREATE INDEX ix_dep__module_name ON dep(module_name)',
-        # 'CREATE UNIQUE INDEX ix_dep__file_id__module_id ON dep(file_id,module_id)', # not all module have module_id anyway, and ones with module_id should already be correct because dep is a hash with module name as key
+        # not all module have module_id anyway, and ones with module_id should
+        # already be correct because dep is a hash with module name as key
+        # 'CREATE UNIQUE INDEX ix_dep__file_id__module_id ON dep(file_id,module_id)',
+        'CREATE INDEX ix_dep__file_id ON dep(file_id)',
+        'CREATE INDEX ix_dep__dist_id ON dep(dist_id)',
+        'CREATE INDEX ix_dep__module_id ON dep(module_id)',
 
         'CREATE TABLE sub (
              id INTEGER NOT NULL PRIMARY KEY,
@@ -882,6 +887,14 @@ our $db_schema_spec = {
          )',
         'CREATE UNIQUE INDEX ix_sub__name__content_id ON sub(name, content_id)',
 
+    ],
+
+    update_to_v11 => [
+        # forgot to add indices because FOREIGN KEY does not automatically
+        # create indexes
+        'CREATE INDEX ix_dep__file_id ON dep(file_id)',
+        'CREATE INDEX ix_dep__dist_id ON dep(dist_id)',
+        'CREATE INDEX ix_dep__module_id ON dep(module_id)',
     ],
 
     # for testing
