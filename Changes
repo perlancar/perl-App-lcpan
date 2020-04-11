@@ -1,4 +1,12 @@
-1.048   2020-04-11  Released-By: PERLANCAR; Urgency: medium
+1.049   2020-04-11  Released-By: PERLANCAR; Urgency: high
+
+	- [bugfix] A logic bug in --dont-uniquify option broke deps & rdeps
+	  subcommands.
+
+
+1.048   2020-04-11  Released-By: PERLANCAR; Urgency: medium; Broken: yes
+
+        - UPDATE: this release was broken, fixed in 1.048.
 
 	- Bump database schema version to v11 to add some indices on dep
 	  table.
