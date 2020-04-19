@@ -1581,14 +1581,16 @@ sub _update_index {
             }
             next unless $file_id;
 
-            if ($dbh->selectrow_array("SELECT id FROM module WHERE name=?", {}, $pkg)) {
+            my $mod_id;
+            if (($mod_id) = $dbh->selectrow_array("SELECT id FROM module WHERE name=?", {}, $pkg)) {
                 $sth_upd_mod->execute(      $file_id, $author, $ver, _numify_ver($ver), $pkg);
             } else {
                 $sth_ins_mod->execute($pkg, $file_id, $author, $ver, _numify_ver($ver));
+                $mod_id = $dbh->last_insert_id("","","","");
                 _set_namespace($dbh, $pkg);
             }
 
-            log_trace("  New/updated module: %s", $pkg);
+            log_trace("  New/updated module: %s (file ID=%d, module ID=%d)", $pkg, $file_id, $mod_id);
         } # while <fh>
 
         # cleanup: delete file record (as well as dists, modules, and deps
