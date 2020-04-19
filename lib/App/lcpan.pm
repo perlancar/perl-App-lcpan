@@ -3577,19 +3577,19 @@ sub _get_prereqs {
     require Module::CoreList::More;
     require Version::Util;
 
-    my ($mods, $dbh, $memory_by_mod_name, $memory_by_dist_id,
+    my ($mods, $dbh, $memory_by_mod_name, $memory_by_dist_name,
         $level, $max_level, $filters, $plver, $flatten, $dont_uniquify, $phase, $rel) = @_;
 
     log_trace("Finding dependencies for module(s) %s (level=%i) ...", $mods, $level);
 
     # first, check that all modules are listed and belong to a dist
-    my @dist_ids;
+    my @dist_names;
     for my $mod0 (@$mods) {
-        my ($mod, $dist_id);
+        my ($mod, $dist_name);
         if (ref($mod0) eq 'HASH') {
             $mod = $mod0->{mod};
-            $dist_id = $mod0->{dist_id};
-            if (!$dist_id) {
+            $dist_name = $mod0->{dist};
+            if (!defined $dist_name) {
                 # some special names need not be warned
                 unless ($mod =~ /\A(perl|Config)\z/) {
                     log_warn("module '$mod' is not indexed (does not have dist ID), skipped");
@@ -3598,17 +3598,17 @@ sub _get_prereqs {
             }
         } else {
             $mod = $mod0;
-            ($dist_id) = $dbh->selectrow_array("SELECT id FROM dist WHERE is_latest AND file_id=(SELECT file_id FROM module WHERE name=?)", {}, $mod)
-                or return [404, "No such module: $mod"];
+            ($dist_name) = $dbh->selectrow_array("SELECT name FROM dist WHERE file_id IN (SELECT file_id FROM module WHERE name=?) ORDER BY id", {}, $mod);
+            defined $dist_name or return [404, "No such module: $mod"];
         }
-        unless ($memory_by_dist_id->{$dist_id} && $dont_uniquify) {
-            push @dist_ids, $dist_id;
-            $memory_by_dist_id->{$dist_id} = $mod;
+        unless ($memory_by_dist_name->{$dist_name} && $dont_uniquify) {
+            push @dist_names, $dist_name;
+            $memory_by_dist_name->{$dist_name} = $mod;
         }
     }
-    return [200, "OK", []] unless @dist_ids;
+    return [200, "OK", []] unless @dist_names;
 
-    my @wheres = ("dp.dist_id IN (".join(",",grep {defined} @dist_ids).")");
+    my @wheres = ("dp.dist_id IN (SELECT id FROM dist WHERE name IN (".join(",",map {$dbh->quote($_)} grep {defined} @dist_names)."))");
     my @binds = ();
 
     if ($filters->{authors}) {
@@ -3624,14 +3624,13 @@ sub _get_prereqs {
 
     # fetch the dependency information
     my $sth = $dbh->prepare("SELECT
-  dp.dist_id dependent_dist_id,
   (SELECT name   FROM dist   WHERE id=dp.dist_id) AS dist,
   CASE
      WHEN module_name IS NOT NULL THEN module_name
      ELSE (SELECT name   FROM module WHERE id=dp.module_id)
   END AS module,
   (SELECT cpanid FROM module WHERE id=dp.module_id) AS author,
-  (SELECT id     FROM dist   WHERE is_latest AND file_id=(SELECT file_id FROM module WHERE id=dp.module_id)) AS module_dist_id,
+  (SELECT name FROM dist WHERE file_id=(SELECT file_id FROM module WHERE id=dp.module_id)) AS module_dist,
   phase,
   rel,
   version
@@ -3654,7 +3653,11 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
             next;
         }
 
-        if ((exists $memory_by_mod_name->{$row->{module}}) && !$dont_uniquify) {
+        if (!$dont_uniquify && (
+            (exists $memory_by_mod_name->{$row->{module}}) ||
+                ($level > 1 && defined $row->{module_dist} && exists $memory_by_dist_name->{$row->{module_dist}})
+            )
+        ) {
             if ($flatten) {
                 $memory_by_mod_name->{$row->{module}} = $row->{version}
                     if version->parse($row->{version}) > version->parse($memory_by_mod_name->{$row->{module}});
@@ -3673,7 +3676,7 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
         next unless defined $row->{module}; # BUG? we can encounter case where module is undef
         if (defined $memory_by_mod_name->{$row->{module}}) {
             if (Version::Util::version_gt($row->{version}, $memory_by_mod_name->{$row->{module}})) {
-                $memory_by_mod_name->{$row->{version}} = $row->{version};
+                $memory_by_mod_name->{$row->{module}} = $row->{version};
             }
             next unless $dont_uniquify;
         }
@@ -3685,9 +3688,9 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
     }
 
     if (@res && ($max_level==-1 || $level < $max_level)) {
-        my $subres = _get_prereqs([map { {mod=>$_->{module}, dist_id=>$_->{module_dist_id}} } @res], $dbh,
+        my $subres = _get_prereqs([map { {mod=>$_->{module}, dist=>$_->{module_dist}} } @res], $dbh,
                                   $memory_by_mod_name,
-                                  $memory_by_dist_id,
+                                  $memory_by_dist_name,
                                   $level+1, $max_level, $filters, $plver, $flatten, $dont_uniquify, $phase, $rel);
         return $subres if $subres->[0] != 200;
         if ($flatten) {
@@ -3703,13 +3706,13 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
             for my $s (@{$subres->[2]}) {
                 for my $i (0..@res-1) {
                     my $r = $res[$i];
-                    if (defined($s->{dependent_dist_id}) && defined($r->{module_dist_id}) &&
-                            $s->{dependent_dist_id} == $r->{module_dist_id}) {
+                    if (defined($s->{dist}) && defined($r->{module_dist}) &&
+                            $s->{dist} eq $r->{module_dist}) {
                         splice @res, $i+1, 0, $s;
                         next SUBRES_TO_INSERT;
                     }
                 }
-                return [500, "Bug? Can't insert subres (module=$s->{module}, dist_id=$s->{module_dist_id})"];
+                return [500, "Bug? Can't insert subres (module=$s->{module}, module_dist=$s->{module_dist})"];
             }
         }
     }
@@ -4007,8 +4010,6 @@ sub deps {
             unless $args{flatten};
         delete $_->{level};
         delete $_->{dist} unless @$mods > 1;
-        delete $_->{dependent_dist_id};
-        delete $_->{module_dist_id};
     }
 
     my $resmeta = {};
