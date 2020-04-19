@@ -3721,32 +3721,32 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
 }
 
 sub _get_revdeps {
-    my ($mods, $dbh, $memory_by_dist_name, $memory_by_mod_id,
+    my ($mods, $dbh, $memory_by_dist_name, $memory_by_mod_name,
         $level, $max_level, $filters, $flatten, $dont_uniquify, $phase, $rel) = @_;
 
     log_trace("Finding reverse dependencies for module(s) %s ...", $mods);
 
     # first, check that all modules are listed
-    my @mod_ids;
+    my @mod_names;
     for my $mod0 (@$mods) {
-        my ($mod, $mod_id) = @_;
+        my ($mod);
         if (ref($mod0) eq 'HASH') {
             $mod = $mod0->{mod};
-            $mod_id = $mod0->{mod_id};
         } else {
-            $mod = $mod0;
-            ($mod_id) = $dbh->selectrow_array("SELECT id FROM module WHERE name=?", {}, $mod)
-                or return [404, "No such module: $mod"];
+            ($mod) = $dbh->selectrow_array("SELECT name FROM module WHERE name=?", {}, $mod0)
+                or return [404, "No such module: $mod0"];
         }
-        unless ($memory_by_mod_id->{$mod_id} && $dont_uniquify) {
-            push @mod_ids, $mod_id;
-            $memory_by_mod_id->{$mod_id} = $mod;
+        unless ($memory_by_mod_name->{$mod} && $dont_uniquify) {
+            push @mod_names, $mod;
+            $memory_by_mod_name->{$mod} = $mod;
         }
     }
-    return [200, "OK", []] unless @mod_ids;
+    return [200, "OK", []] unless @mod_names;
 
-    my @wheres = ('module_id IN ('.join(",", @mod_ids).')');
+    my @wheres = ('module IN ('.join(",", map {$dbh->quote($_)} @mod_names).')');
     my @binds  = ();
+
+    push @wheres, "dist IS NOT NULL";
 
     if ($filters->{authors}) {
         push @wheres, '('.join(' OR ', ('author=?') x @{$filters->{authors}}).')';
@@ -3758,17 +3758,17 @@ sub _get_revdeps {
             push @binds, $_;
         }
     }
-    push @wheres, "is_latest";
 
     # get all dists that depend on that module
     my $sth = $dbh->prepare("SELECT
-  dp.dist_id dist_id,
-  (SELECT is_latest FROM dist WHERE id=dp.dist_id) is_latest,
-  (SELECT id FROM dist WHERE is_latest AND file_id=(SELECT file_id FROM module WHERE id=dp.module_id)) module_dist_id,
-  (SELECT name    FROM module WHERE dp.module_id=module.id) AS module,
-  (SELECT name    FROM dist WHERE dp.dist_id=dist.id)       AS dist,
-  (SELECT cpanid  FROM file WHERE dp.file_id=file.id)       AS author,
-  (SELECT version FROM dist WHERE dp.dist_id=dist.id)       AS dist_version,
+  -- dp.dist_id AS _dist_id, -- unused, for debugging only
+  -- dp.dist_id AS _mod_id,  -- unused, for debugging only
+
+  (SELECT name      FROM dist WHERE dp.dist_id=dist.id)       AS dist,
+  (SELECT name      FROM dist WHERE file_id=(SELECT file_id FROM module WHERE id=dp.module_id)) module_dist,
+  (SELECT name      FROM module WHERE dp.module_id=module.id) AS module,
+  (SELECT cpanid    FROM file WHERE dp.file_id=file.id)       AS author,
+  (SELECT version   FROM dist WHERE dp.dist_id=dist.id)       AS dist_version,
   phase,
   rel,
   version req_version
@@ -3789,14 +3789,20 @@ ORDER BY dist".($level > 1 ? " DESC" : ""));
     }
 
     if (@res && ($max_level==-1 || $level < $max_level)) {
-        my $sth = $dbh->prepare("SELECT m.id id, m.name name FROM dist d JOIN module m ON d.file_id=m.file_id WHERE d.is_latest AND d.id IN (".join(", ", map {$_->{dist_id}} @res).")");
+        # find the module of those depending dists
+        my $sth = $dbh->prepare("
+SELECT m.name name
+FROM dist d
+JOIN module m
+ON d.file_id=m.file_id
+WHERE d.name IN (".join(", ", map {$dbh->quote($_->{dist})} @res).")");
         $sth->execute();
         my @mods;
         while (my $row = $sth->fetchrow_hashref) {
-            push @mods, {mod=>$row->{name}, mod_id=>$row->{id}};
+            push @mods, {mod=>$row->{name}};
         }
         my $subres = _get_revdeps(\@mods, $dbh,
-                                  $memory_by_dist_name, $memory_by_mod_id,
+                                  $memory_by_dist_name, $memory_by_mod_name,
                                   $level+1, $max_level, $filters, $flatten, $dont_uniquify, $phase, $rel);
         return $subres if $subres->[0] != 200;
         # insert to res in appropriate places
@@ -3804,12 +3810,12 @@ ORDER BY dist".($level > 1 ? " DESC" : ""));
         for my $s (@{$subres->[2]}) {
             for my $i (reverse 0..@res-1) {
                 my $r = $res[$i];
-                if ($s->{module_dist_id} == $r->{dist_id}) {
+                if ($s->{module_dist} eq $r->{dist}) {
                     splice @res, $i+1, 0, $s;
                     next SUBRES_TO_INSERT;
                 }
             }
-            return [500, "Bug? Can't insert subres (dist=$s->{dist}, dist_id=$s->{dist_id})"];
+            return [500, "Bug? Can't insert subres (dist=$s->{dist}, module_dist=$s->{module_dist})"];
         }
     }
 
@@ -4008,8 +4014,8 @@ sub deps {
         }
         $_->{module} = ("  " x ($_->{level}-1)) . $_->{module}
             unless $args{flatten};
+        delete $_->{dist} unless @$mods > 1 || $_->{level} > 1;
         delete $_->{level};
-        delete $_->{dist} unless @$mods > 1;
     }
 
     my $resmeta = {};
@@ -4100,15 +4106,12 @@ sub rdeps {
     for (@{$res->[2]}) {
         $_->{dist} = ("  " x ($_->{level}-1)) . $_->{dist}
             unless $args{flatten};
+        delete $_->{module} unless @$mods > 1 || $_->{level} > 1;
         delete $_->{level};
-        delete $_->{dist_id};
-        delete $_->{module_dist_id};
-        delete $_->{module} unless @$mods > 1;
-        delete $_->{is_latest};
     }
 
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/module dist author dist_version req_version/];
+    $resmeta->{'table.fields'} = [qw/dist author dist_version req_version/];
     $res->[3] = $resmeta;
     $res;
 }
