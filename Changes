@@ -1,3 +1,9 @@
+1.051   2020-04-20  Released-By: PERLANCAR; Urgency: medium
+
+	- Add unique indexes for PK which apparently are not added for
+	  tables that have other unique indexes.
+
+
 1.050   2020-04-19  Released-By: PERLANCAR; Urgency: medium
 
 	- [subcommand deps] Fix query: do not link queries using dist_id +
