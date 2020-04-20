@@ -550,7 +550,7 @@ sub _set_namespace {
 }
 
 our $db_schema_spec = {
-    latest_v => 11,
+    latest_v => 12,
 
     install => [
         'CREATE TABLE author (
@@ -597,6 +597,7 @@ our $db_schema_spec = {
              has_makefilepl INTEGER,
              has_buildpl INTEGER
         )',
+        'CREATE UNIQUE INDEX ix_file__id ON file(id)', # not created automatically when there is another unique index?
         'CREATE UNIQUE INDEX ix_file__cpanid__name ON file(cpanid,name)',
 
         # files inside the release archive file
@@ -608,6 +609,7 @@ our $db_schema_spec = {
              mtime INT,
              size INT -- uncompressed size
         )',
+        'CREATE UNIQUE INDEX ix_content__id ON content(id)', # not created automatically when there is another unique index?
         'CREATE UNIQUE INDEX ix_content__file_id__path ON content(file_id, path)',
         'CREATE INDEX ix_content__package ON content(package)',
 
@@ -621,6 +623,7 @@ our $db_schema_spec = {
              content_id INTEGER REFERENCES content(id),
              abstract TEXT
          )',
+        'CREATE UNIQUE INDEX ix_module__id ON module(id)', # not created automatically when there is another unique index?
         'CREATE UNIQUE INDEX ix_module__name ON module(name)',
         'CREATE INDEX ix_module__file_id ON module(file_id)',
         'CREATE INDEX ix_module__cpanid ON module(cpanid)',
@@ -633,6 +636,7 @@ our $db_schema_spec = {
              content_id INT REFERENCES content(id),
              abstract TEXT
         )',
+        'CREATE UNIQUE INDEX ix_script__id ON script(id)', # not created automatically when there is another unique index?
         'CREATE UNIQUE INDEX ix_script__file_id__name ON script(file_id, name)',
         'CREATE INDEX ix_script__name ON script(name)',
 
@@ -644,6 +648,7 @@ our $db_schema_spec = {
              module_name TEXT,  -- if mention module and module is unknown (unlisted in module table), only the name will be recorded here
              script_name TEXT   -- if mention script
         )',
+        'CREATE UNIQUE INDEX ix_mention__id ON mention(id)', # not created automatically when there is another unique index?
         'CREATE UNIQUE INDEX ix_mention__module_id__source_content_id   ON mention(module_id, source_content_id)',
         'CREATE UNIQUE INDEX ix_mention__module_name__source_content_id ON mention(module_name, source_content_id)',
         'CREATE UNIQUE INDEX ix_mention__script_name__source_content_id ON mention(script_name, source_content_id)',
@@ -666,6 +671,7 @@ our $db_schema_spec = {
              version_numified DECIMAL,
              is_latest BOOLEAN -- [cache]
          )',
+        'CREATE UNIQUE INDEX ix_dist__id ON dist(id)', # not created automatically when there is another unique index?
         'CREATE INDEX ix_dist__name ON dist(name)',
         'CREATE UNIQUE INDEX ix_dist__file_id ON dist(file_id)',
         'CREATE INDEX ix_dist__cpanid ON dist(cpanid)',
@@ -698,6 +704,7 @@ our $db_schema_spec = {
              name TEXT NOT NULL,
              linum INTEGER NOT NULL
          )',
+        'CREATE UNIQUE INDEX ix_sub__id ON sub(id)', # not created automatically when there is another unique index?
         'CREATE UNIQUE INDEX ix_sub__name__content_id ON sub(name, content_id)',
 
     ], # install
@@ -895,6 +902,16 @@ our $db_schema_spec = {
         'CREATE INDEX ix_dep__file_id ON dep(file_id)',
         'CREATE INDEX ix_dep__dist_id ON dep(dist_id)',
         'CREATE INDEX ix_dep__module_id ON dep(module_id)',
+    ],
+
+    upgrade_to_v12 => [
+        'CREATE UNIQUE INDEX ix_file__id ON file(id)', # not created automatically when there is another unique index?
+        'CREATE UNIQUE INDEX ix_content__id ON content(id)', # not created automatically when there is another unique index?
+        'CREATE UNIQUE INDEX ix_module__id ON module(id)', # not created automatically when there is another unique index?
+        'CREATE UNIQUE INDEX ix_script__id ON script(id)', # not created automatically when there is another unique index?
+        'CREATE UNIQUE INDEX ix_mention__id ON mention(id)', # not created automatically when there is another unique index?
+        'CREATE UNIQUE INDEX ix_dist__id ON dist(id)', # not created automatically when there is another unique index?
+        'CREATE UNIQUE INDEX ix_sub__id ON sub(id)', # not created automatically when there is another unique index?
     ],
 
     # for testing
