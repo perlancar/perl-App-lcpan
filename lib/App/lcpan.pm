@@ -2105,13 +2105,26 @@ sub _update_index {
                      " WHERE name IN (".join(", ", map {$dbh->quote($_)} sort keys %dists).")");
     }
 
-    $dbh->do("INSERT OR REPLACE INTO meta (name,value) VALUES (?,?)",
-             {}, 'last_index_time', time());
-    {
-        # record the module version that does the indexing
-        no strict 'refs';
+  UPDATE_TIMESTAMPS: {
+        my $now = time();
+        my ($index_creation_time_exists) = $dbh->selectrow_array(
+            "SELECT 1 FROM META WHERE name='index_creation_time'");
+        my ($last_index_time) = $dbh->selectrow_array(
+            "SELECT value FROM META WHERE name='last_index_time'");
+        unless ($index_creation_time_exists) {
+            $dbh->do("INSERT INTO meta (name,value) VALUES (?,?)",
+                     {}, 'index_creation_time',
+                     $last_index_time ? undef : $now);
+        }
         $dbh->do("INSERT OR REPLACE INTO meta (name,value) VALUES (?,?)",
-                 {}, 'indexer_version', ${__PACKAGE__.'::VERSION'});
+                 {}, 'last_index_time', $now);
+
+        # record the module version that does the indexing
+        {
+            no strict 'refs';
+            $dbh->do("INSERT OR REPLACE INTO meta (name,value) VALUES (?,?)",
+                     {}, 'indexer_version', ${__PACKAGE__.'::VERSION'});
+        }
     }
 
     [200];
@@ -2350,6 +2363,11 @@ FROM file");
 
     ($stat->{num_subs}) = $dbh->selectrow_array("SELECT COUNT(*) FROM sub");
 
+    {
+        my ($time) = $dbh->selectrow_array("SELECT value FROM meta WHERE name='index_creation_time'");
+        $stat->{raw_index_creation_time} = $time;
+        $stat->{index_creation_time} = _fmt_time($time);
+    }
     {
         my ($time) = $dbh->selectrow_array("SELECT value FROM meta WHERE name='last_index_time'");
         $stat->{raw_last_index_time} = $time;
