@@ -1,3 +1,15 @@
+1.052   2020-05-04  Released-By: PERLANCAR; Urgency: medium
+
+	- Bump database schema version to 13 to add rec_mtime and rec_mtime to
+	  all tables. Recording ctime and mtime will allow users to check for
+	  newly added/updated authors, distributions, modules, and so on.
+
+        - Add filter options --added-{before,after} & --updated-{before,after}
+          to some subcommands.
+
+	- Record index creation time and show it in 'stats'.
+
+
 1.051   2020-04-20  Released-By: PERLANCAR; Urgency: medium
 
 	- Add unique indexes for PK which apparently are not added for
