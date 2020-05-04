@@ -33,8 +33,11 @@ sub handle_text {
             log_trace("    found a mention in naked text to unknown module: %s", $1);
             $module_name = $1;
         }
+        my $now = time();
         $self->{sth_ins_mention}->execute(
-            $self->{content_id}, $self->{file_id}, $module_id, $module_name, undef);
+            $self->{content_id}, $self->{file_id}, $module_id, $module_name, undef,
+            $now,$now,
+        );
     }
 }
 
@@ -66,8 +69,11 @@ sub start_L {
         # name doesn't look like a module name, skip
         return;
     }
+    my $now = time();
     $self->{sth_ins_mention}->execute(
-        $self->{content_id}, $self->{file_id}, $module_id, $module_name, $script_name);
+        $self->{content_id}, $self->{file_id}, $module_id, $module_name, $script_name,
+        $now,$now,
+    );
 }
 
 1;
