@@ -1,6 +1,6 @@
 1.052   2020-05-04  Released-By: PERLANCAR; Urgency: medium
 
-	- Bump database schema version to 13 to add rec_mtime and rec_mtime to
+	- Bump database schema version to v13 to add rec_mtime and rec_mtime to
 	  all tables. Recording ctime and mtime will allow users to check for
 	  newly added/updated authors, distributions, modules, and so on.
 
@@ -12,8 +12,8 @@
 
 1.051   2020-04-20  Released-By: PERLANCAR; Urgency: medium
 
-	- Add unique indexes for PK which apparently are not added for
-	  tables that have other unique indexes.
+	- Add unique indexes for PK which apparently are not added for tables
+	  that have other unique indexes (bump database schema version to v12).
 
 
 1.050   2020-04-19  Released-By: PERLANCAR; Urgency: medium
@@ -575,7 +575,7 @@
           '--no-skip-sub-indexing' option during 'lcpan update'. It increases
           index size to ~360M on current mini CPAN.
 
-        - Bump database schema version to 10 to support subroutine indexing and
+        - Bump database schema version to v10 to support subroutine indexing and
           force reindexing of content/script/mention.
 
         [Enhancements]
