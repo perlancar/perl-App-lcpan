@@ -31,6 +31,8 @@ $SPEC{'handle_cmd'} = {
             schema => ['array*', of=>'str*'],
             element_completion => \&App::lcpan::_complete_cpanid,
         },
+        %App::lcpan::fctime_args,
+        %App::lcpan::fmtime_args,
     },
 };
 sub handle_cmd {
