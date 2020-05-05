@@ -529,6 +529,15 @@ sub _relpath {
         substr($cpanid, 0, 2)."/$cpanid/$filename";
 }
 
+sub _dblog {
+    no strict 'refs';
+
+    my ($dbh, $level, $category, $summary) = @_;
+    $dbh->do("INSERT INTO log (date,lcpan_version,pid, level,category,summary) VALUES (?,?,?, ?,?,?)", {},
+             time(), ${__PACKAGE__ . "::VERSION"}, $$,
+             $level, $category, $summary);
+}
+
 sub _fill_namespace {
     my $dbh = shift;
 
@@ -776,6 +785,17 @@ our $db_schema_spec = {
         'CREATE INDEX ix_sub__rec_ctime ON sub(rec_ctime)',
         'CREATE INDEX ix_sub__rec_mtime ON sub(rec_mtime)',
 
+        'CREATE TABLE log (
+             id INTEGER NOT NULL PRIMARY KEY,
+             date INTEGER NOT NULL,
+             pid INTEGER NOT NULL,
+             level INTEGER NOT NULL, # like in Log::ger: fatal=10, error=20, warn=30, info=40, debug=50, trace=60
+             category TEXT NOT NULL,
+             summary TEXT NOT NULL
+         )',
+        'CREATE UNIQUE INDEX ix_log__id ON log(id)',
+        'CREATE INDEX ix_log__date ON log(date)',
+        'CREATE INDEX ix_log__category ON log(category)',
     ], # install
 
     upgrade_to_v2 => [
@@ -1056,6 +1076,22 @@ our $db_schema_spec = {
         'CREATE INDEX ix_sub__rec_mtime ON sub(rec_mtime)',
         "UPDATE sub SET rec_ctime=(SELECT value FROM meta WHERE name='last_index_time') WHERE rec_ctime IS NULL",
         "UPDATE sub SET rec_mtime=(SELECT value FROM meta WHERE name='last_index_time') WHERE rec_mtime IS NULL",
+    ],
+
+    upgrade_to_v14 => [
+        # add log table
+        'CREATE TABLE log (
+             id INTEGER NOT NULL PRIMARY KEY,
+             date INTEGER NOT NULL,
+             lcpan_version TEXT,
+             pid INTEGER NOT NULL,
+             level INTEGER NOT NULL, # like in Log::ger: fatal=10, error=20, warn=30, info=40, debug=50, trace=60
+             category TEXT NOT NULL,
+             summary TEXT NOT NULL
+         )',
+        'CREATE UNIQUE INDEX ix_log__id ON log(id)',
+        'CREATE INDEX ix_log__date ON log(date)',
+        'CREATE INDEX ix_log__category ON log(category)',
     ],
 
     # for testing
@@ -1624,6 +1660,8 @@ sub _update_index {
             _reset($dbh);
         }
     }
+
+    _dblog($dbh, 40, "update_index", "Begin updating index");
 
     # parse 01mailrc.txt.gz and insert the parse result to 'author' table
   PARSE_MAILRC:
@@ -2272,6 +2310,9 @@ sub _update_index {
 
   UPDATE_TIMESTAMPS: {
         my $now = time();
+
+        _dblog($dbh, 40, "update_index", "Finish updating index");
+
         my ($index_creation_time_exists) = $dbh->selectrow_array(
             "SELECT 1 FROM META WHERE name='index_creation_time'");
         my ($last_index_time) = $dbh->selectrow_array(
