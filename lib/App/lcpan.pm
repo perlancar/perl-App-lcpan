@@ -2656,8 +2656,8 @@ sub log {
     while (my $row = $sth->fetchrow_hashref) { push @rows, $row }
 
     [200, "OK", \@rows, {
-        'table.fields'        => ['id', 'date', 'pid', 'level', 'category', 'summary'],
-        'table.field_formats' => [undef, 'iso8601_datetime', undef, undef, undef, undef],
+        'table.fields'        => ['id', 'date', 'pid', 'lcpan_version', 'level', 'category', 'summary'],
+        'table.field_formats' => [undef, 'iso8601_datetime', undef, undef, undef, undef, undef],
     }];
 }
 
