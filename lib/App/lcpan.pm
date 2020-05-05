@@ -2609,6 +2609,30 @@ FROM file");
     [200, "OK", $stat];
 }
 
+$SPEC{'log'} = {
+    v => 1.1,
+    summary => 'Show database index log',
+    args => {
+        %common_args,
+    },
+};
+sub log {
+    my %args = @_;
+
+    my $state = _init(\%args, 'ro');
+    my $dbh = $state->{dbh};
+
+    my $sth = $dbh->prepare("SELECT * FROM log ORDER BY date");
+    $sth->execute;
+    my @rows;
+    while (my $row = $sth->fetchrow_hashref) { push @rows, $row }
+
+    [200, "OK", \@rows, {
+        'table.fields'        => ['id', 'date', 'pid', 'level', 'category', 'summary'],
+        'table.field_formats' => [undef, 'iso8601_datetime', undef, undef, undef, undef],
+    }];
+}
+
 sub _complete_mod {
     my %args = @_;
 
