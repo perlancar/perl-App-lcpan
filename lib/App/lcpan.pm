@@ -2501,6 +2501,7 @@ sub _reset {
     $dbh->do("DELETE FROM content")   if _table_exists($dbh, "main", "content");
     $dbh->do("DELETE FROM file");
     $dbh->do("DELETE FROM author");
+    $dbh->do("DELETE FROM log")       if _table_exists($dbh, "main", "log");
 
     $dbh->do("DELETE FROM meta WHERE name='index_creation_time'");
 }
@@ -2508,6 +2509,16 @@ sub _reset {
 $SPEC{'reset'} = {
     v => 1.1,
     summary => 'Reset (empty) the database index',
+    description => <<'_',
+
+All data tables will be emptied. This includes all records in the `log` table as
+well as `index_creation_time` record in the `meta` table, so there is no records
+of previous indexing activity. There is also no record of resetting in the
+`log`.
+
+Tables are not dropped and re-created. The `meta` table is not emptied.
+
+_
     args => {
         %common_args,
     },
