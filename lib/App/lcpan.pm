@@ -815,6 +815,7 @@ our $db_schema_spec = {
         'CREATE TABLE log (
              id INTEGER NOT NULL PRIMARY KEY,
              date INTEGER NOT NULL,
+             lcpan_version TEXT,
              pid INTEGER NOT NULL,
              level INTEGER NOT NULL, -- like in Log::ger: fatal=10, error=20, warn=30, info=40, debug=50, trace=60
              category TEXT NOT NULL,
