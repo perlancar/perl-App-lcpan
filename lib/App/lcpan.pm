@@ -252,6 +252,12 @@ our %fctime_args = (
         schema => ['date*', 'x.perl.coerce_rules' => ['From_str::natural']],
         tags => ['category:filtering'],
     },
+    added_in_last_update => {
+        summary => 'Include only records that are added during the last index update',
+        schema => 'true*',
+        tags => ['category:filtering'],
+    },
+    # XXX choose one: added_before/after or added_in_last_update
 );
 
 our %fmtime_args = (
@@ -265,6 +271,12 @@ our %fmtime_args = (
         schema => ['date*', 'x.perl.coerce_rules' => ['From_str::natural']],
         tags => ['category:filtering'],
     },
+    updated_in_last_update => {
+        summary => 'Include only records that are updated during the last index update',
+        schema => 'true*',
+        tags => ['category:filtering'],
+    },
+    # XXX choose one: added_before/after or added_in_last_update
 );
 
 our %perl_version_args = (
@@ -498,6 +510,21 @@ sub _set_args_default {
     $args->{index_name} //= 'index.db';
     if (!defined($args->{num_backups})) {
         $args->{num_backups} = 7;
+    }
+}
+
+# set {added,updated}_after time when {added,update}_in_last_updated
+sub _set_added_updated_times {
+    my ($args, $dbh) = @_;
+
+    if ($args->{added_in_last_update} || $args->{updated_in_last_update}) {
+        my ($time) = $dbh->selectrow_array("SELECT date FROM log WHERE category='update_index' AND summary LIKE 'Begin%' ORDER BY date DESC");
+        if (delete $args->{added_in_last_update}) {
+            $args->{added_after} //= $time // 0;
+        }
+        if (delete $args->{updated_in_last_update}) {
+            $args->{added_after} //= $time // 0;
+        }
     }
 }
 
@@ -3245,6 +3272,7 @@ sub authors {
         }
     }
 
+    _set_added_updated_times(\%args, $dbh);
     if (defined $args{added_before}  ) { push @where, "author.rec_ctime < ". (0+$args{added_before}) }
     if (defined $args{added_after}   ) { push @where, "author.rec_ctime > ". (0+$args{added_after}) }
     if (defined $args{updated_before}) { push @where, "author.rec_mtime < ". (0+$args{updated_before}) }
@@ -3418,6 +3446,7 @@ sub modules {
         push @where, "NOT dist.is_latest";
     }
 
+    _set_added_updated_times(\%args, $dbh);
     if (defined $args{added_before}  ) { push @where, "module.rec_ctime < ". (0+$args{added_before}) }
     if (defined $args{added_after}   ) { push @where, "module.rec_ctime > ". (0+$args{added_after}) }
     if (defined $args{updated_before}) { push @where, "module.rec_mtime < ". (0+$args{updated_before}) }
@@ -3679,6 +3708,7 @@ sub dists {
         push @bind, $args{rel_mtime_newer_than};
     }
 
+    _set_added_updated_times(\%args, $dbh);
     if (defined $args{added_before}  ) { push @where, "d.rec_ctime < ". (0+$args{added_before}) }
     if (defined $args{added_after}   ) { push @where, "d.rec_ctime > ". (0+$args{added_after}) }
     if (defined $args{updated_before}) { push @where, "d.rec_mtime < ". (0+$args{updated_before}) }
@@ -3833,6 +3863,7 @@ sub releases {
         push @where, "NOT(d.is_latest)";
     }
 
+    _set_added_updated_times(\%args, $dbh);
     if (defined $args{added_before}  ) { push @where, "f1.rec_ctime < ". (0+$args{added_before}) }
     if (defined $args{added_after}   ) { push @where, "f1.rec_ctime > ". (0+$args{added_after}) }
     if (defined $args{updated_before}) { push @where, "f1.rec_mtime < ". (0+$args{updated_before}) }
@@ -4312,6 +4343,7 @@ sub deps {
     my $include_indexed = $args{include_indexed} // 1;
     my $include_unindexed = $args{include_unindexed} // 1;
 
+    _set_added_updated_times(\%args, $dbh);
     my $filters = {
         include_core => $include_core,
         include_noncore => $include_noncore,
@@ -4424,6 +4456,7 @@ sub rdeps {
     my $authors =  $args{authors} ? [map {uc} @{$args{authors}}] : undef;
     my $authors_arent = $args{authors_arent} ? [map {uc} @{$args{authors_arent}}] : undef;
 
+    _set_added_updated_times(\%args, $dbh);
     my $filters = {
         authors => $authors,
         authors_arent => $authors_arent,
@@ -4542,6 +4575,7 @@ sub namespaces {
         push @bind, $args{level}-1;
     }
 
+    _set_added_updated_times(\%args, $dbh);
     if (defined $args{added_before}  ) { push @where, "namespace.rec_ctime < ". (0+$args{added_before}) }
     if (defined $args{added_after}   ) { push @where, "namespace.rec_ctime > ". (0+$args{added_after}) }
     if (defined $args{updated_before}) { push @where, "namespace.rec_mtime < ". (0+$args{updated_before}) }
