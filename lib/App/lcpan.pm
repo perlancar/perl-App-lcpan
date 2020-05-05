@@ -257,7 +257,12 @@ our %fctime_args = (
         schema => 'true*',
         tags => ['category:filtering'],
     },
-    # XXX choose one: added_before/after or added_in_last_update
+    added_in_last_n_updates => {
+        summary => 'Include only records that are added during the last N index updates',
+        schema => 'posint*',
+        tags => ['category:filtering'],
+    },
+    # XXX choose one: added_before/after or added_in_last_update or added_in_last_n_updates
 );
 
 our %fmtime_args = (
@@ -276,7 +281,12 @@ our %fmtime_args = (
         schema => 'true*',
         tags => ['category:filtering'],
     },
-    # XXX choose one: added_before/after or added_in_last_update
+    updated_in_last_n_updates => {
+        summary => 'Include only records that are updated during the last N index updates',
+        schema => 'posint*',
+        tags => ['category:filtering'],
+    },
+    # XXX choose one: updated_before/after or updated_in_last_update or updated_in_last_n_updates
 );
 
 our %perl_version_args = (
@@ -523,8 +533,32 @@ sub _set_added_updated_times {
             $args->{added_after} //= $time // 0;
         }
         if (delete $args->{updated_in_last_update}) {
-            $args->{added_after} //= $time // 0;
+            $args->{updated_after} //= $time // 0;
         }
+    }
+
+    {
+        last unless defined $args->{added_in_last_n_updates};
+        my $n = int($args->{added_in_last_n_updates});
+        last unless $n >= 1;
+        my $sth = $dbh->prepare("SELECT date FROM log WHERE category='update_index' AND summary LIKE 'Begin%' ORDER BY date DESC");
+        $sth->execute;
+        my $i = 0;
+        my $time;
+        1 while ++$i <= $n && (($time) = $sth->fetchrow_array);
+        $args->{added_after} //= $time // 0;
+    }
+
+    {
+        last unless defined $args->{updated_in_last_n_updates};
+        my $n = int($args->{updated_in_last_n_updates});
+        last unless $n >= 1;
+        my $sth = $dbh->prepare("SELECT date FROM log WHERE category='update_index' AND summary LIKE 'Begin%' ORDER BY date DESC");
+        $sth->execute;
+        my $i = 0;
+        my $time;
+        1 while ++$i <= $n && (($time) = $sth->fetchrow_array);
+        $args->{updated_after} //= $time // 0;
     }
 }
 
