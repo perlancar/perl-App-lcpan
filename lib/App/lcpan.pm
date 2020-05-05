@@ -2460,6 +2460,8 @@ sub _reset {
     $dbh->do("DELETE FROM content")   if _table_exists($dbh, "main", "content");
     $dbh->do("DELETE FROM file");
     $dbh->do("DELETE FROM author");
+
+    $dbh->do("DELETE FROM meta WHERE name='index_creation_time'");
 }
 
 $SPEC{'reset'} = {
