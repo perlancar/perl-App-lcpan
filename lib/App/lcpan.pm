@@ -1864,7 +1864,8 @@ sub _update_index {
                 $pass == 2 ?
                 "SELECT * FROM file WHERE pod_status IS NULL AND file_status NOT IN ('nofile','unsupported','err') ORDER BY name" :
 
-                "SELECT * FROM file WHERE sub_status IS NULL AND file_status NOT IN ('nofile','unsupported','err') AND EXISTS(SELECT id FROM content WHERE file_id=file.id AND package IS NOT NULL) ORDER BY name"
+                "SELECT * FROM file WHERE sub_status IS NULL AND file_status NOT IN ('nofile','unsupported','err') ".
+                "AND EXISTS(SELECT id FROM content WHERE file_id=file.id AND package IS NOT NULL) ORDER BY name"
         );
         $sth->execute;
 
@@ -2214,16 +2215,19 @@ sub _update_index {
 
                 if (my $reason = $builtin_file_skip_list_sub{ $file->{name} }) {
                     log_info("Skipped indexing subs for file %s (reason: built-in file skip list for sub: %s)", $file->{name}, $reason);
+                    $sth_set_sub_status->execute("skipped", time(), $file->{id});
                     last;
                 }
 
                 if ($args{skip_sub_indexing_files} && first {$_ eq $file->{name}} @{ $args{skip_sub_indexing_files} }) {
                     log_info("Skipped indexing subs for file %s (reason: skip_sub_indexing_files)", $file->{name});
+                    $sth_set_sub_status->execute("skipped", time(), $file->{id});
                     last;
                 }
 
                 if ($args{skip_sub_indexing_file_patterns} && first {$file->{name} =~ $_} @{ $args{skip_sub_indexing_file_patterns} }) {
                     log_info("Skipped indexing subs for file %s (reason: skip_sub_indexing_file_patterns)", $file->{name});
+                    $sth_set_sub_status->execute("skipped", time(), $file->{id});
                     last;
                 }
 
