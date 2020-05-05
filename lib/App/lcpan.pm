@@ -587,7 +587,7 @@ sub _set_namespace {
 }
 
 our $db_schema_spec = {
-    latest_v => 13,
+    latest_v => 14,
 
     install => [
         'CREATE TABLE author (
