@@ -1974,7 +1974,7 @@ sub _update_index {
 
         my $sth_set_meta_status = $dbh->prepare("UPDATE file SET meta_status=?,meta_error=?, rec_mtime=? WHERE id=?");
         my $sth_set_meta_info = $dbh->prepare("UPDATE file SET has_metajson=?,has_metayml=?,has_makefilepl=?,has_buildpl=?, rec_mtime=? WHERE id=?");
-        my $sth_ins_dist = $dbh->prepare("INSERT OR REPLACE INTO dist (name,cpanid,abstract,file_id,version,version_numified, rec_ctime,rec_mtime) VALUES (?,?,?,?,?,?, ?,?)");
+        my $sth_ins_dist = $dbh->prepare("INSERT INTO dist (name,cpanid,abstract,file_id,version,version_numified, rec_ctime,rec_mtime) VALUES (?,?,?,?,?,?, ?,?)");
         my $sth_upd_dist = $dbh->prepare("UPDATE dist SET cpanid=?,abstract=?,file_id=?,version=?,version_numified=?, rec_mtime=? WHERE id=?");
         my $sth_ins_dep = $dbh->prepare("INSERT OR REPLACE INTO dep (file_id,dist_id,module_id,module_name,phase,rel, version,version_numified, rec_ctime,rec_mtime) VALUES (?,?,?,?,?,?, ?,?, ?,?)");
 
@@ -2361,9 +2361,9 @@ sub _update_index {
         }
     } # process files
 
-    #, try to extract its CPAN META or
-    # Makefile.PL/Build.PL (dependencies information), parse its PODs
-    # (module/script abstracts, 'mentions' information)
+    # TODO: try to extract its CPAN META or Makefile.PL/Build.PL (dependencies
+    # information), parse its PODs (module/script abstracts, 'mentions'
+    # information)
 
     # there remains some files for which we haven't determine the dist name of
     # (e.g. non-existing file, no info, other error). we determine the dist from
