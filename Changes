@@ -1,3 +1,8 @@
+1.056   2020-05-06  Released-By: PERLANCAR; Urgency: medium
+
+	- [testing] Avoid error when testing database schema version upgrades.
+
+
 1.055   2020-05-06  Released-By: PERLANCAR; Urgency: medium
 
 	- [testing] Add some basic tests, finally.
