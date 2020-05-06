@@ -655,7 +655,7 @@ sub _set_namespace {
 }
 
 our $db_schema_spec = {
-    latest_v => 15,
+    latest_v => 16,
 
     install => [
         'CREATE TABLE author (
@@ -692,6 +692,12 @@ our $db_schema_spec = {
              meta_status TEXT,
              meta_error TEXT,
 
+             dist_name TEXT,
+             dist_abstract TEXT,
+             dist_version VARCHAR(20),
+             dist_version_numified VARCHAR(20),
+             is_latest_dist BOOLEAN,
+
              -- POD processing status: ok (POD has been extracted and
              -- parsed/indexed).
 
@@ -713,6 +719,7 @@ our $db_schema_spec = {
         'CREATE UNIQUE INDEX ix_file__cpanid__name ON file(cpanid,name)',
         'CREATE INDEX ix_file__rec_ctime ON file(rec_ctime)',
         'CREATE INDEX ix_file__rec_mtime ON file(rec_mtime)',
+        'CREATE INDEX ix_file__dist_name ON file(dist_name)',
 
         # files inside the release archive file
         'CREATE TABLE content (
@@ -795,28 +802,8 @@ our $db_schema_spec = {
         'CREATE INDEX ix_namespace__rec_ctime ON namespace(rec_ctime)',
         'CREATE INDEX ix_namespace__rec_mtime ON namespace(rec_mtime)',
 
-        'CREATE TABLE dist (
-             id INTEGER NOT NULL PRIMARY KEY,
-             name VARCHAR(90) NOT NULL,
-             cpanid VARCHAR(20) NOT NULL REFERENCES author(cpanid), -- [cache]
-             abstract TEXT,
-             file_id INTEGER NOT NULL,
-             version VARCHAR(20),
-             version_numified DECIMAL,
-             is_latest BOOLEAN, -- [cache]
-             rec_ctime INT,
-             rec_mtime INT
-         )',
-        'CREATE UNIQUE INDEX ix_dist__id ON dist(id)', # not created automatically when there is another unique index?
-        'CREATE INDEX ix_dist__name ON dist(name)',
-        'CREATE UNIQUE INDEX ix_dist__file_id ON dist(file_id)',
-        'CREATE INDEX ix_dist__cpanid ON dist(cpanid)',
-        'CREATE INDEX ix_dist__rec_ctime ON dist(rec_ctime)',
-        'CREATE INDEX ix_dist__rec_mtime ON dist(rec_mtime)',
-
         'CREATE TABLE dep (
              file_id INTEGER,
-             dist_id INTEGER, -- [cache]
              module_id INTEGER, -- if module is known (listed in module table), only its id will be recorded here
              module_name TEXT,  -- if module is unknown (unlisted in module table), only the name will be recorded here
              rel TEXT, -- relationship: requires, ...
@@ -826,7 +813,6 @@ our $db_schema_spec = {
              rec_ctime INT,
              rec_mtime INT,
              FOREIGN KEY (file_id) REFERENCES file(id),
-             FOREIGN KEY (dist_id) REFERENCES dist(id),
              FOREIGN KEY (module_id) REFERENCES module(id)
          )',
         'CREATE INDEX ix_dep__module_name ON dep(module_name)',
@@ -834,7 +820,6 @@ our $db_schema_spec = {
         # already be correct because dep is a hash with module name as key
         # 'CREATE UNIQUE INDEX ix_dep__file_id__module_id ON dep(file_id,module_id)',
         'CREATE INDEX ix_dep__file_id ON dep(file_id)',
-        'CREATE INDEX ix_dep__dist_id ON dep(dist_id)',
         'CREATE INDEX ix_dep__module_id ON dep(module_id)',
         'CREATE INDEX ix_dep__rec_ctime ON dep(rec_ctime)',
         'CREATE INDEX ix_dep__rec_mtime ON dep(rec_mtime)',
@@ -1173,6 +1158,19 @@ our $db_schema_spec = {
         },
     ],
 
+    upgrade_to_v16 => [
+        # we merge 'dist' into 'file' table to make things simpler, because
+        # 'dist' has a 1:1 relationship with 'file'
+        'ALTER TABLE file ADD COLUMN dist_name TEXT',
+        'ALTER TABLE file ADD COLUMN dist_abstract TEXT',
+        'ALTER TABLE file ADD COLUMN dist_version VARCHAR(20)',
+        'ALTER TABLE file ADD COLUMN dist_version_numified VARCHAR(20)',
+        'ALTER TABLE file ADD COLUMN is_latest_dist BOOLEAN',
+        'CREATE INDEX ix_file__dist_name ON file(dist_name)',
+
+        'DROP TABLE dist',
+    ],
+
     # for testing
     install_v1 => [
         'CREATE TABLE author (
@@ -1356,7 +1354,7 @@ sub _parse_meta_yml {
 }
 
 sub _add_prereqs {
-    my ($file_id, $dist_id, $hash, $phase, $rel, $sth_ins_dep, $sth_sel_mod) = @_;
+    my ($file_id, $hash, $phase, $rel, $sth_ins_dep, $sth_sel_mod) = @_;
     log_trace("  Adding prereqs (%s %s): %s", $phase, $rel, $hash);
     my $now = time();
     for my $mod (keys %$hash) {
@@ -1369,7 +1367,7 @@ sub _add_prereqs {
             $mod_name = $mod;
         }
         my $ver = $hash->{$mod};
-        $sth_ins_dep->execute($file_id, $dist_id, $mod_id, $mod_name, $phase,
+        $sth_ins_dep->execute($file_id, $mod_id, $mod_name, $phase,
                               $rel, $ver, _numify_ver($ver),
                               $now, $now);
     }
@@ -1569,17 +1567,6 @@ sub _delete_releases_records {
 
         log_trace("  Deleting module records");
         $dbh->do("DELETE FROM module WHERE file_id IN (".join(",",@file_ids).")");
-    }
-
-    my %changed_dists;
-    {
-        my $sth = $dbh->prepare("SELECT name FROM dist WHERE file_id IN (".join(",",@file_ids).")");
-        $sth->execute;
-        while (my @row = $sth->fetchrow_array) {
-            $changed_dists{$row[0]}++;
-        }
-        log_trace("  Deleting dist records");
-        $dbh->do("DELETE FROM dist WHERE file_id IN (".join(",",@file_ids).")");
     }
 
     log_trace("  Deleting mention records");
@@ -1824,10 +1811,6 @@ sub _update_index {
         }
     }
 
-    # these hashes maintain the dist names that are changed so we can refresh
-    # the 'is_latest' field later at the end of indexing process
-    my %changed_dists;
-
     # parse 02packages.details.txt.gz and insert the parse result to 'file' and
     # 'module' tables. we haven't parsed distribution names yet because that
     # will need information from META.{json,yaml} inside release files.
@@ -1974,9 +1957,8 @@ sub _update_index {
 
         my $sth_set_meta_status = $dbh->prepare("UPDATE file SET meta_status=?,meta_error=?, rec_mtime=? WHERE id=?");
         my $sth_set_meta_info = $dbh->prepare("UPDATE file SET has_metajson=?,has_metayml=?,has_makefilepl=?,has_buildpl=?, rec_mtime=? WHERE id=?");
-        my $sth_ins_dist = $dbh->prepare("INSERT INTO dist (name,cpanid,abstract,file_id,version,version_numified, rec_ctime,rec_mtime) VALUES (?,?,?,?,?,?, ?,?)");
-        my $sth_upd_dist = $dbh->prepare("UPDATE dist SET cpanid=?,abstract=?,file_id=?,version=?,version_numified=?, rec_mtime=? WHERE id=?");
-        my $sth_ins_dep = $dbh->prepare("INSERT OR REPLACE INTO dep (file_id,dist_id,module_id,module_name,phase,rel, version,version_numified, rec_ctime,rec_mtime) VALUES (?,?,?,?,?,?, ?,?, ?,?)");
+        my $sth_set_dist_info = $dbh->prepare("UPDATE file SET dist_name=?,dist_abstract=?,dist_version=?,dist_version_numified=?, rec_mtime=? WHERE id=?");
+        my $sth_ins_dep = $dbh->prepare("INSERT OR REPLACE INTO dep (file_id,module_id,module_name,phase,rel, version,version_numified, rec_ctime,rec_mtime) VALUES (?,?,?,?,?, ?,?, ?,?)");
 
         my $sth_sel_mod  = $dbh->prepare("SELECT * FROM module WHERE name=?");
         my $sth_sel_script  = $dbh->prepare("SELECT * FROM script WHERE name=? AND file_id=?");
@@ -2222,34 +2204,27 @@ sub _update_index {
                 my $dist_abstract = $meta->{abstract};
                 my $dist_version = $meta->{version};
                 $dist_name =~ s/::/-/g; # sometimes author miswrites module name
-                # insert dist record
-                my $dist_id;
-                if (($dist_id) = $dbh->selectrow_array("SELECT id FROM dist WHERE name=?", {}, $dist_name)) {
-                    $sth_upd_dist->execute(            $file->{cpanid}, $dist_abstract, $file->{id}, $dist_version, _numify_ver($dist_version), time(), $dist_id);
-                } else {
-                    my $now = time();
-                    $sth_ins_dist->execute($dist_name, $file->{cpanid}, $dist_abstract, $file->{id}, $dist_version, _numify_ver($dist_version), $now,$now);
-                    $dist_id = $dbh->last_insert_id("","","","");
-                }
+
+                $sth_set_dist_info->execute($dist_name, $dist_abstract, $dist_version, _numify_ver($dist_version), time(), $file->{id});
 
                 # insert dependency information
                 if (ref($meta->{configure_requires}) eq 'HASH') {
-                    _add_prereqs($file->{id}, $dist_id, $meta->{configure_requires}, 'configure', 'requires', $sth_ins_dep, $sth_sel_mod);
+                    _add_prereqs($file->{id}, $meta->{configure_requires}, 'configure', 'requires', $sth_ins_dep, $sth_sel_mod);
                 }
                 if (ref($meta->{build_requires}) eq 'HASH') {
-                    _add_prereqs($file->{id}, $dist_id, $meta->{build_requires}, 'build', 'requires', $sth_ins_dep, $sth_sel_mod);
+                    _add_prereqs($file->{id}, $meta->{build_requires}, 'build', 'requires', $sth_ins_dep, $sth_sel_mod);
                 }
                 if (ref($meta->{test_requires}) eq 'HASH') {
-                    _add_prereqs($file->{id}, $dist_id, $meta->{test_requires}, 'test', 'requires', $sth_ins_dep, $sth_sel_mod);
+                    _add_prereqs($file->{id}, $meta->{test_requires}, 'test', 'requires', $sth_ins_dep, $sth_sel_mod);
                 }
                 if (ref($meta->{requires}) eq 'HASH') {
-                    _add_prereqs($file->{id}, $dist_id, $meta->{requires}, 'runtime', 'requires', $sth_ins_dep, $sth_sel_mod);
+                    _add_prereqs($file->{id}, $meta->{requires}, 'runtime', 'requires', $sth_ins_dep, $sth_sel_mod);
                 }
                 if (ref($meta->{prereqs}) eq 'HASH') {
                     for my $phase (keys %{ $meta->{prereqs} }) {
                         my $phprereqs = $meta->{prereqs}{$phase};
                         for my $rel (keys %$phprereqs) {
-                            _add_prereqs($file->{id}, $dist_id, $phprereqs->{$rel}, $phase, $rel, $sth_ins_dep, $sth_sel_mod);
+                            _add_prereqs($file->{id}, $phprereqs->{$rel}, $phase, $rel, $sth_ins_dep, $sth_sel_mod);
                         }
                     }
                 }
@@ -2369,7 +2344,7 @@ sub _update_index {
     # (e.g. non-existing file, no info, other error). we determine the dist from
     # the module name.
     {
-        my $sth = $dbh->prepare("SELECT * FROM file WHERE NOT EXISTS (SELECT id FROM dist WHERE file_id=file.id)");
+        my $sth = $dbh->prepare("SELECT * FROM file WHERE dist_name IS NULL");
         my @files;
         $sth->execute;
         while (my $row = $sth->fetchrow_hashref) {
@@ -2377,7 +2352,7 @@ sub _update_index {
         }
 
         my $sth_sel_mod = $dbh->prepare("SELECT * FROM module WHERE file_id=? ORDER BY name LIMIT 1");
-        my $sth_ins_dist = $dbh->prepare("INSERT INTO dist (name,cpanid,file_id,version,version_numified, rec_ctime,rec_mtime) VALUES (?,?,?,?,?, ?,?)");
+        my $sth_set_dist_info = $dbh->prepare("UPDATE file SET dist_name=?,dist_version=?,dist_version_numified=?, rec_mtime=? WHERE id=?");
 
         $dbh->begin_work;
       FILE:
@@ -2386,24 +2361,17 @@ sub _update_index {
             my $row = $sth_sel_mod->fetchrow_hashref or next FILE;
             my $dist_name = $row->{name};
             $dist_name =~ s/::/-/g;
-            log_trace("Setting dist name for %s as %s", $row->{name}, $dist_name);
-            my $now = time();
-            $sth_ins_dist->execute($dist_name, $file->{cpanid}, $file->{id}, $row->{version}, _numify_ver($row->{version}), $now,$now);
+            log_trace("Setting dist name for %s as %s (from module name %s)", $row->{name}, $dist_name, $row->{name});
+            $sth_set_dist_info->execute($dist_name, $row->{version}, _numify_ver($row->{version}), time(), $file->{id});
         }
         $dbh->commit;
     }
 
     {
-        log_trace("Updating is_latest column ...");
-        my %dists = %changed_dists;
-        my $sth = $dbh->prepare("SELECT DISTINCT(name) FROM dist WHERE is_latest IS NULL");
-        $sth->execute;
-        while (my @row = $sth->fetchrow_array) {
-            $dists{$row[0]}++;
-        }
-        last unless keys %dists;
-        $dbh->do("UPDATE dist SET is_latest=(SELECT CASE WHEN EXISTS(SELECT name FROM dist d WHERE d.name=dist.name AND d.version_numified>dist.version_numified) THEN 0 ELSE 1 END)".
-                     " WHERE name IN (".join(", ", map {$dbh->quote($_)} sort keys %dists).")");
+        log_trace("Updating is_latest_dist column ...");
+        $dbh->do("UPDATE file SET is_latest_dist=".
+                     "(SELECT CASE WHEN EXISTS(SELECT name FROM file f2 WHERE f2.dist_name=file.dist_name AND f2.dist_version_numified>file.dist_version_numified) THEN 0 ELSE 1 END)".
+                     " WHERE dist_name IS NOT NULL");
     }
 
   UPDATE_TIMESTAMPS: {
@@ -2595,7 +2563,7 @@ sub _reset {
     $dbh->do("DELETE FROM module");
     $dbh->do("DELETE FROM script")    if _table_exists($dbh, "main", "script");
     $dbh->do("DELETE FROM sub")       if _table_exists($dbh, "main", "sub");
-    $dbh->do("DELETE FROM dist");
+    $dbh->do("DELETE FROM dist")      if _table_exists($dbh, "main", "dist");
     $dbh->do("DELETE FROM content")   if _table_exists($dbh, "main", "content");
     $dbh->do("DELETE FROM file");
     $dbh->do("DELETE FROM author");
@@ -2656,7 +2624,6 @@ sub stats {
     ($stat->{num_authors_with_releases}) = $dbh->selectrow_array("SELECT COUNT(DISTINCT cpanid) FROM file");
     ($stat->{num_modules}) = $dbh->selectrow_array("SELECT COUNT(*) FROM module");
     ($stat->{num_namespaces}) = $dbh->selectrow_array("SELECT COUNT(*) FROM namespace");
-    ($stat->{num_dists}) = $dbh->selectrow_array("SELECT COUNT(DISTINCT name) FROM dist");
     (
         $stat->{num_releases},
         $stat->{num_releases_with_metajson},
@@ -2818,7 +2785,7 @@ sub _complete_mod_or_dist {
     if ($word =~ /-/) {
         $is_dist++;
         $sth = $dbh->prepare(
-            "SELECT name FROM dist   WHERE name LIKE ? ORDER BY name");
+            "SELECT DISTINCT dist_name FROM file WHERE dist_name LIKE ? ORDER BY dist_name");
     } else {
         $sth = $dbh->prepare(
             "SELECT name FROM module WHERE name LIKE ? ORDER BY name");
@@ -2889,7 +2856,7 @@ sub _complete_mod_or_dist_or_script {
     if ($word =~ /-/) {
         $is_dist++;
         $sth = $dbh->prepare(
-            "SELECT name FROM dist   WHERE name LIKE ? ORDER BY name");
+            "SELECT DISTINCT dist_name FROM file WHERE dist_name LIKE ? ORDER BY dist_name");
     } else {
         $sth = $dbh->prepare(
             "SELECT name FROM module WHERE name LIKE ? ORDER BY name");
@@ -3052,7 +3019,7 @@ sub _complete_dist {
     }
 
     my $sth = $dbh->prepare(
-        "SELECT name FROM dist WHERE name LIKE ? ORDER BY name");
+        "SELECT DISTINCT dist_name FROM file WHERE dist_name LIKE ? ORDER BY dist_name");
     $sth->execute($word . '%');
 
     # XXX follow Complete::Common::OPT_CI
@@ -3454,7 +3421,7 @@ sub modules {
         ['module.name', 'module'],
         ['module.version', 'version'],
         ['module.abstract', 'abstract'],
-        ['dist.name', 'dist'],
+        ['file.dist_name', 'dist'],
         ['file.cpanid', 'author'],
         ['file.mtime', 'rel_mtime', 'iso8601_datetime'],
     );
@@ -3466,7 +3433,7 @@ sub modules {
         for my $q0 (@{ $args{query} // [] }) {
             if ($qt eq 'any') {
                 my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
-                push @q_where, "(module.name LIKE ? OR module.abstract LIKE ? OR dist.name LIKE ?)";
+                push @q_where, "(module.name LIKE ? OR module.abstract LIKE ? OR file.dist_name LIKE ?)";
                 push @bind, $q, $q, $q;
             } elsif ($qt eq 'name') {
                 my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
@@ -3508,9 +3475,9 @@ sub modules {
         push @where, "(".join(" OR ", @ns_where).")";
     }
     if ($args{latest}) {
-        push @where, "dist.is_latest";
+        push @where, "file.is_latest_dist";
     } elsif (defined $args{latest}) {
-        push @where, "NOT dist.is_latest";
+        push @where, "NOT file.is_latest_dist";
     }
 
     _set_added_updated_times(\%args, $dbh);
@@ -3525,7 +3492,6 @@ sub modules {
     my $sql = "SELECT ".join(", ", map {ref($_) ? "$_->[0] AS $_->[1]" : $_} @cols)."
 FROM module
 LEFT JOIN file ON module.file_id=file.id
-LEFT JOIN dist ON file.id=dist.file_id
 ".
     (@where ? " WHERE ".join(" AND ", @where) : "").
     (@order ? " ORDER BY ".join(", ", @order) : "");
@@ -3682,13 +3648,13 @@ sub dists {
     my $sort = $args{sort} // ['dist'];
 
     my @cols = (
-        "d.name dist",
-        "d.cpanid author",
-        "version",
+        "f.dist_name dist",
+        "f.cpanid author",
+        "f.dist_version version",
         "f.name release",
         "f.size rel_size",
         "f.mtime rel_mtime",
-        "abstract",
+        "f.dist_abstract abstract",
     );
 
     my %delcols;
@@ -3700,21 +3666,21 @@ sub dists {
         for my $q0 (@{ $args{query} // [] }) {
             if ($qt eq 'any') {
                 my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
-                push @q_where, "(d.name LIKE ? OR abstract LIKE ?)";
+                push @q_where, "(f.dist_name LIKE ? OR f.dist_abstract LIKE ?)";
                 push @bind, $q, $q;
             } elsif ($qt eq 'name') {
                 my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
-                push @q_where, "(d.name LIKE ?)";
+                push @q_where, "(f.dist_name LIKE ?)";
                 push @bind, $q;
             } elsif ($qt eq 'exact-name') {
-                push @q_where, "(d.name=?)";
+                push @q_where, "(f.dist_name=?)";
                 push @bind, $q0;
             } elsif ($qt eq 'regexp-name') {
-                push @q_where, "(d.name REGEXP ?)";
+                push @q_where, "(f.dist_name REGEXP ?)";
                 push @bind, $q0;
             } elsif ($qt eq 'abstract') {
                 my $q = $q0 =~ /%/ ? $q0 : '%'.$q0.'%';
-                push @q_where, "(abstract LIKE ?)";
+                push @q_where, "(f.dist_abstract LIKE ?)";
                 push @bind, $q;
             }
         }
@@ -3729,9 +3695,9 @@ sub dists {
         push @bind, $author;
     }
     if ($args{latest}) {
-        push @where, "is_latest";
+        push @where, "is_latest_dist";
     } elsif (defined $args{latest}) {
-        push @where, "NOT(is_latest)";
+        push @where, "NOT(is_latest_dist)";
     }
     if (defined $args{has_makefilepl}) {
         if ($args{has_makefilepl}) {
@@ -3776,17 +3742,16 @@ sub dists {
     }
 
     _set_added_updated_times(\%args, $dbh);
-    if (defined $args{added_before}  ) { push @where, "d.rec_ctime < ". (0+$args{added_before}) }
-    if (defined $args{added_after}   ) { push @where, "d.rec_ctime > ". (0+$args{added_after}) }
-    if (defined $args{updated_before}) { push @where, "d.rec_mtime < ". (0+$args{updated_before}) }
-    if (defined $args{updated_after} ) { push @where, "d.rec_mtime > ". (0+$args{updated_after}) }
+    if (defined $args{added_before}  ) { push @where, "f.rec_ctime < ". (0+$args{added_before}) }
+    if (defined $args{added_after}   ) { push @where, "f.rec_ctime > ". (0+$args{added_after}) }
+    if (defined $args{updated_before}) { push @where, "f.rec_mtime < ". (0+$args{updated_before}) }
+    if (defined $args{updated_after} ) { push @where, "f.rec_mtime > ". (0+$args{updated_after}) }
 
     my @order;
     for (@$sort) { /\A(-?)(\w+)/ and push @order, $2 . ($1 ? " DESC" : "") }
 
     my $sql = "SELECT ".join(", ", @cols)."
-FROM dist d
-LEFT JOIN file f ON d.file_id=f.id
+FROM file f
 ".
         (@where ? " WHERE ".join(" AND ", @where) : "").
         (@order ? " ORDER BY ".join(", ", @order) : "");
@@ -3954,7 +3919,6 @@ sub releases {
   meta_error,
   pod_status
 FROM file f1
-LEFT JOIN dist d ON f1.id=d.file_id
 ".
     (@where ? " WHERE ".join(" AND ", @where) : "").
     (@order ? " ORDER BY ".join(", ", @order) : "");
@@ -4007,7 +3971,7 @@ sub _get_prereqs {
             }
         } else {
             $mod = $mod0;
-            ($dist_name) = $dbh->selectrow_array("SELECT name FROM dist WHERE file_id IN (SELECT file_id FROM module WHERE name=?) ORDER BY id", {}, $mod);
+            ($dist_name) = $dbh->selectrow_array("SELECT dist_name FROM file WHERE id IN (SELECT file_id FROM module WHERE name=?) ORDER BY id", {}, $mod);
             defined $dist_name or return [404, "No such module: $mod"];
         }
         unless ($memory_by_dist_name->{$dist_name} && $dont_uniquify) {
@@ -4017,7 +3981,7 @@ sub _get_prereqs {
     }
     return [200, "OK", []] unless @dist_names;
 
-    my @where = ("dp.dist_id IN (SELECT id FROM dist WHERE name IN (".join(",",map {$dbh->quote($_)} grep {defined} @dist_names)."))");
+    my @where = ("dp.file_id IN (SELECT id FROM file WHERE dist_name IN (".join(",",map {$dbh->quote($_)} grep {defined} @dist_names)."))");
     my @bind  = ();
 
     if ($filters->{authors}) {
@@ -4038,13 +4002,13 @@ sub _get_prereqs {
 
     # fetch the dependency information
     my $sth = $dbh->prepare("SELECT
-  (SELECT name   FROM dist   WHERE id=dp.dist_id) AS dist,
+  (SELECT dist_name FROM file WHERE id=dp.file_id) AS dist,
   CASE
      WHEN module_name IS NOT NULL THEN module_name
      ELSE (SELECT name   FROM module WHERE id=dp.module_id)
   END AS module,
   (SELECT cpanid FROM module WHERE id=dp.module_id) AS author,
-  (SELECT name FROM dist WHERE file_id=(SELECT file_id FROM module WHERE id=dp.module_id)) AS module_dist,
+  (SELECT dist_name FROM file WHERE id=(SELECT file_id FROM module WHERE id=dp.module_id)) AS module_dist,
   phase,
   rel,
   version
@@ -4180,14 +4144,14 @@ sub _get_revdeps {
 
     # get all dists that depend on that module
     my $sth = $dbh->prepare("SELECT
-  -- dp.dist_id AS _dist_id, -- unused, for debugging only
-  -- dp.dist_id AS _mod_id,  -- unused, for debugging only
+  -- dp.file_id AS _file_id, -- unused, for debugging only
+  -- dp.module_id AS _mod_id,  -- unused, for debugging only
 
-  (SELECT name      FROM dist WHERE dp.dist_id=dist.id)       AS dist,
-  (SELECT name      FROM dist WHERE file_id=(SELECT file_id FROM module WHERE id=dp.module_id)) module_dist,
-  (SELECT name      FROM module WHERE dp.module_id=module.id) AS module,
-  (SELECT cpanid    FROM file WHERE dp.file_id=file.id)       AS author,
-  (SELECT version   FROM dist WHERE dp.dist_id=dist.id)       AS dist_version,
+  (SELECT dist_name    FROM file WHERE id=dp.file_id)            AS dist,
+  (SELECT name         FROM dist WHERE file_id=(SELECT file_id FROM module WHERE id=dp.module_id)) module_dist,
+  (SELECT name         FROM module WHERE dp.module_id=module.id) AS module,
+  (SELECT cpanid       FROM file WHERE dp.file_id=file.id)       AS author,
+  (SELECT dist_version FROM file WHERE dp.file_id=file.id)       AS dist_version,
   phase,
   rel,
   version req_version
@@ -4211,10 +4175,10 @@ ORDER BY dist".($level > 1 ? " DESC" : ""));
         # find the module of those depending dists
         my $sth = $dbh->prepare("
 SELECT m.name name
-FROM dist d
+FROM file f
 JOIN module m
-ON d.file_id=m.file_id
-WHERE d.name IN (".join(", ", map {$dbh->quote($_->{dist})} @res).")");
+ON f.id=m.file_id
+WHERE f.dist_name IN (".join(", ", map {$dbh->quote($_->{dist})} @res).")");
         $sth->execute();
         my @mods;
         while (my $row = $sth->fetchrow_hashref) {
