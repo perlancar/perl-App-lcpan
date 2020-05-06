@@ -1168,8 +1168,8 @@ our $db_schema_spec = {
         # in 3be9ae8), we will need to redo file indexing
         sub {
             my $dbh = shift;
-            log_info("Will be redoing file indexing for all files due to bug in lcpan <= 1.056");
-            $dbh->do("UPDATE file SET file_status=NULL, pod_status=NULL, sub_status=NULL");
+            log_info("Will be reindexing for all files due to bug in lcpan <= 1.056");
+            _reset($dbh, 'soft');
         },
     ],
 
@@ -2572,7 +2572,7 @@ sub _table_exists {
 sub _reset {
     # this sub is used since v7, so we need to check tables that have not
     # existed in v7 or earlier.
-    my $dbh = shift;
+    my ($dbh, $soft) = @_;
     $dbh->do("DELETE FROM dep");
     $dbh->do("DELETE FROM namespace");
     $dbh->do("DELETE FROM mention")   if _table_exists($dbh, "main", "mention");
@@ -2583,9 +2583,9 @@ sub _reset {
     $dbh->do("DELETE FROM content")   if _table_exists($dbh, "main", "content");
     $dbh->do("DELETE FROM file");
     $dbh->do("DELETE FROM author");
-    $dbh->do("DELETE FROM log")       if _table_exists($dbh, "main", "log");
+    $dbh->do("DELETE FROM log")       if _table_exists($dbh, "main", "log") && !$soft;
 
-    $dbh->do("DELETE FROM meta WHERE name='index_creation_time'");
+    $dbh->do("DELETE FROM meta WHERE name='index_creation_time'") if !$soft;
 }
 
 $SPEC{'reset'} = {
