@@ -1660,7 +1660,7 @@ sub _get_meta {
 
     if ($zip) {
         for my $member (@members) {
-            if ($member->fileName =~ m!(?:/|\\)(META\.yml|META\.json)$!) {
+            if ($member->fileName =~ m!(?:/|\\)?(META\.yml|META\.json)$!) {
                 log_trace("  found META: %s", $member->fileName);
                 my $type = $1;
                 #log_trace("content=[[%s]]", $content);
@@ -1677,7 +1677,7 @@ sub _get_meta {
         }
     } else {
         for my $member (@members) {
-            if ($member->{full_path} =~ m!/(META\.yml|META\.json)$!) {
+            if ($member->{full_path} =~ m!/?(META\.yml|META\.json)$!) {
                 log_trace("  found META %s", $member->{full_path});
                 my $type = $1;
                 my ($obj) = $tar->get_files($member->{full_path});
