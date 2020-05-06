@@ -1745,6 +1745,8 @@ sub _update_index {
     # parse 01mailrc.txt.gz and insert the parse result to 'author' table
   PARSE_MAILRC:
     {
+        require DBIx::UpdateTable::FromHoH;
+
         my $path = "$cpan/authors/01mailrc.txt.gz";
         log_info("Parsing %s ...", $path);
         open my($fh), "<:gzip", $path or do {
@@ -1752,13 +1754,7 @@ sub _update_index {
             last PARSE_MAILRC;
         };
 
-        # i would like to use INSERT OR IGNORE, but rows affected returned by
-        # execute() is always 1?
-
-        my $sth_ins_auth = $dbh->prepare("INSERT INTO author (cpanid,fullname,email, rec_ctime,rec_mtime) VALUES (?,?,?, ?,?)");
-        my $sth_sel_auth = $dbh->prepare("SELECT cpanid FROM author WHERE cpanid=?");
-
-        $dbh->begin_work;
+        my $hoh = {};
         my $line = 0;
         while (<$fh>) {
             $line++;
@@ -1766,14 +1762,25 @@ sub _update_index {
                 log_warn("  line %d: syntax error, skipped: %s", $line, $_);
                 next;
             };
-
-            $sth_sel_auth->execute($cpanid);
-            next if $sth_sel_auth->fetchrow_arrayref;
-            my $now = time();
-            $sth_ins_auth->execute($cpanid, $fullname, $email, $now, $now);
-            log_trace("  new author: %s", $cpanid);
+            $hoh->{$cpanid} = {fullname=>$fullname, email=>$email};
         }
-        $dbh->commit;
+        my $now = time();
+        my $res = DBIx::UpdateTable::FromHoH::update_table_from_hoh(
+            dbh => $dbh,
+            table => 'author',
+            hoh => $hoh,
+            key_column => 'cpanid',
+            data_columns => [qw/fullname email/],
+            extra_insert_columns => {rec_ctime=>$now, rec_mtime=>$now},
+            extra_update_columns => {rec_mtime=>$now},
+        );
+        if ($res->[0] == 200) {
+            log_info("Updated author table: %s", $res);
+        } elsif ($res->[0] == 304) {
+            log_trace("author table unchanged: %s", $res);
+        } else {
+            log_error("Can't update author table: %s", $res);
+        }
     }
 
     # some darkpans (e.g. produced by OrePAN) has authors/00whois.xml instead
@@ -1793,19 +1800,28 @@ sub _update_index {
         # i would like to use INSERT OR IGNORE, but rows affected returned by
         # execute() is always 1?
 
-        my $sth_ins_auth = $dbh->prepare("INSERT INTO author (cpanid,fullname,email, rec_ctime,rec_mtime) VALUES (?,?,NULL, ?,?)");
-        my $sth_sel_auth = $dbh->prepare("SELECT cpanid FROM author WHERE cpanid=?");
-
-        $dbh->begin_work;
+        my $hoh = {};
         while ($content =~ m!<id>(\w+)</id>!g) {
             my ($cpanid) = ($1);
-            $sth_sel_auth->execute($cpanid);
-            next if $sth_sel_auth->fetchrow_arrayref;
-            my $now = time();
-            $sth_ins_auth->execute($cpanid, $cpanid, $now, $now);
-            log_trace("  new author: %s", $cpanid);
+            $hoh->{$cpanid} = {fullname=>$cpanid, email=>undef};
         }
-        $dbh->commit;
+        my $now = time();
+        my $res = DBIx::UpdateTable::FromHoH::update_table_from_hoh(
+            dbh => $dbh,
+            table => 'author',
+            hoh => $hoh,
+            key_column => 'cpanid',
+            data_columns => [qw/fullname email/],
+            extra_insert_columns => {rec_ctime=>$now, rec_mtime=>$now},
+            extra_update_columns => {rec_mtime=>$now},
+        );
+        if ($res->[0] == 200) {
+            log_info("Updated author table: %s", $res);
+        } elsif ($res->[0] == 304) {
+            log_trace("author table unchanged: %s", $res);
+        } else {
+            log_error("Can't update author table: %s", $res);
+        }
     }
 
     # these hashes maintain the dist names that are changed so we can refresh
