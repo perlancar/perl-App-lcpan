@@ -655,7 +655,7 @@ sub _set_namespace {
 }
 
 our $db_schema_spec = {
-    latest_v => 14,
+    latest_v => 15,
 
     install => [
         'CREATE TABLE author (
@@ -1161,6 +1161,16 @@ our $db_schema_spec = {
         'CREATE UNIQUE INDEX ix_log__id ON log(id)',
         'CREATE INDEX ix_log__date ON log(date)',
         'CREATE INDEX ix_log__category ON log(category)',
+    ],
+
+    upgrade_to_v15 => [
+        # since there were misplaced placeholders when setting rec_mtime (fixed
+        # in 3be9ae8), we will need to redo file indexing
+        sub {
+            my $dbh = shift;
+            log_info("Will be redoing file indexing for all files due to bug in lcpan <= 1.056");
+            $dbh->do("UPDATE file SET file_status=NULL, pod_status=NULL, sub_status=NULL");
+        },
     ],
 
     # for testing
