@@ -77,13 +77,13 @@ subtest minicpan1 => sub {
         is($res->{stdout}[0]{dist}, 'Foo-Bar');
         is($res->{stdout}[0]{author}, 'BUDI');
         is($res->{stdout}[0]{version}, '0.01');
-        # XXX why is abstract blank?
+        is($res->{stdout}[0]{abstract}, 'A Foo::Bar module for testing');
 
         is($res->{stdout}[1]{module}, 'Foo::Bar::Baz');
         is($res->{stdout}[1]{dist}, 'Foo-Bar');
         is($res->{stdout}[1]{author}, 'BUDI');
         is($res->{stdout}[1]{version}, '0.01');
-        # XXX why is abstract blank?
+        is($res->{stdout}[1]{abstract}, 'A Foo::Bar::Baz module for testing');
 
         # XXX test options
     };

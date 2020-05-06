@@ -1400,7 +1400,7 @@ sub _index_pod {
                /mx) {
         $pkg = $1;
         log_trace("  found package declaration '%s'", $pkg);
-        $sth_set_content_package->execute($pkg, $content_id, time());
+        $sth_set_content_package->execute($pkg, time(), $content_id);
 
         if ($type eq 'pm_or_pod') {
             # set module abstract if pkg refers to a known module
@@ -1411,7 +1411,7 @@ sub _index_pod {
                 $module_id = $row->{id};
                 if ($abstract) {
                     log_trace("  set abstract for module %s: %s", $pkg, $abstract);
-                    $sth_set_module_abstract->execute($abstract, $module_id, time());
+                    $sth_set_module_abstract->execute($abstract, time(), $module_id);
                 }
             }
         }
@@ -1431,7 +1431,7 @@ sub _index_pod {
         # set script abstract
         if ($abstract) {
             log_trace("  set abstract for script %s (%s): %s", $script_name, $file_name, $abstract);
-            $sth_set_script_abstract->execute($abstract, $script_id, time());
+            $sth_set_script_abstract->execute($abstract, time(), $script_id);
         }
     }
 
@@ -1908,7 +1908,7 @@ sub _update_index {
         push @passes, 3;
     }
 
-  PROCESS_FILES:
+  PROCESS_FILES_PASS:
     for my $pass (@passes) {
         # we're processing files in several passes.
 
@@ -1918,13 +1918,12 @@ sub _update_index {
         # the second pass: extract PODs and insert module/script abstracts and
         # pod mentions.
 
-        # the third pass:
+        # the third pass: subroutine indexing
 
         # we're doing it in several passes because: in pass 2, we want to
         # collect all known scripts first to be able to detect links to scripts
         # in POD (collected in pass 1). also some passes are more high-level
         # and/or experimental and/or optional.
-
 
         my $sth = $dbh->prepare(
             $pass == 1 ?
@@ -2045,14 +2044,14 @@ sub _update_index {
             if (!$file->{file_status}) {
                 unless (-f $path) {
                     log_error("File %s doesn't exist, skipped", $path);
-                    $sth_set_file_status->execute("nofile", undef, $file->{id}, time());
-                    $sth_set_meta_status->execute("nometa", undef, $file->{id}, time());
+                    $sth_set_file_status->execute("nofile", undef, time(), $file->{id});
+                    $sth_set_meta_status->execute("nometa", undef, time(), $file->{id});
                     next FILE;
                 }
                 if ($path !~ /(.+)\.(tar|tar\.gz|tar\.bz2|tar\.Z|tgz|tbz2?|zip)$/i) {
                     log_error("Doesn't support file type: %s, skipped", $file->{name});
-                    $sth_set_file_status->execute("unsupported", undef, $file->{id}, time());
-                    $sth_set_meta_status->execute("nometa", undef, $file->{id}, time());
+                    $sth_set_file_status->execute("unsupported", undef, time(), $file->{id});
+                    $sth_set_meta_status->execute("nometa", undef, time(), $file->{id});
                     next FILE;
                 }
             }
@@ -2061,8 +2060,8 @@ sub _update_index {
 
             my $la_res = _list_archive_members($path, $file->{name}, $file->{id});
             unless ($la_res->[0] == 200) {
-                $sth_set_file_status->execute("err", $la_res->[1], $la_res->[3]{'func.file_id'}, time());
-                $sth_set_meta_status->execute("err", "file err", $la_res->[3]{'func.file_id'}, time());
+                $sth_set_file_status->execute("err", $la_res->[1], time(), $la_res->[3]{'func.file_id'});
+                $sth_set_meta_status->execute("err", "file err", time(), $la_res->[3]{'func.file_id'});
                 next FILE;
             }
             my @members = @{ $la_res->[2] };
@@ -2154,7 +2153,7 @@ sub _update_index {
                         }
                     }
                 }
-                $sth_set_file_status->execute("ok", undef, $file->{id}, time());
+                $sth_set_file_status->execute("ok", undef, time(), $file->{id});
                 $file->{file_status} = 'ok';
             }
 
@@ -2183,8 +2182,8 @@ sub _update_index {
                 } else {
                     log_warn("  error in meta: %s", $gm_res->[1]);
                 }
-                $sth_set_meta_status->execute($meta ? "ok" : "nometa", undef, $file->{id}, time());
-                $sth_set_meta_info->execute($has_metajson, $has_metayml, $has_makefilepl, $has_buildpl, $file->{id}, time());
+                $sth_set_meta_status->execute($meta ? "ok" : "nometa", undef, time(), $file->{id});
+                $sth_set_meta_info->execute($has_metajson, $has_metayml, $has_makefilepl, $has_buildpl, time(), $file->{id});
             }
 
           GET_DEPS:
@@ -2200,7 +2199,7 @@ sub _update_index {
                 # insert dist record
                 my $dist_id;
                 if (($dist_id) = $dbh->selectrow_array("SELECT id FROM dist WHERE name=?", {}, $dist_name)) {
-                    $sth_upd_dist->execute(            $file->{cpanid}, $dist_abstract, $file->{id}, $dist_version, _numify_ver($dist_version), $dist_id, time());
+                    $sth_upd_dist->execute(            $file->{cpanid}, $dist_abstract, $file->{id}, $dist_version, _numify_ver($dist_version), time(), $dist_id);
                 } else {
                     my $now = time();
                     $sth_ins_dist->execute($dist_name, $file->{cpanid}, $dist_abstract, $file->{id}, $dist_version, _numify_ver($dist_version), $now,$now);
@@ -2275,7 +2274,7 @@ sub _update_index {
                     );
                 } # for each content
 
-                $sth_set_pod_status->execute("ok", $file->{id}, time());
+                $sth_set_pod_status->execute("ok", time(), $file->{id});
             } # PARSE_POD
 
           PARSE_SUB:
@@ -2505,13 +2504,13 @@ _
             examples => ['^Foo-Bar-\d'],
         },
         skip_file_indexing_pass_1 => {
-            schema => ['bool', is=>1],
+            schema => 'bool*',
         },
         skip_file_indexing_pass_2 => {
-            schema => ['bool', is=>1],
+            schema => 'bool*',
         },
         skip_file_indexing_pass_3 => {
-            schema => ['bool', is=>1],
+            schema => 'bool*',
         },
         skip_sub_indexing => {
             schema => ['bool'],
