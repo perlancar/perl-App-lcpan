@@ -1,6 +1,8 @@
 package App::lcpan::Cmd::contents;
 
+# AUTHORITY
 # DATE
+# DIST
 # VERSION
 
 use 5.010;
@@ -87,7 +89,7 @@ sub handle_cmd {
         push @bind, $author;
     }
     if ($dist) {
-        push @where, "(file.id=(SELECT file_id FROM dist WHERE name=?))";
+        push @where, "file.dist_name=?";
         push @bind, $dist;
     }
     if ($package) {

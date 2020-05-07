@@ -1,6 +1,8 @@
 package App::lcpan::Cmd::extract_dist;
 
+# AUTHORITY
 # DATE
+# DIST
 # VERSION
 
 use 5.010;
@@ -31,12 +33,11 @@ sub handle_cmd {
     my $dist = $args{dist};
 
     my $row = $dbh->selectrow_hashref("SELECT
-  file.cpanid cpanid,
-  file.name name
-FROM dist
-LEFT JOIN file ON dist.file_id=file.id
-WHERE dist.name=?
-ORDER BY version_numified DESC
+  cpanid cpanid,
+  name name
+FROM file
+WHERE dist_name=? AND is_latest_dist=1
+ORDER BY dist_version_numified DESC
 ", {}, $dist);
 
     return [404, "No release for distribution '$dist'"] unless $row;

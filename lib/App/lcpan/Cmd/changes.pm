@@ -1,9 +1,11 @@
 package App::lcpan::Cmd::changes;
 
+# AUTHORITY
 # DATE
+# DIST
 # VERSION
 
-use 5.010;
+use 5.010001;
 use strict;
 use warnings;
 
@@ -71,7 +73,7 @@ sub handle_cmd {
         # search in dist or script
         unless ($mod_or_dist_or_script =~ /::/) {
             my $dist_found;
-            my $sth = $dbh->prepare("SELECT file_id FROM dist WHERE name=? ORDER BY version_numified DESC LIMIT 1");
+            my $sth = $dbh->prepare("SELECT id FROM file WHERE dist_name=? ORDER BY dist_version_numified DESC LIMIT 1");
             $sth->execute($mod_or_dist_or_script);
             while (my ($e) = $sth->fetchrow_array) {
                 $dist_found++;

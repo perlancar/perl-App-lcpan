@@ -282,6 +282,20 @@ subtest minicpan1 => sub {
 
     };
 
+    subtest "rdeps" => sub {
+        $res = run_lcpan_json("rdeps", "--cpan", "$tempdir/minicpan1", "--all", "Foo::Bar");
+        cmp_deeply($res->{stdout}, [
+            superhashof({dist=>'Simpel'}),
+        ]);
+
+        $res = run_lcpan_json("rdeps", "--cpan", "$tempdir/minicpan1", "--all", "-l2", "Foo::Bar");
+        cmp_deeply($res->{stdout}, [
+            superhashof({dist=>'Simpel'}),
+            superhashof({dist=>'  Sederhana'}),
+            superhashof({dist=>'  Simpel-Banget'}),
+        ]);
+    };
+
     subtest "contents" => sub {
 
         $res = run_lcpan_json("contents", "--cpan", "$tempdir/minicpan1");
@@ -327,6 +341,40 @@ subtest minicpan1 => sub {
         # XXX test options
     };
 
+    # XXX mentions
+
+    subtest "related-mods" => sub {
+        $res = run_lcpan_json("related-mods", "--cpan", "$tempdir/minicpan1", "Sederhana");
+        cmp_deeply($res->{stdout}, [
+            superhashof({module=>'Simpel'}),
+            superhashof({module=>'Simpel::Banget'}),
+        ]);
+    };
+
+    subtest "changes" => sub {
+        $res = run_lcpan_json("changes", "--cpan", "$tempdir/minicpan1", "Foo-Bar");
+        like($res->{stdout}, "First release");
+    };
+
+    subtest "dist2rel" => sub {
+        $res = run_lcpan_json("dist2rel", "--cpan", "$tempdir/minicpan1", "Sederhana");
+        cmp_deeply($res->{stdout}, "T/TO/TONO/Sederhana");
+        # XXX option: --full-path
+    };
+
+    subtest "dist-meta" => sub {
+        $res = run_lcpan_json("dist-meta", "--cpan", "$tempdir/minicpan1", "Sederhana");
+        cmp_deeply($res->{stdout}, superhashof({
+            name => 'Sederhana',
+            license => 'perl',
+            # ...
+        }));
+    };
+
+    subtest "scripts-from-same-dist" => sub {
+        $res = run_lcpan_json("scripts-from-same-dist", "--cpan", "$tempdir/minicpan1", "simpel");
+        cmp_deeply($res->{stdout}, ["simpel"]); # XXX test dists with multiple scripts
+    };
 };
 
 subtest minicpan2 => sub {
@@ -400,7 +448,7 @@ subtest minicpan2 => sub {
             version => '0.001',
             dist => 'Simpel-Banget',
             abstract => 'A very modest module',
-        }), "Simple::Banget unchanged");
+        }), "Simpel::Banget unchanged");
 
         # XXX test options
     };

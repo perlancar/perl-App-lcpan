@@ -1,6 +1,8 @@
 package App::lcpan::Cmd::dist_meta;
 
+# AUTHORITY
 # DATE
+# DIST
 # VERSION
 
 use 5.010;
@@ -15,6 +17,7 @@ $SPEC{'handle_cmd'} = {
     v => 1.1,
     summary => 'Get distribution metadata',
     args => {
+        %App::lcpan::common_args,
         %App::lcpan::dist_args,
     },
 };
@@ -25,7 +28,7 @@ sub handle_cmd {
     my $dbh = $state->{dbh};
 
     my ($dist_id, $cpanid, $file_name, $file_id, $has_metajson, $has_metayml) = $dbh->selectrow_array(
-        "SELECT d.id, d.cpanid, f.name, f.id, f.has_metajson, f.has_metayml FROM dist d JOIN file f ON d.file_id=f.id WHERE d.is_latest AND d.name=?", {}, $args{dist});
+        "SELECT id, cpanid, name, has_metajson, has_metayml FROM file WHERE is_latest_dist AND dist_name=?", {}, $args{dist});
     $dist_id or return [404, "No such dist '$args{dist}'"];
     $has_metajson || $has_metayml or return [412, "Dist does not have metadata"];
 

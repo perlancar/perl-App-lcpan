@@ -1,9 +1,11 @@
 package App::lcpan::Cmd::authors_by_dist_count;
 
+# AUTHORITY
 # DATE
+# DIST
 # VERSION
 
-use 5.010;
+use 5.010001;
 use strict;
 use warnings;
 
@@ -27,8 +29,9 @@ sub handle_cmd {
     my $sql = "SELECT
   cpanid author,
   COUNT(*) AS dist_count,
-  ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM dist), 4) dist_count_pct
-FROM dist d
+  ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM file), 4) dist_count_pct
+FROM file f
+WHERE f.dist_name IS NOT NULL AND f.is_latest_dist
 GROUP BY cpanid
 ORDER BY dist_count DESC
 ";

@@ -30,12 +30,11 @@ sub handle_cmd {
     my $dist = $args{dist};
 
     my $row = $dbh->selectrow_hashref("SELECT
-  file.cpanid cpanid,
-  file.name name
-FROM dist
-LEFT JOIN file ON dist.file_id=file.id
-WHERE dist.name=?
-ORDER BY version_numified DESC", {}, $dist);
+  cpanid cpanid,
+  dist_name name
+FROM file
+WHERE dist_name=?
+ORDER BY dist_version_numified DESC", {}, $dist);
     my $rel;
 
     if ($row) {

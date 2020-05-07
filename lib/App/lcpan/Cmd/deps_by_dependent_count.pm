@@ -1,6 +1,8 @@
 package App::lcpan::Cmd::deps_by_dependent_count;
 
+# AUTHORITY
 # DATE
+# DIST
 # VERSION
 
 use 5.010;
@@ -65,14 +67,14 @@ sub handle_cmd {
     my $include_noncore = $args{include_noncore} // 1;
     my $plver   = $args{perl_version} // "$^V";
 
-    # first, get the dist ID's of the requested modules
-    my @dist_ids;
+    # first, get the file ID's of the requested modules
+    my @file_ids;
     {
         my $mods_s = join(", ", map {$dbh->quote($_)} @{$args{modules}});
-        my $sth = $dbh->prepare("SELECT id FROM dist WHERE is_latest AND file_id IN (SELECT file_id FROM module WHERE name IN ($mods_s))");
+        my $sth = $dbh->prepare("SELECT id FROM file WHERE is_latest_dist AND id IN (SELECT file_id FROM module WHERE name IN ($mods_s))");
         $sth->execute;
-        while (my ($id) = $sth->fetchrow_array) { push @dist_ids, $id }
-        return [404, "No such module(s)"] unless @dist_ids;
+        while (my ($id) = $sth->fetchrow_array) { push @file_ids, $id }
+        return [404, "No such module(s)"] unless @file_ids;
     }
 
     my @cols = (
@@ -86,7 +88,7 @@ sub handle_cmd {
 
     my @wheres = (
         "m.id IS NOT NULL",
-        "dep.dist_id IN (".join(",", @dist_ids).")",
+        "dep.file_id IN (".join(",", @file_ids).")",
     );
     my @binds;
 

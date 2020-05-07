@@ -99,7 +99,7 @@ sub handle_cmd {
         push @bind, $author;
     }
     if ($dist) {
-        push @where, "(script.file_id=(SELECT file_id FROM dist WHERE name=?))";
+        push @where, "(script.file_id=(SELECT id FROM file WHERE dist_name=?))";
         push @bind, $dist;
     }
 

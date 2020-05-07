@@ -1,6 +1,8 @@
 package App::lcpan::Cmd::dists_by_dep_count;
 
+# AUTHORITY
 # DATE
+# DIST
 # VERSION
 
 use 5.010;
@@ -45,15 +47,15 @@ sub handle_cmd {
         push @where, "(rel=?)";
         push @binds, $args{rel};
     }
-    push @where, "d.is_latest";
+    push @where, "f.is_latest_dist";
     @where = (1) if !@where;
 
     my $sql = "SELECT
-  d.name name,
-  d.cpanid author,
-  COUNT(*) AS dep_count
-FROM dist d
-JOIN dep dp ON dp.dist_id=d.id
+  f.dist_name name,
+  f.cpanid author,
+  COUNT(DISTINCT dp.file_id) AS dep_count
+FROM file f
+JOIN dep dp ON dp.file_id=f.id
 WHERE ".join(" AND ", @where)."
 GROUP BY id
 ORDER BY dep_count DESC

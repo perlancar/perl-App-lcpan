@@ -1,6 +1,8 @@
 package App::lcpan::Cmd::dist_contents;
 
+# AUTHORITY
 # DATE
+# DIST
 # VERSION
 
 use 5.010;
@@ -42,7 +44,7 @@ sub handle_cmd {
     my $dbh = $state->{dbh};
 
     my ($dist_id) = $dbh->selectrow_array(
-        "SELECT id FROM dist WHERE name=?", {}, $args{dist});
+        "SELECT id FROM file WHERE dist_name=?", {}, $args{dist});
     $dist_id or return [404, "No such dist '$args{dist}'"];
 
     App::lcpan::Cmd::contents::handle_cmd(%args);

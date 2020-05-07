@@ -190,7 +190,7 @@ our %flatest_args = (
 );
 
 our %file_id_args = (
-    dist => {
+    file_id => {
         summary => 'Filter by file ID',
         schema => 'posint*',
         #completion => \&_complete_file_id,
@@ -462,6 +462,7 @@ our %dist_args = (
 
 our %dists_args = (
     dists => {
+        summary => 'Distribution names (e.g. Foo-Bar)',
         schema => ['array*', of=>'perl::distname*', min_len=>1],
         'x.name.is_plural' => 1,
         req => 1,
@@ -473,7 +474,8 @@ our %dists_args = (
 );
 
 our %dists_with_optional_vers_args = (
-    dists_with_optional_vers => {
+    dists => {
+        summary => 'Distribution names (with optional version suffix, e.g. Foo-Bar@1.23)',
         schema => ['array*', of=>'perl::distname_with_optional_ver*', min_len=>1],
         'x.name.is_plural' => 1,
         req => 1,
@@ -3757,7 +3759,7 @@ sub dists {
         }
     }
     if (defined $args{has_multiple_rels}) {
-        push @cols, "(SELECT COUNT(*) FROM dist d2 WHERE d2.name=d.name) rel_count";
+        push @cols, "(SELECT COUNT(*) FROM file f2 WHERE f2.dist_name=f.dist_name) rel_count";
         if ($args{has_multiple_rels}) {
             push @where, "rel_count > 1";
         } else {
@@ -4163,7 +4165,7 @@ sub _get_revdeps {
   -- dp.module_id AS _mod_id,  -- unused, for debugging only
 
   (SELECT dist_name    FROM file WHERE id=dp.file_id)            AS dist,
-  (SELECT name         FROM dist WHERE file_id=(SELECT file_id FROM module WHERE id=dp.module_id)) module_dist,
+  (SELECT dist_name    FROM file WHERE id=(SELECT file_id FROM module WHERE id=dp.module_id)) module_dist,
   (SELECT name         FROM module WHERE dp.module_id=module.id) AS module,
   (SELECT cpanid       FROM file WHERE dp.file_id=file.id)       AS author,
   (SELECT dist_version FROM file WHERE dp.file_id=file.id)       AS dist_version,
@@ -4404,7 +4406,7 @@ sub deps {
     my $state = _init(\%args, 'ro');
     my $dbh = $state->{dbh};
 
-    my $file_ids = _dists_with_optional_vers2file_ids($dbh, $args{dists_with_optional_vers});
+    my $file_ids = _dists_with_optional_vers2file_ids($dbh, $args{dists});
     my $phase    = $args{phase} // 'runtime';
     my $rel      = $args{rel} // 'requires';
     my $plver    = $args{perl_version} // "$^V";

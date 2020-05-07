@@ -1,6 +1,8 @@
 package App::lcpan::Cmd::mods_from_same_dist;
 
+# AUTHORITY
 # DATE
+# DIST
 # VERSION
 
 use 5.010;
@@ -31,20 +33,20 @@ sub handle_cmd {
 
     my $emods = join(",", map {$dbh->quote($_)} @{ $args{modules} });
     my @where;
-    push @where, "dist.name IN (SELECT name FROM dist WHERE file_id IN (SELECT file_id FROM module WHERE name IN ($emods)))";
+    push @where, "f.id IN (SELECT file_id FROM module WHERE name IN ($emods))";
     if ($args{latest}) {
-        push @where, "dist.is_latest";
+        push @where, "f.is_latest_dist";
     } elsif (defined $args{latest}) {
-        push @where, "NOT(dist.is_latest)";
+        push @where, "NOT(f.is_latest_dist)";
     }
     my $sth = $dbh->prepare("SELECT
   module.name name,
   module.version version,
   module.abstract abstract,
-  dist.name dist,
-  dist.version dist_version
+  f.dist_name dist,
+  f.dist_version dist_version
 FROM module
-JOIN dist ON module.file_id=dist.file_id
+JOIN file f ON module.file_id=f.id
 WHERE ".join(" AND ", @where)."
 ORDER BY name DESC");
     $sth->execute;
