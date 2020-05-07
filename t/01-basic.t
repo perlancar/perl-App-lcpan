@@ -4,51 +4,59 @@ use 5.010001;
 use strict;
 use warnings;
 use FindBin '$Bin';
+use Test::Deep;
 use Test::More 0.98;
 
 # list of minicpans test data:
 #
 # - minicpan1:
-#   + 4 authors, only contains 1 release (BUDI)
+#   + 4 authors, 4 releases (1 BUDI's, 3 TONO's)
 # - minicpan2:
-#   + 1 new author (KADAL), 1 removed author (NINA), 1 changed author (BUDI, email)
-#   + 2 new distros
-#     - Kadal-Busuk-1.00.tar.bz2 (naked, no containing folder)
+#   + author changes
+#     - 1 unchanged (WATI)
+#     - 1 new author (KADAL)
+#     - 1 removed author (NINA)
+#     - 1 changed author (BUDI, email)
+#   + distro changes
+#     - 1 unchanged distro: Simpel-Banget-0.001.tar.gz
+#     - 1 new distro: Kadal-Busuk-1.00.tar.bz2
+#       + extract naked, no containing folder
 #       + no changes, manifest, license, readme
 #       + modules: Kadal::Busuk, Kadal::Busuk::Sekali (no pod, no abstract, no version)
 #       + dep: runtime-requires to Foo::Bar
 #       + dep: test-requires to Foo::Bar::Baz
-#     - Kadal-Rusak-1.00.tar.gz (not a tar.gz, cannot be extracted)
-#     - Kadal-Hilang-1.00.tar.gz (indexed but does not exist)
-#     - Kadal-Jelek-1.00.tar.bz2
+#     - 1 new distro: Kadal-Rusak-1.00.tar.gz
+#       + not a tar.gz, cannot be extracted
+#     - 1 new distro: Kadal-Hilang-1.00.tar.gz
+#       + indexed but does not exist (assumed not downloaded)
+#     - 1 new distro: Kadal-Jelek-1.00.tar.bz2
 #       + modules: Kadal::Jelek, Kadal::Jelek::Sekali (all put in top-level dir)
 #       + no distro metadata, but has Makefile.PL which can be run to produce MYMETA.*
-#       + 2 scripts (in bin/, script/)
-#   + 1 updated distro (Foo-Bar-0.02)
-#     - release file now in subdir subdir1/
-#     - format changed to zip
-#     - has META.yml now instead of META.json
-#     - add a module: Foo::Bar::Qux (different version: 3.10)
-#     - removed a module: Foo::Bar::Baz
-#     - update module: Foo::Bar (abstract, add subs)
-#     - add, remove some deps, update some deps (version)
+#       + 2 new scripts (in bin/, script/)
+#     - 1 updated distro (Foo-Bar-0.02)
+#       + release file now in subdir subdir1/
+#       + format changed to zip
+#       + has META.yml now instead of META.json
+#       + add a module: Foo::Bar::Qux (different version: 3.10)
+#       + removed a module: Foo::Bar::Baz
+#       + update module: Foo::Bar (abstract, add subs)
+#       + add, remove some deps, update some deps (version)
+#     - 1 removed distro (Simpel-0.001)
+#       + 1 removed module and 1 removed script
+#     - 1 updated distro + change maintainership (TONO -> BUDI): Sederhana-v2.0.2
+#       + 1 updated script: sederhana (abstract)
+#       + 1 update module: Sederhana (abstract)
 # - TODO minicpan3:
 # - TODO minicpan4:
 #
-# list of releases test data:
-#
-# - Foo-Bar-0.01.tar.gz: META.json
-#
 # todo:
-# - module that change maintainer
-# - removed distro
-# - added scripts
-# - updated scripts (abstract, distro)
-# - removed scripts
+# - distro that use Build.PL
+# - distro that has META.yml as well as META.json
+# - dep that change phase/rel
 # - option: skipped files
 # - option: skipped files from sub indexing
 # - pod:
-# - mentions
+# - mentions:
 
 use File::Copy::Recursive qw(dircopy fcopy);
 use File::Temp qw(tempdir tempfile);
@@ -83,20 +91,60 @@ subtest minicpan1 => sub {
     subtest "modules, mods" => sub {
 
         $res = run_lcpan_json("modules", "--cpan", "$tempdir/minicpan1");
-        is_deeply($res->{stdout}, [qw/Foo::Bar Foo::Bar::Baz/]);
+        is_deeply($res->{stdout}, [
+            'Foo::Bar',
+            'Foo::Bar::Baz',
+            'Sederhana',
+            'Sederhana::Juga',
+            'Simpel',
+            'Simpel::Banget',
+        ]);
 
         $res = run_lcpan_json("mods", "--cpan", "$tempdir/minicpan1", "-l");
-        is($res->{stdout}[0]{module}, 'Foo::Bar');
-        is($res->{stdout}[0]{dist}, 'Foo-Bar');
-        is($res->{stdout}[0]{author}, 'BUDI');
-        is($res->{stdout}[0]{version}, '0.01');
-        is($res->{stdout}[0]{abstract}, 'A Foo::Bar module for testing');
-
-        is($res->{stdout}[1]{module}, 'Foo::Bar::Baz');
-        is($res->{stdout}[1]{dist}, 'Foo-Bar');
-        is($res->{stdout}[1]{author}, 'BUDI');
-        is($res->{stdout}[1]{version}, '0.01');
-        is($res->{stdout}[1]{abstract}, 'A Foo::Bar::Baz module for testing');
+        cmp_deeply($res->{stdout}, [
+            superhashof({
+                module   => 'Foo::Bar',
+                dist     => 'Foo-Bar',
+                author   => 'BUDI',
+                version  => '0.01',
+                abstract => 'A Foo::Bar module for testing',
+            }),
+            superhashof({
+                module   => 'Foo::Bar::Baz',
+                dist     => 'Foo-Bar',
+                author   => 'BUDI',
+                version  => '0.01',
+                abstract => 'A Foo::Bar::Baz module for testing',
+            }),
+            superhashof({
+                module   => 'Sederhana',
+                dist     => 'Sederhana',
+                author   => 'TONO',
+                version  => 'v2.0.1',
+                abstract => 'A simple module',
+            }),
+            superhashof({
+                module   => 'Sederhana::Juga',
+                dist     => 'Sederhana',
+                author   => 'TONO',
+                version  => undef,
+                abstract => 'Another simple module',
+            }),
+            superhashof({
+                module   => 'Simpel',
+                dist     => 'Simpel',
+                author   => 'TONO',
+                version  => '0.001',
+                abstract => 'A modest module',
+            }),
+            superhashof({
+                module   => 'Simpel::Banget',
+                dist     => 'Simpel-Banget',
+                author   => 'TONO',
+                version  => '0.001',
+                abstract => 'A very modest module',
+            }),
+        ]);
 
         # XXX test options
     };
@@ -104,14 +152,43 @@ subtest minicpan1 => sub {
     subtest "dists" => sub {
 
         $res = run_lcpan_json("dists", "--cpan", "$tempdir/minicpan1");
-        is_deeply($res->{stdout}, [qw/Foo-Bar/]);
+        is_deeply($res->{stdout}, [qw/Foo-Bar Sederhana Simpel Simpel-Banget/]);
 
         $res = run_lcpan_json("dists", "--cpan", "$tempdir/minicpan1", "-l");
-        is($res->{stdout}[0]{dist}, 'Foo-Bar');
-        is($res->{stdout}[0]{author}, 'BUDI');
-        is($res->{stdout}[0]{version}, '0.01');
-        is($res->{stdout}[0]{release}, 'Foo-Bar-0.01.tar.gz');
-        is($res->{stdout}[0]{abstract}, 'A Foo::Bar module for testing');
+        cmp_deeply($res->{stdout}, [
+            superhashof({
+                dist     => 'Foo-Bar',
+                author   => 'BUDI',
+                version  => '0.01',
+                release  => 'Foo-Bar-0.01.tar.gz',
+                abstract => 'A Foo::Bar module for testing',
+                # XXX rel_size, rel_mtime > 0
+            }),
+            superhashof({
+                dist     => 'Sederhana',
+                author   => 'TONO',
+                version  => '2.0.1',
+                release  => 'Sederhana-v2.0.1.tar.gz',
+                abstract => 'A simple distribution',
+                # XXX rel_size, rel_mtime > 0
+            }),
+            superhashof({
+                dist     => 'Simpel',
+                author   => 'TONO',
+                version  => '0.001',
+                release  => 'Simpel-0.001.tar.gz',
+                abstract => 'A modest distribution',
+                # XXX rel_size, rel_mtime > 0
+            }),
+            superhashof({
+                dist     => 'Simpel-Banget',
+                author   => 'TONO',
+                version  => '0.001',
+                release  => 'Simpel-Banget-0.001.tar.gz',
+                abstract => 'A very modest distribution',
+                # XXX rel_size, rel_mtime > 0
+            }),
+        ]);
 
         # XXX test options
     };
@@ -119,30 +196,57 @@ subtest minicpan1 => sub {
     subtest "releases, rels" => sub {
 
         $res = run_lcpan_json("releases", "--cpan", "$tempdir/minicpan1");
-        is_deeply($res->{stdout}, [qw!B/BU/BUDI/Foo-Bar-0.01.tar.gz!]);
+        is_deeply($res->{stdout}, [
+            'B/BU/BUDI/Foo-Bar-0.01.tar.gz',
+            'T/TO/TONO/Sederhana-v2.0.1.tar.gz',
+            'T/TO/TONO/Simpel-0.001.tar.gz',
+            'T/TO/TONO/Simpel-Banget-0.001.tar.gz',
+        ]);
 
         $res = run_lcpan_json("rels", "--cpan", "$tempdir/minicpan1", "-l");
-        is_deeply($res->{stdout}[0]{name}, 'B/BU/BUDI/Foo-Bar-0.01.tar.gz');
-        is_deeply($res->{stdout}[0]{author}, 'BUDI');
-        is_deeply($res->{stdout}[0]{file_status}, 'ok');
-        is_deeply($res->{stdout}[0]{file_error}, undef);
-        is_deeply($res->{stdout}[0]{has_buildpl}, 0);
-        is_deeply($res->{stdout}[0]{has_makefilepl}, 1);
-        is_deeply($res->{stdout}[0]{has_metajson}, 1);
-        is_deeply($res->{stdout}[0]{has_metayml}, 0);
-        is_deeply($res->{stdout}[0]{meta_status}, 'ok');
-        is_deeply($res->{stdout}[0]{meta_error}, undef);
-        ok($res->{stdout}[0]{size} > 0);
-        ok($res->{stdout}[0]{mtime} > 0);
-
+        cmp_deeply($res->{stdout}, [
+            superhashof({
+                name => 'B/BU/BUDI/Foo-Bar-0.01.tar.gz',
+                author   => 'BUDI',
+                file_status => 'ok',
+                file_error => undef,
+                meta_status => 'ok',
+                meta_error => undef,
+                pod_status => 'ok',
+                has_makefilepl => 1,
+                has_buildpl => 0,
+                has_metayml => 0,
+                has_metajson => 1,
+                # XXX size, mtime > 0
+            }),
+            superhashof({
+                name => 'T/TO/TONO/Sederhana-v2.0.1.tar.gz',
+                author   => 'TONO',
+                has_metayml => 1,
+                has_metajson => 0,
+            }),
+            superhashof({
+                name => 'T/TO/TONO/Simpel-0.001.tar.gz',
+                author   => 'TONO',
+                has_metayml => 1,
+                has_metajson => 0,
+            }),
+            superhashof({
+                name => 'T/TO/TONO/Simpel-Banget-0.001.tar.gz',
+                author   => 'TONO',
+                has_metayml => 1,
+                has_metajson => 0,
+            }),
+        ]);
     };
 
     subtest "deps" => sub {
 
+        my $hoh;
+
         $res = run_lcpan_json("deps", "--cpan", "$tempdir/minicpan1", "--all", "Foo::Bar");
-        my $deps = {};
-        for (@{ $res->{stdout} }) { $deps->{ $_->{phase} }{ $_->{rel} }{ $_->{module} } = $_->{version} }
-        is_deeply($deps, {
+        $hoh = _deps2hoh($res->{stdout});
+        is_deeply($hoh, {
             develop => { requires => {
                 'Pod::Coverage::TrustPod' => 0,
                 'Test::Perl::Critic' => 0,
@@ -158,7 +262,23 @@ subtest minicpan1 => sub {
                 'IPC::Open3' => 0,
                 'Test::More' => 0,
             }},
-        }) or diag explain $deps;
+        }) or diag explain $hoh;
+
+        # this dist will disappear later
+        $res = run_lcpan_json("deps", "--cpan", "$tempdir/minicpan1", "--all", "Simpel");
+        $hoh = _deps2hoh($res->{stdout});
+        is_deeply($hoh, {
+            runtime => { requires => {
+                'Foo::Bar' => 0,
+            }},
+        }) or diag explain $hoh;
+
+        $res = run_lcpan_json("deps", "--cpan", "$tempdir/minicpan1", "-l2", "Sederhana");
+        cmp_deeply($res->{stdout}, [
+            superhashof({module=>'Simpel'}),
+            superhashof({module=>'  Foo::Bar'}),
+            superhashof({module=>'Simpel::Banget'}),
+        ]);
 
     };
 
@@ -169,6 +289,44 @@ subtest minicpan1 => sub {
 
         # XXX test contents detail
     };
+
+    subtest "scripts" => sub {
+
+        $res = run_lcpan_json("scripts", "--cpan", "$tempdir/minicpan1");
+        is_deeply($res->{stdout}, [
+            'sederhana',            # [0]
+            'simpel',               # [1]
+            'simpel-banget',        # [2]
+        ]);
+
+        $res = run_lcpan_json("scripts", "--cpan", "$tempdir/minicpan1", "-l");
+        cmp_deeply($res->{stdout}, [
+            superhashof({
+                name => 'sederhana',
+                cpanid => 'TONO',
+                abstract => 'A simple script',
+                dist => 'Sederhana',
+                dist_version => '2.0.1',
+            }),
+            superhashof({
+                name => 'simpel',
+                cpanid => 'TONO',
+                abstract => 'A modest script',
+                dist => 'Simpel',
+                dist_version => '0.001',
+            }),
+            superhashof({
+                name => 'simpel-banget',
+                cpanid => 'TONO',
+                abstract => 'A very modest script',
+                dist => 'Simpel-Banget',
+                dist_version => '0.001',
+            }),
+        ]);
+
+        # XXX test options
+    };
+
 };
 
 subtest minicpan2 => sub {
@@ -208,63 +366,111 @@ subtest minicpan2 => sub {
             'Kadal::Jelek',         # [6]
             'Kadal::Jelek::Sekali', # [7]
             'Kadal::Rusak',         # [8]
+            'Sederhana',            # [9]
+            'Sederhana::Juga',      # [10]
+            'Simpel::Banget',       # [11]
         ]);
 
-        $res = run_lcpan_json("mods", "--cpan", "$tempdir/minicpan1", "-l");
+        $res = run_lcpan_json("mods", "--cpan", "$tempdir/minicpan2", "-l");
         is($res->{stdout}[0]{version}, '0.02', 'Foo::Bar version updated to 0.02');
         is($res->{stdout}[1]{version}, '0.01', 'Foo::Bar::Baz version still at 0.01, refers to old dist');
-        # XXX why is Foo::Bar::Qux version 0.02 and not 3.10?
+        is($res->{stdout}[2]{version}, '3.10', 'Foo::Bar::Qux version follows 02packages');
+        cmp_deeply($res->{stdout}[5], superhashof({
+            module => 'Kadal::Hilang',
+            author => 'KADAL',
+            version => '1.00',
+            dist => 'Kadal-Hilang', # set by changing Kadal::Hilang -> Kadang-Hilang
+        }), 'module with no release (Kadal-Hilang) file still indexed');
+        cmp_deeply($res->{stdout}[8], superhashof({
+            module => 'Kadal::Rusak',
+            author => 'KADAL',
+            version => '1.00',
+            dist => 'Kadal-Rusak', # set by changing Kadal::Rusak -> Kadang-Rusak
+        }), 'module with release file unextractable (Kadal-Rusak) file still indexed');
+        cmp_deeply($res->{stdout}[9], superhashof({
+            module => 'Sederhana',
+            author => 'BUDI',
+            version => 'v2.0.2',
+            dist => 'Sederhana',
+            abstract => 'A simple yet useful module',
+        }), "Sederhana updated");
+        cmp_deeply($res->{stdout}[11], superhashof({
+            module => 'Simpel::Banget',
+            author => 'TONO',
+            version => '0.001',
+            dist => 'Simpel-Banget',
+            abstract => 'A very modest module',
+        }), "Simple::Banget unchanged");
 
         # XXX test options
     };
 
     subtest "dists" => sub {
 
-        $res = run_lcpan_json("dists", "--cpan", "$tempdir/minicpan1");
+        $res = run_lcpan_json("dists", "--cpan", "$tempdir/minicpan2");
         is_deeply($res->{stdout}, [
             'Foo-Bar',
-            # XXX Foo-Bar-Baz and Foo-Bar-Qux should not exist
-            'Foo-Bar-Baz',
-            'Foo-Bar-Qux',
+            'Foo-Bar',
+            'Kadal-Busuk',
+            'Kadal-Hilang',
+            'Kadal-Jelek',
+            'Kadal-Rusak',
+            'Sederhana',
+            'Simpel-Banget',
+        ]);
+        $res = run_lcpan_json("dists", "--cpan", "$tempdir/minicpan2", "--latest");
+        is_deeply($res->{stdout}, [
+            'Foo-Bar',
+            'Kadal-Busuk',
+            'Kadal-Hilang',
+            'Kadal-Jelek',
+            'Kadal-Rusak',
+            'Sederhana',
+            'Simpel-Banget',
         ]);
 
-        $res = run_lcpan_json("dists", "--cpan", "$tempdir/minicpan1", "-l");
-        is($res->{stdout}[0]{dist}, 'Foo-Bar');
-        is($res->{stdout}[0]{author}, 'BUDI');
-        is($res->{stdout}[0]{version}, '0.01');
-        is($res->{stdout}[0]{release}, 'Foo-Bar-0.01.tar.gz');
-        is($res->{stdout}[0]{abstract}, 'A Foo::Bar module for testing');
-
-        # XXX test options
+        $res = run_lcpan_json("dists", "--cpan", "$tempdir/minicpan2", "-l");
+        # XXX test more details
     };
 
     subtest "releases, rels" => sub {
 
-        $res = run_lcpan_json("releases", "--cpan", "$tempdir/minicpan1");
-        is_deeply($res->{stdout}, [qw!B/BU/BUDI/Foo-Bar-0.01.tar.gz!]);
+        $res = run_lcpan_json("releases", "--cpan", "$tempdir/minicpan2");
+        is_deeply($res->{stdout}, [
+            'B/BU/BUDI/Foo-Bar-0.01.tar.gz',
+            'K/KA/KADAL/Kadal-Busuk-1.00.tar.bz2',
+            'K/KA/KADAL/Kadal-Hilang-1.00.tar.gz',
+            'K/KA/KADAL/Kadal-Jelek-1.00.tgz',
+            'K/KA/KADAL/Kadal-Rusak-1.00.tar.gz',
+            'B/BU/BUDI/Sederhana-v2.0.2.tar.gz',
+            'T/TO/TONO/Simpel-Banget-0.001.tar.gz',
+            'B/BU/BUDI/subdir1/Foo-Bar-0.02.zip',
+        ]);
 
-        $res = run_lcpan_json("rels", "--cpan", "$tempdir/minicpan1", "-l");
-        is_deeply($res->{stdout}[0]{name}, 'B/BU/BUDI/Foo-Bar-0.01.tar.gz');
-        is_deeply($res->{stdout}[0]{author}, 'BUDI');
-        is_deeply($res->{stdout}[0]{file_status}, 'ok');
-        is_deeply($res->{stdout}[0]{file_error}, undef);
-        is_deeply($res->{stdout}[0]{has_buildpl}, 0);
-        is_deeply($res->{stdout}[0]{has_makefilepl}, 1);
-        is_deeply($res->{stdout}[0]{has_metajson}, 1);
-        is_deeply($res->{stdout}[0]{has_metayml}, 0);
-        is_deeply($res->{stdout}[0]{meta_status}, 'ok');
-        is_deeply($res->{stdout}[0]{meta_error}, undef);
-        ok($res->{stdout}[0]{size} > 0);
-        ok($res->{stdout}[0]{mtime} > 0);
-
+        $res = run_lcpan_json("rels", "--cpan", "$tempdir/minicpan2", "-l");
+        # XXX test more details
     };
 
     subtest "deps" => sub {
 
-        $res = run_lcpan_json("deps", "--cpan", "$tempdir/minicpan1", "--all", "Foo::Bar");
+        $res = run_lcpan_json("deps", "--cpan", "$tempdir/minicpan2", "--all", "Foo::Bar");
         my $deps = {};
         for (@{ $res->{stdout} }) { $deps->{ $_->{phase} }{ $_->{rel} }{ $_->{module} } = $_->{version} }
         is_deeply($deps, {
+            configure => { requires => {
+                'ExtUtils::MakeMaker' => 0,
+            }},
+            build => { requires => {
+                'File::Spec' => '0.01',
+                'IO::HandleTest' => 0,
+                'IPC::Open3' => 0,
+                'Test::More' => 0,
+            }},
+        }, "deps shows the latest version of Foo-Bar") or diag explain $deps;
+
+        $res = run_lcpan_json("deps", "--cpan", "$tempdir/minicpan2", "--all", 'Foo::Bar@0.01');
+        my $hoh = _deps2hoh($res->{stdout});
+        is_deeply($hoh, {
             develop => { requires => {
                 'Pod::Coverage::TrustPod' => 0,
                 'Test::Perl::Critic' => 0,
@@ -280,17 +486,41 @@ subtest minicpan2 => sub {
                 'IPC::Open3' => 0,
                 'Test::More' => 0,
             }},
-        }) or diag explain $deps;
+        }, "deps can still show deps of older dists that are indexed") or diag explain $hoh;
 
+        $res = run_lcpan_json("deps", "--cpan", "$tempdir/minicpan2", "--all", "Foo::Bar@9.9");
+        $hoh = _deps2hoh($res->{stdout});
+        is_deeply($hoh, {
+        }, "deps of unknown dist version") or diag explain $hoh;
+
+        $res = run_lcpan_json("deps", "--cpan", "$tempdir/minicpan2", "--all", "Sederhana");
+        cmp_deeply($res->{stdout}, [
+            superhashof({module=>'Simpel', author=>undef}),
+            superhashof({module=>'Simpel::Banget', author=>'TONO'}),
+        ], "a broken dependency (points to an unindexed module");
     };
 
     subtest "contents" => sub {
 
-        $res = run_lcpan_json("contents", "--cpan", "$tempdir/minicpan1");
+        $res = run_lcpan_json("contents", "--cpan", "$tempdir/minicpan2");
         ok(scalar(@{ $res->{stdout} }));
 
         # XXX test contents detail
     };
+
+    subtest "scripts" => sub {
+
+        $res = run_lcpan_json("scripts", "--cpan", "$tempdir/minicpan2");
+        is_deeply($res->{stdout}, [
+            'simpel-banget',
+            'script2',
+            'script1',
+            'sederhana',
+        ]);
+
+        # XXX test more details
+    };
+
 };
 
 DONE_TESTING:
@@ -334,4 +564,13 @@ sub run_lcpan_ok {
     my $res = run_lcpan(@_);
     is($res->{exit_code}, 0);
     $res;
+}
+
+sub _deps2hoh {
+    my $deps = shift;
+    my $hoh = {};
+    for (@{ $deps }) {
+        $hoh->{ $_->{phase} }{ $_->{rel} }{ $_->{module} } = $_->{version};
+    }
+    $hoh;
 }

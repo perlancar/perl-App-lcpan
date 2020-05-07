@@ -104,6 +104,8 @@ sub handle_cmd {
     }
 
     my $sql = "SELECT
+  file.dist_name dist,
+  file.dist_version dist_version,
   file.name release,
   script.cpanid cpanid,
   script.name name,
@@ -119,7 +121,7 @@ LEFT JOIN file ON file.id=script.file_id".
         push @res, $detail ? $row : $row->{name};
     }
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/name abstract release cpanid/]
+    $resmeta->{'table.fields'} = [qw/name abstract dist dist_version release cpanid/]
         if $detail;
     [200, "OK", \@res, $resmeta];
 }

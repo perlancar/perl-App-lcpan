@@ -472,6 +472,18 @@ our %dists_args = (
     },
 );
 
+our %dists_with_optional_vers_args = (
+    dists_with_optional_vers => {
+        schema => ['array*', of=>'perl::distname_with_optional_ver*', min_len=>1],
+        'x.name.is_plural' => 1,
+        req => 1,
+        pos => 0,
+        slurpy => 1,
+        cmdline_src => 'stdin_or_args',
+        element_completion => \&_complete_dist,
+    },
+);
+
 our %rel_args = (
     release => {
         schema => 'str*', # XXX perl::relname
@@ -574,6 +586,28 @@ sub _numify_ver {
     my $v;
     eval { $v = version->parse($_[0]) };
     $v ? $v->numify : undef;
+}
+
+sub _dists_with_optional_vers2file_ids {
+    my ($dbh, $dists_with_optional_vers) = @_;
+
+    return [] unless $dists_with_optional_vers;
+    my $file_ids = [];
+    for my $dist_with_optional_ver (@$dists_with_optional_vers) {
+        my $dist = $dist_with_optional_ver;
+        my $file_id;
+        if ($dist =~ s/@(.+)$//) {
+            my $ver = $1;
+            ($file_id) = $dbh->selectrow_array("SELECT id FROM file WHERE dist_name=? AND dist_version=?", {}, $dist, $ver);
+            do { warn "lcpan: No such dist '$dist' version '$ver'\n"; next } unless $file_id;
+        } else {
+            ($file_id) = $dbh->selectrow_array("SELECT id FROM file WHERE dist_name=? AND is_latest_dist=1", {}, $dist);
+            do { warn "lcpan: No such dist '$dist'\n"; next } unless $file_id;
+        }
+        push @$file_ids, $file_id;
+    }
+
+    $file_ids;
 }
 
 sub _fullpath {
@@ -816,9 +850,6 @@ our $db_schema_spec = {
              FOREIGN KEY (module_id) REFERENCES module(id)
          )',
         'CREATE INDEX ix_dep__module_name ON dep(module_name)',
-        # not all module have module_id anyway, and ones with module_id should
-        # already be correct because dep is a hash with module name as key
-        # 'CREATE UNIQUE INDEX ix_dep__file_id__module_id ON dep(file_id,module_id)',
         'CREATE INDEX ix_dep__file_id ON dep(file_id)',
         'CREATE INDEX ix_dep__module_id ON dep(module_id)',
         'CREATE INDEX ix_dep__rec_ctime ON dep(rec_ctime)',
@@ -3950,38 +3981,22 @@ sub _get_prereqs {
     require Module::CoreList::More;
     require Version::Util;
 
-    my ($mods, $dbh, $memory_by_mod_name, $memory_by_dist_name,
+    my ($file_ids0, $dbh, $memory_by_mod_name, $memory_by_file_id,
         $level, $max_level, $filters, $plver, $flatten, $dont_uniquify, $phase, $rel) = @_;
 
-    log_trace("Finding dependencies for module(s) %s (level=%i) ...", $mods, $level);
+    my $file_ids = [];
 
-    # first, check that all modules are listed and belong to a dist
-    my @dist_names;
-    for my $mod0 (@$mods) {
-        my ($mod, $dist_name);
-        if (ref($mod0) eq 'HASH') {
-            $mod = $mod0->{mod};
-            $dist_name = $mod0->{dist};
-            if (!defined $dist_name) {
-                # some special names need not be warned
-                unless ($mod =~ /\A(perl|Config)\z/) {
-                    log_warn("module '$mod' is not indexed (does not have dist ID), skipped");
-                }
-                next;
-            }
-        } else {
-            $mod = $mod0;
-            ($dist_name) = $dbh->selectrow_array("SELECT dist_name FROM file WHERE id IN (SELECT file_id FROM module WHERE name=?) ORDER BY id", {}, $mod);
-            defined $dist_name or return [404, "No such module: $mod"];
-        }
-        unless ($memory_by_dist_name->{$dist_name} && $dont_uniquify) {
-            push @dist_names, $dist_name;
-            $memory_by_dist_name->{$dist_name} = $mod;
+    for my $file_id (@$file_ids0) {
+        unless ($memory_by_file_id->{$file_id} && $dont_uniquify) {
+            push @$file_ids, $file_id;
+            $memory_by_file_id->{$file_id} = 1;
         }
     }
-    return [200, "OK", []] unless @dist_names;
 
-    my @where = ("dp.file_id IN (SELECT id FROM file WHERE dist_name IN (".join(",",map {$dbh->quote($_)} grep {defined} @dist_names)."))");
+    log_trace("Finding dependencies for file ID(s) %s (level=%i) ...", $file_ids, $level);
+    return [200, "OK", []] unless @$file_ids;
+
+    my @where = ("dp.file_id IN (".join(",", @$file_ids).")");
     my @bind  = ();
 
     if ($filters->{authors}) {
@@ -4009,6 +4024,7 @@ sub _get_prereqs {
   END AS module,
   (SELECT cpanid FROM module WHERE id=dp.module_id) AS author,
   (SELECT dist_name FROM file WHERE id=(SELECT file_id FROM module WHERE id=dp.module_id)) AS module_dist,
+  (SELECT file_id FROM module WHERE id=dp.module_id) AS module_file_id,
   phase,
   rel,
   version
@@ -4019,7 +4035,9 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
     my @res;
   MOD:
     while (my $row = $sth->fetchrow_hashref) {
-        next unless $row->{module};
+        # BUG? we can encounter case where module is undef
+        next unless defined $row->{module};
+
         next unless $phase eq 'ALL' || $row->{phase} eq $phase;
         next unless $rel   eq 'ALL' || $row->{rel}   eq $rel;
 
@@ -4033,7 +4051,7 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
 
         if (!$dont_uniquify && (
             (exists $memory_by_mod_name->{$row->{module}}) ||
-                ($level > 1 && defined $row->{module_dist} && exists $memory_by_dist_name->{$row->{module_dist}})
+                ($level > 1 && defined $row->{module_dist} && exists $memory_by_file_id->{$row->{module_file_id}})
             )
         ) {
             if ($flatten) {
@@ -4051,7 +4069,6 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
             Module::CoreList::More->is_still_core($row->{module}, undef, version->parse($plver)->numify);
         next if !$filters->{include_core}    &&  $row->{is_core};
         next if !$filters->{include_noncore} && !$row->{is_core};
-        next unless defined $row->{module}; # BUG? we can encounter case where module is undef
         if (defined $memory_by_mod_name->{$row->{module}}) {
             if (Version::Util::version_gt($row->{version}, $memory_by_mod_name->{$row->{module}})) {
                 $memory_by_mod_name->{$row->{module}} = $row->{version};
@@ -4066,9 +4083,9 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
     }
 
     if (@res && ($max_level==-1 || $level < $max_level)) {
-        my $subres = _get_prereqs([map { {mod=>$_->{module}, dist=>$_->{module_dist}} } @res], $dbh,
+        my $subres = _get_prereqs([grep {defined} map { $_->{module_file_id} } @res], $dbh,
                                   $memory_by_mod_name,
-                                  $memory_by_dist_name,
+                                  $memory_by_file_id,
                                   $level+1, $max_level, $filters, $plver, $flatten, $dont_uniquify, $phase, $rel);
         return $subres if $subres->[0] != 200;
         if ($flatten) {
@@ -4333,7 +4350,7 @@ our $deps_args_rels = {
 
 $SPEC{'deps'} = {
     v => 1.1,
-    summary => 'List dependencies',
+    summary => 'List dependencies of distributions',
     description => <<'_',
 
 By default only runtime requires are displayed. To see prereqs for other phases
@@ -4351,10 +4368,36 @@ dependencies.
 _
     args => {
         %common_args,
-        %mods_args,
+        %dists_with_optional_vers_args,
         %deps_args,
     },
     args_rels => $deps_args_rels,
+    examples => [
+        {
+            summary => 'List what modules Module-List requires',
+            argv => ['Module-List'],
+            test => 0,
+            'x.doc.show_result' => 0,
+        },
+        {
+            summary => 'List modules Module-List requires (module name will be converted to distro name)',
+            argv => ['Module::List'],
+            test => 0,
+            'x.doc.show_result' => 0,
+        },
+        {
+            summary => 'List non-core modules Module-List requires',
+            argv => ['Module-List', '--exclude-core'],
+            test => 0,
+            'x.doc.show_result' => 0,
+        },
+        {
+            summary => 'List dependencies of a specific distribution release',
+            argv => ['Module-List@0.004'],
+            test => 0,
+            'x.doc.show_result' => 0,
+        },
+    ],
 };
 sub deps {
     require Module::XSOrPP;
@@ -4363,11 +4406,11 @@ sub deps {
     my $state = _init(\%args, 'ro');
     my $dbh = $state->{dbh};
 
-    my $mods    = $args{modules};
-    my $phase   = $args{phase} // 'runtime';
-    my $rel     = $args{rel} // 'requires';
-    my $plver   = $args{perl_version} // "$^V";
-    my $level   = $args{level} // 1;
+    my $file_ids = _dists_with_optional_vers2file_ids($dbh, $args{dists_with_optional_vers});
+    my $phase    = $args{phase} // 'runtime';
+    my $rel      = $args{rel} // 'requires';
+    my $plver    = $args{perl_version} // "$^V";
+    my $level    = $args{level} // 1;
     my $include_core    = $args{include_core} // 1;
     my $include_noncore = $args{include_noncore} // 1;
     my $with_xs_or_pp = $args{with_xs_or_pp};
@@ -4388,13 +4431,13 @@ sub deps {
         updated_after  => $args{updated_after},
     };
 
-    my $res = _get_prereqs($mods, $dbh, {}, {},
+    my $res = _get_prereqs($file_ids, $dbh, {}, {},
                            1, $level, $filters, $plver, $args{flatten}, $args{dont_uniquify}, $phase, $rel);
 
     return $res unless $res->[0] == 200;
     my @cols;
     push @cols, (qw/module/);
-    push @cols, "dist" if @$mods > 1;
+    push @cols, "dist" if @$file_ids > 1;
     push @cols, (qw/author version/);
     push @cols, "is_core";
     push @cols, "xs_or_pp" if $with_xs_or_pp;
@@ -4404,7 +4447,7 @@ sub deps {
         }
         $_->{module} = ("  " x ($_->{level}-1)) . $_->{module}
             unless $args{flatten};
-        delete $_->{dist} unless @$mods > 1 || $_->{level} > 1;
+        delete $_->{dist} unless @$file_ids > 1 || $_->{level} > 1;
         delete $_->{level};
     }
 
