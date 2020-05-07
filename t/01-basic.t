@@ -352,13 +352,13 @@ subtest minicpan1 => sub {
     };
 
     subtest "changes" => sub {
-        $res = run_lcpan_json("changes", "--cpan", "$tempdir/minicpan1", "Foo-Bar");
-        like($res->{stdout}, "First release");
+        $res = run_lcpan_ok("changes", "--cpan", "$tempdir/minicpan1", "Foo-Bar");
+        like($res->{stdout}, qr/First release/);
     };
 
     subtest "dist2rel" => sub {
-        $res = run_lcpan_json("dist2rel", "--cpan", "$tempdir/minicpan1", "Sederhana");
-        cmp_deeply($res->{stdout}, "T/TO/TONO/Sederhana");
+        $res = run_lcpan_ok("dist2rel", "--cpan", "$tempdir/minicpan1", "Sederhana");
+        cmp_deeply($res->{stdout}, "T/TO/TONO/Sederhana\n");
         # XXX option: --full-path
     };
 
