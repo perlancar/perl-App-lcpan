@@ -689,7 +689,7 @@ sub _set_namespace {
 }
 
 our $db_schema_spec = {
-    latest_v => 16,
+    latest_v => 15,
 
     install => [
         'CREATE TABLE author (
@@ -1180,16 +1180,6 @@ our $db_schema_spec = {
     ],
 
     upgrade_to_v15 => [
-        # since there were misplaced placeholders when setting rec_mtime (fixed
-        # in 3be9ae8), we will need to redo file indexing
-        sub {
-            my $dbh = shift;
-            log_info("Will be reindexing for all files due to bug in lcpan <= 1.056");
-            _reset($dbh, 'soft');
-        },
-    ],
-
-    upgrade_to_v16 => [
         # we merge 'dist' into 'file' table to make things simpler, because
         # 'dist' has a 1:1 relationship with 'file'
         'ALTER TABLE file ADD COLUMN dist_name TEXT',
@@ -1200,6 +1190,14 @@ our $db_schema_spec = {
         'CREATE INDEX ix_file__dist_name ON file(dist_name)',
 
         'DROP TABLE dist',
+
+        # since there were misplaced placeholders when setting rec_mtime (fixed
+        # in 3be9ae8), we will need to redo file indexing.
+        sub {
+            my $dbh = shift;
+            log_info("Will be reindexing for all files due to bug in lcpan <= 1.056");
+            _reset($dbh, 'soft');
+        },
     ],
 
     # for testing
