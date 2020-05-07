@@ -1,9 +1,11 @@
 package App::lcpan::Cmd::script2mod;
 
+# AUTHORITY
 # DATE
+# DIST
 # VERSION
 
-use 5.010;
+use 5.010001;
 use strict;
 use warnings;
 
@@ -44,7 +46,6 @@ SELECT
   (SELECT name FROM module WHERE file_id=file.id LIMIT 1) module
 FROM script
 LEFT JOIN file   ON script.file_id=file.id
-LEFT JOIN dist   ON file.id=dist.file_id
 WHERE script.name IN ($scripts_s)
 ");
 

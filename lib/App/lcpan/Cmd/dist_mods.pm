@@ -1,9 +1,11 @@
 package App::lcpan::Cmd::dist_mods;
 
+# AUTHORITY
 # DATE
+# DIST
 # VERSION
 
-use 5.010;
+use 5.010001;
 use strict;
 use warnings;
 
@@ -35,8 +37,7 @@ sub handle_cmd {
   module.abstract abstract
 FROM module
 LEFT JOIN file ON module.file_id=file.id
-LEFT JOIN dist ON file.id=dist.file_id
-WHERE dist.name=?
+WHERE file.dist_name=?
 ORDER BY name DESC");
     $sth->execute($dist);
     my @res;

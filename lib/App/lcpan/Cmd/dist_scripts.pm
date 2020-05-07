@@ -29,16 +29,15 @@ sub handle_cmd {
     my $dbh = $state->{dbh};
 
     my @wheres;
-    push @wheres, "dist.name IN (".join(",", map {$dbh->quote($_)} @{ $args{dists} }).")";
+    push @wheres, "file.dist_name IN (".join(",", map {$dbh->quote($_)} @{ $args{dists} }).")";
     my $detail = $args{detail};
 
     my $sth = $dbh->prepare("SELECT
   script.name name,
-  dist.name dist,
+  file.dist_name dist,
   script.abstract abstract
 FROM script
 LEFT JOIN file ON script.file_id=file.id
-LEFT JOIN dist ON file.id=dist.file_id
 WHERE ".join(" AND ", @wheres)."
 ORDER BY name DESC");
     $sth->execute();

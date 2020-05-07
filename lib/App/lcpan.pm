@@ -1193,6 +1193,22 @@ our $db_schema_spec = {
 
         'DROP TABLE dist',
 
+        # recreate table dep to remove the dist_id column
+        'DROP TABLE dep',
+        'CREATE TABLE dep (
+             file_id INTEGER,
+             module_id INTEGER, -- if module is known (listed in module table), only its id will be recorded here
+             module_name TEXT,  -- if module is unknown (unlisted in module table), only the name will be recorded here
+             rel TEXT, -- relationship: requires, ...
+             phase TEXT, -- runtime, ...
+             version VARCHAR(20),
+             version_numified DECIMAL,
+             rec_ctime INT,
+             rec_mtime INT,
+             FOREIGN KEY (file_id) REFERENCES file(id),
+             FOREIGN KEY (module_id) REFERENCES module(id)
+         )',
+
         # since there were misplaced placeholders when setting rec_mtime (fixed
         # in 3be9ae8), we will need to redo file indexing.
         sub {

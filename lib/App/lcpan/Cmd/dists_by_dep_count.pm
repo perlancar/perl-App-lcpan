@@ -53,7 +53,7 @@ sub handle_cmd {
     my $sql = "SELECT
   f.dist_name name,
   f.cpanid author,
-  COUNT(DISTINCT dp.file_id) AS dep_count
+  COUNT(DISTINCT f.id) AS dep_count
 FROM file f
 JOIN dep dp ON dp.file_id=f.id
 WHERE ".join(" AND ", @where)."

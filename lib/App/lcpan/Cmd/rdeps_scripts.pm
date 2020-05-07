@@ -58,16 +58,15 @@ sub handle_cmd {
     push @dists, $_->{dist} for @{ $res->[2] };
 
     my @where;
-    push @where, "dist.name IN (".
+    push @where, "file.dist_name IN (".
         join(",", map { $dbh->quote($_) } @dists).")";
     my $sql = "SELECT
   script.name name,
-  dist.name dist,
+  file.dist_name dist,
   script.cpanid author,
   script.abstract abstract
 FROM script
 LEFT JOIN file ON script.file_id=file.id
-LEFT JOIN dist ON file.id=dist.file_id
 WHERE ".join(" AND ", @where)."
 ";
 

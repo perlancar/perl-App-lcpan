@@ -33,10 +33,9 @@ sub handle_cmd {
     my $sth = $dbh->prepare("
 SELECT
   script.name script,
-  dist.name dist
+  file.dist_name dist
 FROM script
 LEFT JOIN file ON script.file_id=file.id
-LEFT JOIN dist ON file.id=dist.file_id
 WHERE script.name IN ($scripts_s)");
 
     my @res;

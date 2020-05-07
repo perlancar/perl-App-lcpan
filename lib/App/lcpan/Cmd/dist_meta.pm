@@ -27,9 +27,9 @@ sub handle_cmd {
     my $state = App::lcpan::_init(\%args, 'ro');
     my $dbh = $state->{dbh};
 
-    my ($dist_id, $cpanid, $file_name, $file_id, $has_metajson, $has_metayml) = $dbh->selectrow_array(
-        "SELECT id, cpanid, name, has_metajson, has_metayml FROM file WHERE is_latest_dist AND dist_name=?", {}, $args{dist});
-    $dist_id or return [404, "No such dist '$args{dist}'"];
+    my ($cpanid, $file_name, $file_id, $has_metajson, $has_metayml) = $dbh->selectrow_array(
+        "SELECT cpanid, name, id, has_metajson, has_metayml FROM file WHERE is_latest_dist AND dist_name=?", {}, $args{dist});
+    $file_id or return [404, "No such dist '$args{dist}'"];
     $has_metajson || $has_metayml or return [412, "Dist does not have metadata"];
 
     my $path = App::lcpan::_fullpath($file_name, $state->{cpan}, $cpanid);

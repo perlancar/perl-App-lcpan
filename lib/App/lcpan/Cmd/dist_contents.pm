@@ -43,9 +43,9 @@ sub handle_cmd {
     my $state = App::lcpan::_init(\%args, 'ro');
     my $dbh = $state->{dbh};
 
-    my ($dist_id) = $dbh->selectrow_array(
+    my ($file_id) = $dbh->selectrow_array(
         "SELECT id FROM file WHERE dist_name=?", {}, $args{dist});
-    $dist_id or return [404, "No such dist '$args{dist}'"];
+    $file_id or return [404, "No such dist '$args{dist}'"];
 
     App::lcpan::Cmd::contents::handle_cmd(%args);
 }

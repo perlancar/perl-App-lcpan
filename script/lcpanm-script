@@ -45,7 +45,6 @@ SELECT
   (SELECT name FROM module WHERE file_id=file.id LIMIT 1) module
 FROM script
 LEFT JOIN file   ON script.file_id=file.id
-LEFT JOIN dist   ON file.id=dist.file_id
 WHERE script.name IN ($scripts_s)
 ");
     $sth->execute;

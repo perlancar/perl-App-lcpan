@@ -1,6 +1,8 @@
 package App::lcpan::Cmd::mod2dist;
 
+# AUTHORITY
 # DATE
+# DIST
 # VERSION
 
 use 5.010;
@@ -32,10 +34,9 @@ sub handle_cmd {
     my $sth = $dbh->prepare("
 SELECT
   module.name module,
-  dist.name dist
+  file.dist_name dist
 FROM module
 LEFT JOIN file ON module.file_id=file.id
-LEFT JOIN dist ON file.id=dist.file_id
 WHERE module.name IN ($mods_s)");
 
     my $res;
