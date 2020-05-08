@@ -43,6 +43,10 @@ _
             schema => ['str*', in=>['content', 'dist', 'author']],
             default => 'content',
         },
+        n => {
+            summary => 'Return at most this number of results',
+            schema => 'posint*',
+        },
     },
 };
 sub handle_cmd {
@@ -77,7 +81,7 @@ LEFT JOIN file targetfile ON module.file_id=targetfile.id
 WHERE ".join(" AND ", @where)."
 GROUP BY module.name
 ORDER BY mention_count DESC
-";
+".($args{n} ? "LIMIT ".(0+$args{n}) : "");
 
     my @res;
     my $sth = $dbh->prepare($sql);

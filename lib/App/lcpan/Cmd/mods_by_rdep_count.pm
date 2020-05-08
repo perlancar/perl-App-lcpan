@@ -1,6 +1,8 @@
 package App::lcpan::Cmd::mods_by_rdep_count;
 
+# AUTHORITY
 # DATE
+# DIST
 # VERSION
 
 use 5.010;
@@ -21,6 +23,10 @@ $SPEC{'handle_cmd'} = {
         %App::lcpan::fauthor_args,
         clone_list(%App::lcpan::deps_phase_args),
         clone_list(%App::lcpan::deps_rel_args),
+        n => {
+            summary => 'Return at most this number of results',
+            schema => 'posint*',
+        },
     },
 };
 delete $SPEC{'handle_cmd'}{args}{phase}{default};
@@ -48,7 +54,7 @@ sub handle_cmd {
     @where = (1) if !@where;
 
     my $sql = "SELECT
-  m.name name,
+  m.name module,
   m.cpanid author,
   COUNT(*) AS rdep_count
 FROM module m
@@ -56,7 +62,7 @@ JOIN dep dp ON dp.module_id=m.id
 WHERE ".join(" AND ", @where)."
 GROUP BY m.name
 ORDER BY rdep_count DESC
-";
+".($args{n} ? " LIMIT ".(0+$args{n}) : "");
 
     my @res;
     my $sth = $dbh->prepare($sql);

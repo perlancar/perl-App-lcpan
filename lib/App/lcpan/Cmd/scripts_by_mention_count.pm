@@ -1,6 +1,8 @@
 package App::lcpan::Cmd::scripts_by_mention_count;
 
+# AUTHORITY
 # DATE
+# DIST
 # VERSION
 
 use 5.010;
@@ -40,6 +42,10 @@ _
             schema => ['str*', in=>['content', 'dist', 'author']],
             default => 'content',
         },
+        n => {
+            summary => 'Return at most this number of results',
+            schema => 'posint*',
+        },
     },
 };
 sub handle_cmd {
@@ -64,6 +70,7 @@ sub handle_cmd {
 
     my $sql = "SELECT
   script.name script,
+  targetfile.cpanid author,
   COUNT($count) AS mention_count
 FROM mention
 LEFT JOIN file srcfile ON mention.source_file_id=srcfile.id
@@ -72,7 +79,7 @@ LEFT JOIN file targetfile ON script.file_id=targetfile.id
 WHERE ".join(" AND ", @where)."
 GROUP BY script.name
 ORDER BY mention_count DESC
-";
+".($args{n} ? "LIMIT ".(0+$args{n}) : "");
 
     my @res;
     my $sth = $dbh->prepare($sql);
