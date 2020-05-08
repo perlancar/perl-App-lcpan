@@ -23,6 +23,10 @@ $SPEC{'handle_cmd'} = {
         %App::lcpan::fauthor_args,
         clone_list(%App::lcpan::deps_phase_args),
         clone_list(%App::lcpan::deps_rel_args),
+        n => {
+            summary => 'Return at most this number of results',
+            schema => 'posint*',
+        },
     },
 };
 delete $SPEC{'handle_cmd'}{args}{phase}{default};
@@ -59,7 +63,7 @@ LEFT JOIN file ON dep.file_id=file.id
 WHERE ".join(" AND ", @where)."
 GROUP BY dep.file_id
 ORDER BY dep_count DESC
-";
+".($args{n} ? "LIMIT ".(0+$args{n}) : "");
 
     my @res;
     my $sth = $dbh->prepare($sql);
