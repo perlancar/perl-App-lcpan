@@ -36,28 +36,28 @@ sub handle_cmd {
     my @where;
     my @binds;
     if ($args{author}) {
-        push @where, "(author=?)";
+        push @where, "(file.author=?)";
         push @binds, $args{author};
     }
     if ($args{phase} && $args{phase} ne 'ALL') {
-        push @where, "(phase=?)";
+        push @where, "(dep.phase=?)";
         push @binds, $args{phase};
     }
     if ($args{rel} && $args{rel} ne 'ALL') {
-        push @where, "(rel=?)";
+        push @where, "(dep.rel=?)";
         push @binds, $args{rel};
     }
-    push @where, "f.is_latest_dist";
+    push @where, "file.is_latest_dist";
     @where = (1) if !@where;
 
     my $sql = "SELECT
-  f.dist_name name,
-  f.cpanid author,
-  COUNT(DISTINCT f.id) AS dep_count
-FROM file f
-JOIN dep dp ON dp.file_id=f.id
+  file.dist_name dist,
+  file.cpanid author,
+  COUNT(DISTINCT dep.module_id) AS dep_count
+FROM dep
+LEFT JOIN file ON dep.file_id=file.id
 WHERE ".join(" AND ", @where)."
-GROUP BY id
+GROUP BY dep.file_id
 ORDER BY dep_count DESC
 ";
 
