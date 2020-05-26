@@ -584,7 +584,7 @@ sub _add_since_where_clause {
     my ($args, $where, $table) = @_;
     if (defined $args->{added_since}  )          { push @$where, "$table.rec_ctime >= ". (0+$args->{added_since}) }
     if (defined $args->{updated_since})          { push @$where, "$table.rec_mtime >= ". (0+$args->{updated_since}) }
-    if (defined $args->{added_or_updated_since}) { push @$where, "$table.rec_ctime >= ". (0+$args->{added_or_updated_since}). " OR $table.rec_mtime >= ". (0+$args->{added_or_updated_since}) }
+    if (defined $args->{added_or_updated_since}) { push @$where, "($table.rec_ctime >= ". (0+$args->{added_or_updated_since}). " OR $table.rec_mtime >= ". (0+$args->{added_or_updated_since}). ")" }
 }
 
 sub _fmt_time {
