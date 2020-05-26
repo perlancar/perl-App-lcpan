@@ -609,14 +609,14 @@ sub _set_after_from_in_last_update_or_n_updates {
 
     {
         last unless defined $args->{in_last_n_updates};
-        my $n = int($args->{added_in_last_n_updates});
+        my $n = int($args->{in_last_n_updates});
         last unless $n >= 1;
         my $sth = $dbh->prepare("SELECT date FROM log WHERE category='update_index' AND summary LIKE 'Begin%' ORDER BY date DESC");
         $sth->execute;
         my $i = 0;
         my $time;
         1 while ++$i <= $n && (($time) = $sth->fetchrow_array);
-        $args->{since} //= $time // 0;
+        $args->{after} //= $time // 0;
     }
 }
 
