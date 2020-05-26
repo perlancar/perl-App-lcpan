@@ -34,7 +34,6 @@ sub handle_cmd {
     $args{added_or_updated_since_last_index_update} = 1 if !(grep {exists $App::lcpan::fctime_or_mtime_args{$_}} keys %args);
     App::lcpan::_set_since(\%args, $dbh);
 
-    use DD; dd \%args;
     my $time = delete($args{added_or_updated_since});
     my $ftime = scalar(gmtime $time) . " UTC";
 
@@ -43,8 +42,8 @@ sub handle_cmd {
 
     local $ENV{FORMAT_PRETTY_TABLE_BACKEND} = 'Text::Table::Org';
 
-    $org .= "#+INFOJS_OPT: view:info toc:nil\n";
-    $org .= "* WHAT'S NEW SINCE $ftime\n\n";
+    #$org .= "#+INFOJS_OPT: view:info toc:nil\n";
+    $org .= "WHAT'S NEW SINCE $ftime\n\n";
 
   NEW_MODULES: {
         $res = App::lcpan::modules(added_since=>$time, detail=>1);
@@ -53,7 +52,7 @@ sub handle_cmd {
             last;
         }
         my $num = @{ $res->[2] };
-        $org .= "** New modules ($num)\n";
+        $org .= "* New modules ($num)\n";
         $fres = Perinci::Result::Format::Lite::format(
             $res, 'text-pretty', 0, 0);
         $org .= $fres;
@@ -67,7 +66,7 @@ sub handle_cmd {
             last;
         }
         my $num = @{ $res->[2] };
-        $org .= "** Updated modules ($num)\n";
+        $org .= "* Updated modules ($num)\n";
         $fres = Perinci::Result::Format::Lite::format(
             $res, 'text-pretty', 0, 0);
         $org .= $fres;
@@ -81,7 +80,7 @@ sub handle_cmd {
             last;
         }
         my $num = @{ $res->[2] };
-        $org .= "** New authors ($num)\n";
+        $org .= "* New authors ($num)\n";
         $fres = Perinci::Result::Format::Lite::format(
             $res, 'text-pretty', 0, 0);
         $org .= $fres;
@@ -95,7 +94,7 @@ sub handle_cmd {
             last;
         }
         my $num = @{ $res->[2] };
-        $org .= "** Updated authors ($num)\n";
+        $org .= "* Updated authors ($num)\n";
         $fres = Perinci::Result::Format::Lite::format(
             $res, 'text-pretty', 0, 0);
         $org .= $fres;
