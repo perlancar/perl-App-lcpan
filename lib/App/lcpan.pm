@@ -4459,6 +4459,7 @@ sub deps {
         $_->{module} = ("  " x ($_->{level}-1)) . $_->{module}
             unless $args{flatten};
         delete $_->{dist} unless @$file_ids > 1 || $_->{level} > 1;
+        delete $_->{module_file_id};
         delete $_->{level};
     }
 
