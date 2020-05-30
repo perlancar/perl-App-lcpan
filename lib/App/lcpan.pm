@@ -1683,6 +1683,7 @@ sub _list_archive_members {
         eval {
             $tar = Archive::Tar->new;
             $tar->read($path); # can still die untrapped when out of mem
+            die $tar->error if $tar->error;
             #log_trace("  listing tar members ...");
             @members = $tar->list_files(["full_path","mode","mtime","size"]);
             #log_trace("  members: %s", \@members);
