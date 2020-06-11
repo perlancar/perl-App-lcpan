@@ -10,6 +10,7 @@ use strict;
 use warnings;
 
 require App::lcpan;
+use Hash::Subset qw(hash_subset);
 
 our %SPEC;
 
@@ -63,18 +64,24 @@ sub handle_cmd {
 
     my $author = $args{author};
 
-    my $res = App::lcpan::modules(%args, author=>$author);
+    my $res = App::lcpan::dists(
+        hash_subset(\%args, \%App::lcpan::common_args, \%App::lcpan::author_args),
+    );
     return $res if $res->[0] != 200;
-    my $mods = $res->[2];
+    my $dists = $res->[2];
 
     my %deps_args = %args;
-    $deps_args{modules} = $mods;
+    $deps_args{dists} = $dists;
+    delete $deps_args{author};
     delete $deps_args{authors};
     delete $deps_args{authors_arent};
-    $deps_args{authors} = $args{module_authors};
-    $deps_args{authors_arent} = $args{module_authors_arent};
-    $deps_args{phase} = $args{phase};
-    $deps_args{rel} = $args{rel};
+    $deps_args{authors} = delete $args{module_authors};
+    $deps_args{authors_arent} = delete $args{module_authors_arent};
+    $deps_args{phase} = delete $args{phase};
+    $deps_args{rel} = delete $args{rel};
+    $deps_args{added_since} = delete $args{added_since};
+    $deps_args{updated_since} = delete $args{updated_since};
+    $deps_args{added_or_updated_since} = delete $args{added_or_updated_since};
     $res = App::lcpan::deps(%deps_args);
     return $res if $res->[0] != 200;
 
