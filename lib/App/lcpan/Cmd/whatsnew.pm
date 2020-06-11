@@ -1,3 +1,5 @@
+## no critic: ControlStructures::ProhibitUnreachableCode
+
 package App::lcpan::Cmd::whatsnew;
 
 # AUTHORITY
