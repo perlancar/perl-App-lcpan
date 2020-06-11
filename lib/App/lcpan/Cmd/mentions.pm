@@ -1,6 +1,8 @@
 package App::lcpan::Cmd::mentions;
 
+# AUTHORITY
 # DATE
+# DIST
 # VERSION
 
 use 5.010;
@@ -85,6 +87,9 @@ _
             element_completion => \&App::lcpan::_complete_cpanid,
         },
         #%App::lcpan::fauthor_args,
+        %App::lcpan::fctime_args,
+        %App::lcpan::fmtime_args,
+        %App::lcpan::fctime_or_mtime_args,
     },
 };
 sub handle_cmd {
@@ -108,6 +113,9 @@ sub handle_cmd {
     my @bind;
     my @where;
     #my @having;
+
+    App::lcpan::_set_since(\%args, $dbh);
+    App::lcpan::_add_since_where_clause(\%args, \@where, "mention");
 
     if ($type eq 'script') {
         push @where, "mention.script_name IS NOT NULL";
