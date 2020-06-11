@@ -168,6 +168,25 @@ sub handle_cmd {
         $org .= "\n";
     }
 
+  NEW_MENTIONS: {
+        last unless defined $my_author;
+        my ($res, $fres);
+        require App::lcpan::Cmd::mentions;
+        $res = App::lcpan::Cmd::mentions::handle_cmd(
+            mentioned_authors=>[$my_author], mentioner_authors_arent=>[$my_author], added_since=>$time,
+        );
+        unless ($res->[0] == 200) {
+            $org .= "Can't list updated reverse dependencies for modules of $my_author: $res->[0] - $res->[1]\n\n";
+            last;
+        }
+        my $num = @{ $res->[2] };
+        $org .= "* New mentions to one of $my_author\'s modules ($num)\n";
+        $fres = Perinci::Result::Format::Lite::format(
+            $res, 'text-pretty', 0, 0);
+        $org .= $fres;
+        $org .= "\n";
+    }
+
     [200, "OK", $org, {'content_type' => 'text/x-org'}];
 }
 
