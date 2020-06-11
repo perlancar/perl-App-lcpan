@@ -34,7 +34,7 @@ modules.
 _
             schema => 'str*',
             cmdline_aliases => {a=>{}},
-            completion => \&_complete_cpanid,
+            completion => \&App::lcpan::_complete_cpanid,
         },
     },
 };
