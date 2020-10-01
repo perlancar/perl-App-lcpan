@@ -5,7 +5,7 @@ package App::lcpan::Cmd::rdeps_scripts;
 # DIST
 # VERSION
 
-use 5.010;
+use 5.010001;
 use strict;
 use warnings;
 
@@ -18,9 +18,12 @@ $SPEC{'handle_cmd'} = {
     summary => 'List scripts that depend on specified modules',
     description => <<'_',
 
-This is basically rdeps + dist_scripts. Equivalent to something like:
+This is currently implemented as rdeps + dist_scripts (find distributions that
+depend on specified modules, and list all scripts in those distributions):
 
     % lcpan rdeps Some::Module | td select dist | xargs lcpan dist-scripts Some::Module
+
+so not really accurate.
 
 _
     args => {
@@ -29,6 +32,7 @@ _
         %App::lcpan::rdeps_rel_args,
         %App::lcpan::rdeps_phase_args,
         %App::lcpan::rdeps_level_args,
+        %App::lcpan::fauthor_args,
     },
 };
 sub handle_cmd {
@@ -60,6 +64,8 @@ sub handle_cmd {
     my @where;
     push @where, "file.dist_name IN (".
         join(",", map { $dbh->quote($_) } @dists).")";
+    push @where, "file.cpanid=".$dbh->quote($args{author})
+        if defined $args{author};
     my $sql = "SELECT
   script.name name,
   file.dist_name dist,
