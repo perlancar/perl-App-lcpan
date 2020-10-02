@@ -307,6 +307,24 @@ our %perl_version_args = (
     },
 );
 
+our %random_args = (
+    random => {
+        summary => 'Random sort',
+        schema => 'true*',
+        tags => ['category:ordering'],
+    },
+);
+
+our %sort_args_for_authors = (
+    sort => {
+        summary => 'Sort the result',
+        schema => ['array*', of=>['str*', in=>[map {($_,"-$_")} qw/id name email rec_mtime/]]],
+        default => ['module'],
+        tags => ['category:ordering'],
+    },
+    %random_args,
+);
+
 our %sort_args_for_mods = (
     sort => {
         summary => 'Sort the result',
@@ -314,6 +332,7 @@ our %sort_args_for_mods = (
         default => ['module'],
         tags => ['category:ordering'],
     },
+    %random_args,
 );
 
 our %sort_args_for_dists = (
@@ -323,6 +342,7 @@ our %sort_args_for_dists = (
         default => ['dist'],
         tags => ['category:ordering'],
     },
+    %random_args,
 );
 
 # XXX should it be put in App/lcpan/Cmd/subs.pm?
@@ -332,6 +352,21 @@ our %sort_args_for_subs = (
         schema => ['array*', of=>['str*', in=>[map {($_,"-$_")} qw/sub package linum author/]]],
         default => ['sub'],
         tags => ['category:ordering'],
+    },
+    %random_args,
+);
+
+our %paging_args = (
+    result_limit => {
+        summary => 'Only return a certain number of records',
+        schema => 'uint*',
+        tags => ['category:paging'],
+    },
+    result_start => {
+        summary => 'Only return starting from the n\'th record',
+        schema => 'posint*',
+        default => 1,
+        tags => ['category:paging'],
     },
 );
 
@@ -519,6 +554,7 @@ our %sort_args_for_rels = (
         default => ['name'],
         tags => ['category:sorting'],
     },
+    %random_args,
 );
 
 our %overwrite_args = (
@@ -3309,6 +3345,8 @@ $SPEC{authors} = {
             },
         },
         %fctime_or_mtime_args,
+        %sort_args_for_authors,
+        %paging_args,
     },
     result => {
         description => <<'_',
@@ -3341,6 +3379,7 @@ sub authors {
 
     my $detail = $args{detail};
     my $qt = $args{query_type} // 'any';
+    my $sort = $args{sort} // ['id'];
 
     my @bind;
     my @where;
@@ -3384,13 +3423,18 @@ sub authors {
     _set_since(\%args, $dbh);
     _add_since_where_clause(\%args, \@where, 'author');
 
+    my @order;
+    if ($args{random}) { push @order, "RANDOM()" }
+    for (@$sort) { /\A(-?)(\w+)/ and push @order, $2 . ($1 ? " DESC" : "") }
+
     my $sql = "SELECT
   cpanid id,
   fullname name,
   email
 FROM author".
         (@where ? " WHERE ".join(" AND ", @where) : "").
-            " ORDER BY id";
+        (@order ? " ORDER BY ".join(", ", @order) : "").
+        ($args{result_limit} ? " LIMIT ".($args{result_start} && $args{result_start} > 1 ? ($args{result_start}-1)."," : "").($args{result_limit}+0) : "");
 
     my @res;
     my $sth = $dbh->prepare($sql);
@@ -3464,6 +3508,7 @@ $SPEC{modules} = {
             cmdline_aliases => {N => {}},
         },
         %sort_args_for_mods,
+        %paging_args,
     },
     result => {
         description => <<'_',
@@ -3557,6 +3602,7 @@ sub modules {
     _add_since_where_clause(\%args, \@where, 'module');
 
     my @order;
+    if ($args{random}) { push @order, "RANDOM()" }
     for (@$sort) { /\A(-?)(\w+)/ and push @order, $2 . ($1 ? " DESC" : "") }
 
     my $sql = "SELECT ".join(", ", map {ref($_) ? "$_->[0] AS $_->[1]" : $_} @cols)."
@@ -3564,7 +3610,8 @@ FROM module
 LEFT JOIN file ON module.file_id=file.id
 ".
     (@where ? " WHERE ".join(" AND ", @where) : "").
-    (@order ? " ORDER BY ".join(", ", @order) : "");
+    (@order ? " ORDER BY ".join(", ", @order) : "").
+    ($args{result_limit} ? " LIMIT ".($args{result_start} && $args{result_start} > 1 ? ($args{result_start}-1)."," : "").($args{result_limit}+0) : "");
 
     my @res;
     my $sth = $dbh->prepare($sql);
@@ -3667,6 +3714,7 @@ $SPEC{dists} = {
             tags => ['category:filtering'],
         },
         %sort_args_for_dists,
+        %paging_args,
     },
     result => {
         description => <<'_',
@@ -3816,13 +3864,15 @@ sub dists {
     _add_since_where_clause(\%args, \@where, 'f');
 
     my @order;
+    if ($args{random}) { push @order, "RANDOM()" }
     for (@$sort) { /\A(-?)(\w+)/ and push @order, $2 . ($1 ? " DESC" : "") }
 
     my $sql = "SELECT ".join(", ", @cols)."
 FROM file f
 ".
         (@where ? " WHERE ".join(" AND ", @where) : "").
-        (@order ? " ORDER BY ".join(", ", @order) : "");
+        (@order ? " ORDER BY ".join(", ", @order) : "").
+        ($args{result_limit} ? " LIMIT ".($args{result_start} && $args{result_start} > 1 ? ($args{result_start}-1)."," : "").($args{result_limit}+0) : "");
 
     my @res;
     my $sth = $dbh->prepare($sql);
@@ -3893,6 +3943,7 @@ $SPEC{'releases'} = {
         %full_path_args,
         %no_path_args,
         %sort_args_for_rels,
+        %paging_args,
     },
     args_rels => {
         choose_one => ['full_path', 'no_path'],
@@ -3968,6 +4019,7 @@ sub releases {
     _add_since_where_clause(\%args, \@where, 'f1');
 
     my @order;
+    if ($args{random}) { push @order, "RANDOM()" }
     for (@$sort) { /\A(-?)(\w+)/ and push @order, $2 . ($1 ? " DESC" : "") }
 
     my $sql = "SELECT
@@ -3987,7 +4039,8 @@ sub releases {
 FROM file f1
 ".
     (@where ? " WHERE ".join(" AND ", @where) : "").
-    (@order ? " ORDER BY ".join(", ", @order) : "");
+    (@order ? " ORDER BY ".join(", ", @order) : "").
+    ($args{result_limit} ? " LIMIT ".($args{result_start} && $args{result_start} > 1 ? ($args{result_start}-1)."," : "").($args{result_limit}+0) : "");
 
     my @res;
     my $sth = $dbh->prepare($sql);
