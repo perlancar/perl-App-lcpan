@@ -319,7 +319,7 @@ our %sort_args_for_authors = (
     sort => {
         summary => 'Sort the result',
         schema => ['array*', of=>['str*', in=>[map {($_,"-$_")} qw/id name email rec_mtime/]]],
-        default => ['module'],
+        default => ['id'],
         tags => ['category:ordering'],
     },
     %random_args,
