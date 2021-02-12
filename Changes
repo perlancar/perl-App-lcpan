@@ -1,3 +1,18 @@
+1.063   2021-02-13  Released-By: PERLANCAR; Urgency: medium
+
+	[subcommand authors]
+
+	- Add options --sort, --result-limit, --result-start, --random.
+
+	[subcommands dists, mods, rels]
+
+        - Add options --random, --result-limit, --result-start.
+
+	[subcommand rdeps-scripts]
+
+        - Add option --author.
+
+
 1.062   2020-08-13  Released-By: PERLANCAR; Urgency: medium
 
 	- [bugfix] Fix completion of whatsnew's --my-author.
