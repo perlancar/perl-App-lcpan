@@ -39,6 +39,10 @@ _
             summary => 'Return score-related fields',
             schema => 'bool*',
         },
+        with_content_paths => {
+            summary => 'Return the list of content paths where the module and a related module are mentioned together',
+            schema => 'bool*',
+        },
         sort => {
             schema => ['array*', of=>['str*', in=>[map {($_,"-$_")} qw/score num_mentions num_mentions_together pct_mentions_together module/]], min_len=>1],
             default => ['-score', '-num_mentions'],
@@ -58,6 +62,10 @@ sub handle_cmd {
 
     my $modules = $args{modules};
     my $modules_s = join(",", map {$dbh->quote($_)} @$modules);
+
+    if ($args{with_content_paths} && @$modules > 1) {
+        return [412, "Sorry, --with-content-paths currently works with only one specified module"];
+    }
 
     my $limit = $args{limit};
 
@@ -113,12 +121,34 @@ GROUP BY m2.name
 LIMIT $limit
 ";
 
+    my $sql_with_content_paths;
+    my $sth_with_content_paths;
+    if ($args{with_content_paths}) {
+        $sql_with_content_paths = "SELECT
+  path
+FROM content c
+WHERE
+  EXISTS(SELECT id FROM mention WHERE module_id=(SELECT id FROM module WHERE name=?) AND source_content_id=c.id) AND
+  EXISTS(SELECT id FROM mention WHERE module_id=(SELECT id FROM module WHERE name=?) AND source_content_id=c.id)
+";
+        $sth_with_content_paths = $dbh->prepare($sql_with_content_paths);
+    }
+
     my @res;
     my $sth = $dbh->prepare($sql);
     $sth->execute();
     while (my $row = $sth->fetchrow_hashref) {
         unless ($args{with_scores}) {
             delete $row->{$_} for qw(num_mentions num_mentions_together pct_mentions_together score);
+        }
+        if ($args{with_content_paths}) {
+            my @content_paths;
+            $sth_with_content_paths->execute($modules->[0], $row->{module});
+            while (my $row2 = $sth_with_content_paths->fetchrow_arrayref) {
+                push @content_paths, $row2->[0];
+            }
+            $sth_with_content_paths->finish;
+            $row->{content_paths} = \@content_paths;
         }
         push @res, $row;
     }
