@@ -1,3 +1,8 @@
+1.064   2021-04-21  Released-By: PERLANCAR; Urgency: medium
+
+	- [subcommand related-mods] Add option: --with-content-paths.
+
+
 1.063   2021-02-13  Released-By: PERLANCAR; Urgency: medium
 
 	[subcommand authors]
