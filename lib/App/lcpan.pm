@@ -4207,23 +4207,39 @@ sub _get_revdeps {
     log_trace("Finding reverse dependencies for module(s) %s ...", $mods);
 
     # first, check that all modules are listed
-    my @mod_names;
+    my @indexed_mod_names;
+    my @unindexed_mod_names;
     for my $mod0 (@$mods) {
         my ($mod);
         if (ref($mod0) eq 'HASH') {
             $mod = $mod0->{mod};
         } else {
             ($mod) = $dbh->selectrow_array("SELECT name FROM module WHERE name=?", {}, $mod0)
-                or return [404, "No such module: $mod0"];
+                or do {
+                    warn "lcpan: Module is unindexed: $mod0\n";
+                    push @unindexed_mod_names, $mod0;
+                    next;
+                };
         }
         unless ($memory_by_mod_name->{$mod} && $dont_uniquify) {
-            push @mod_names, $mod;
+            push @indexed_mod_names, $mod;
             $memory_by_mod_name->{$mod} = $mod;
         }
     }
-    return [200, "OK", []] unless @mod_names;
+    if (@indexed_mod_names) {
+        if (@unindexed_mod_names) {
+            warn "lcpan: There are unindexed as well as indexed module names, I'm ignoring unindexed module names for now (".join(", ", @unindexed_mod_names)."), this limitation will be rectified in the future.\n";
+            @unindexed_mod_names = ();
+        }
+    } elsif (@unindexed_mod_names) {
+        warn "lcpan: Can't do multilevel rdeps for unindexed modules (".join(", ", @unindexed_mod_names)."), ignoring multilevel request\n"
+            if $max_level > 1;
+        return _get_revdeps_unindexed(\@unindexed_mod_names, $dbh, $filters, $phase, $rel);
+    } else {
+        return [200, "OK", []];
+    }
 
-    my @where = ('module IN ('.join(",", map {$dbh->quote($_)} @mod_names).')');
+    my @where = ('module IN ('.join(",", map {$dbh->quote($_)} @indexed_mod_names).')');
     my @bind  = ();
 
     push @where, "dist IS NOT NULL";
@@ -4301,6 +4317,56 @@ WHERE f.dist_name IN (".join(", ", map {$dbh->quote($_->{dist})} @res).")");
         }
     }
 
+    [200, "OK", \@res];
+}
+
+sub _get_revdeps_unindexed {
+    my ($mods, $dbh, $filters, $phase, $rel) = @_;
+
+    my @where = ('module_name IN ('.join(",", map {$dbh->quote($_)} @$mods).')');
+    my @bind  = ();
+
+    push @where, "dist IS NOT NULL";
+
+    if ($filters->{authors}) {
+        push @where, '('.join(' OR ', ('author=?') x @{$filters->{authors}}).')';
+        push @bind , @{$filters->{authors}};
+    }
+    if ($filters->{authors_arent}) {
+        for (@{ $filters->{authors_arent} }) {
+            push @where, 'author <> ?';
+            push @bind , $_;
+        }
+    }
+
+    _add_since_where_clause($filters, \@where, 'dp');
+
+    # get all dists that depend on that module
+    my $sth = $dbh->prepare("SELECT
+  -- dp.file_id AS _file_id, -- unused, for debugging only
+  -- dp.module_id AS _mod_id,  -- unused, for debugging only
+
+  (SELECT dist_name    FROM file WHERE id=dp.file_id)            AS dist,
+  NULL                                                           AS module_dist,
+  module_name                                                    AS module,
+  (SELECT cpanid       FROM file WHERE dp.file_id=file.id)       AS author,
+  (SELECT dist_version FROM file WHERE dp.file_id=file.id)       AS dist_version,
+  phase,
+  rel,
+  version req_version
+FROM dep dp
+WHERE ".join(" AND ", @where)."
+ORDER BY dist");
+    $sth->execute(@bind);
+    my @res;
+    while (my $row = $sth->fetchrow_hashref) {
+        next unless $phase eq 'ALL' || $row->{phase} eq $phase;
+        next unless $rel   eq 'ALL' || $row->{rel}   eq $rel;
+        delete $row->{phase} unless $phase eq 'ALL';
+        delete $row->{rel} unless $rel eq 'ALL';
+        $row->{level} = 1;
+        push @res, $row;
+    }
     [200, "OK", \@res];
 }
 
