@@ -1,3 +1,10 @@
+1.065   2021-05-25  Released-By: PERLANCAR; Urgency: medium
+
+	- [subcommand rdeps] Allow finding revdeps for unindexed modules
+	  (this is already in the database, we just need to give it to
+	  user).
+
+
 1.064   2021-04-21  Released-By: PERLANCAR; Urgency: medium
 
 	- [subcommand related-mods] Add option: --with-content-paths.
