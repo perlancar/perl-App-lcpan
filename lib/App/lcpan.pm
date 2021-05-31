@@ -404,6 +404,14 @@ our %mods_args = (
     },
 );
 
+our %argspecopt_mods = (
+    modules => {
+        schema => ['array*', of=>'perl::modname*', min_len=>1],
+        'x.name.is_plural' => 1,
+        element_completion => \&_complete_mod,
+    },
+);
+
 our %pods_args = (
     pods => {
         schema => ['array*', of=>'perl::modname*', min_len=>1],
@@ -523,6 +531,18 @@ our %dists_with_optional_vers_args = (
         schema => ['array*', of=>'perl::distname_with_optional_ver*', min_len=>1],
         'x.name.is_plural' => 1,
         req => 1,
+        pos => 0,
+        slurpy => 1,
+        cmdline_src => 'stdin_or_args',
+        element_completion => \&_complete_dist,
+    },
+);
+
+our %argspec0opt_dists_with_optional_vers = (
+    dists => {
+        summary => 'Distribution names (with optional version suffix, e.g. Foo-Bar@1.23)',
+        schema => ['array*', of=>'perl::distname_with_optional_ver*', min_len=>1],
+        'x.name.is_plural' => 1,
         pos => 0,
         slurpy => 1,
         cmdline_src => 'stdin_or_args',
@@ -656,6 +676,20 @@ sub _dists_with_optional_vers2file_ids {
         push @$file_ids, $file_id;
     }
 
+    $file_ids;
+}
+
+sub _modules2file_ids {
+    my ($dbh, $modules) = @_;
+
+    return [] unless $modules && @$modules;
+    my $file_ids = [];
+    my $sth = $dbh->prepare("SELECT DISTINCT file_id FROM module WHERE name IN (".
+                                join(",", map {$dbh->quote($_)} @$modules).")");
+    $sth->execute;
+    while (my ($file_id) = $sth->fetchrow_array) {
+        push @$file_ids, $file_id;
+    }
     $file_ids;
 }
 
@@ -4517,10 +4551,14 @@ dependencies.
 _
     args => {
         %common_args,
-        %dists_with_optional_vers_args,
+        %argspec0opt_dists_with_optional_vers,
+        %argspecopt_mods,
         %deps_args,
     },
-    args_rels => $deps_args_rels,
+    args_rels => {
+        req_one => ['modules', 'dists'],
+        dep_any => [flatten => ['level']],
+    },
     examples => [
         {
             summary => 'List what modules Module-List requires',
@@ -4531,6 +4569,20 @@ _
         {
             summary => 'List modules Module-List requires (module name will be converted to distro name)',
             argv => ['Module::List'],
+            test => 0,
+            'x.doc.show_result' => 0,
+        },
+        {
+            summary => 'List what distribution that contains Sah::Schema::filename requires',
+            description => <<'_',
+
+Sah::Schema::filename is included in Sah-Schemas-Path distribution, so this
+command is equivalent to "lcpan deps Sah-Schemas-Path". You can't do "lcpan deps
+Sah::Schema::filename" because `lcpan` will assume that you ask "lcpan deps
+Sah-Schema-filename" and there is no Sah-Schema-filename distribution.
+
+_
+            argv => ['--module', 'Sah::Schema::filename'],
             test => 0,
             'x.doc.show_result' => 0,
         },
@@ -4555,7 +4607,10 @@ sub deps {
     my $state = _init(\%args, 'ro');
     my $dbh = $state->{dbh};
 
-    my $file_ids = _dists_with_optional_vers2file_ids($dbh, $args{dists});
+    my $file_ids =
+        $args{dists} ? _dists_with_optional_vers2file_ids($dbh, $args{dists}) :
+        $args{modules} ? _modules2file_ids($dbh, $args{modules}) :
+        (return [400, "Please specify dists or modules"]);
     my $phase    = $args{phase} // 'runtime';
     my $rel      = $args{rel} // 'requires';
     my $plver    = $args{perl_version} // "$^V";
