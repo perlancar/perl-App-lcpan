@@ -49,6 +49,11 @@ my %builtin_file_skip_list_sub = (
 
 our %SPEC;
 
+# BEGIN argument specifications.
+
+# %argspecFOO is the new naming scheme and we will eventually switch to this.
+# %FOO_args is the old naming scheme.
+
 our %common_args = (
     cpan => {
         schema => 'dirname*',
@@ -404,6 +409,17 @@ our %mods_args = (
     },
 );
 
+our %argspec0opt_modules = (
+    modules => {
+        schema => ['array*', of=>'perl::modname*', min_len=>1],
+        'x.name.is_plural' => 1,
+        pos => 0,
+        slurpy => 1,
+        cmdline_src => 'stdin_or_args',
+        element_completion => \&_complete_mod,
+    },
+);
+
 our %argspecopt_mods = (
     modules => {
         schema => ['array*', of=>'perl::modname*', min_len=>1],
@@ -521,6 +537,15 @@ our %dists_args = (
         pos => 0,
         slurpy => 1,
         cmdline_src => 'stdin_or_args',
+        element_completion => \&_complete_dist,
+    },
+);
+
+our %argspecopt_dists = (
+    dists => {
+        summary => 'Distribution names (e.g. Foo-Bar)',
+        schema => ['array*', of=>'perl::distname*', min_len=>1],
+        'x.name.is_plural' => 1,
         element_completion => \&_complete_dist,
     },
 );
@@ -673,7 +698,7 @@ sub _dists_with_optional_vers2file_ids {
             ($file_id) = $dbh->selectrow_array("SELECT id FROM file WHERE dist_name=? AND is_latest_dist=1", {}, $dist);
             do { warn "lcpan: No such dist '$dist'\n"; next } unless $file_id;
         }
-        push @$file_ids, $file_id;
+        push @$file_ids, $file_id unless grep { $file_id == $_ } @$file_ids;
     }
 
     $file_ids;
@@ -684,13 +709,32 @@ sub _modules2file_ids {
 
     return [] unless $modules && @$modules;
     my $file_ids = [];
-    my $sth = $dbh->prepare("SELECT DISTINCT file_id FROM module WHERE name IN (".
-                                join(",", map {$dbh->quote($_)} @$modules).")");
-    $sth->execute;
-    while (my ($file_id) = $sth->fetchrow_array) {
-        push @$file_ids, $file_id;
+    for my $module (@$modules) {
+        my ($file_id) = $dbh->selectrow_array("SELECT file_id FROM module WHERE name=?", {}, $module);
+        do { warn "lcpan: No such module '$module'\n"; next } unless $file_id;
+        push @$file_ids, $file_id unless grep { $file_id == $_ } @$file_ids;
     }
+
     $file_ids;
+}
+
+sub _dists2theirmods {
+    my ($dbh, $dists) = @_;
+
+    return [] unless $dists;
+    my $mods = [];
+    for my $dist (@$dists) {
+        my $sth = $dbh->prepare("SELECT name FROM module WHERE file_id IN (SELECT id FROM file WHERE dist_name=? AND is_latest_dist=1)");
+        $sth->execute($dist);
+        my @dist_mods;
+        while (my ($dist_mod) = $sth->fetchrow_array) {
+            push @dist_mods, $dist_mod;
+        }
+        do { warn "lcpan: No such distribution or distribution does not contain any module: '$dist'\n"; next } unless @dist_mods;
+        for my $dist_mod (@dist_mods) { push @$mods, $dist_mod unless grep { $dist_mod eq $_ } @$mods }
+    }
+
+    $mods;
 }
 
 sub _fullpath {
@@ -4608,9 +4652,9 @@ sub deps {
     my $dbh = $state->{dbh};
 
     my $file_ids =
-        $args{dists} ? _dists_with_optional_vers2file_ids($dbh, $args{dists}) :
-        $args{modules} ? _modules2file_ids($dbh, $args{modules}) :
-        (return [400, "Please specify dists or modules"]);
+        $args{dists} && !$args{modules} ? _dists_with_optional_vers2file_ids($dbh, $args{dists}) :
+        $args{modules} && !$args{dists} ? _modules2file_ids($dbh, $args{modules}) :
+        (return [400, "Please specify dists OR modules"]);
     my $phase    = $args{phase} // 'runtime';
     my $rel      = $args{rel} // 'requires';
     my $plver    = $args{perl_version} // "$^V";
@@ -4663,7 +4707,8 @@ sub deps {
 
 my %rdeps_args = (
     %common_args,
-    %mods_args,
+    %argspec0opt_modules,
+    %argspecopt_dists,
     %rdeps_rel_args,
     %rdeps_phase_args,
     %rdeps_level_args,
@@ -4722,7 +4767,24 @@ $SPEC{'rdeps'} = {
     args => {
         %rdeps_args,
     },
-    args_rels => $rdeps_args_rels,
+    examples => [
+        {
+            summary => 'List what distributions depend on Sah::Schema::filename',
+            argv => ['Sah::Schema::filename'],
+            test => 0,
+            'x.doc.show_result' => 0,
+        },
+        {
+            summary => 'List what distributions depend on one of the modules in Sah-Schemas-Path',
+            argv => ['--dist', 'Sah-Schemas-Path'],
+            test => 0,
+            'x.doc.show_result' => 0,
+        },
+    ],
+    args_rels => {
+        req_one => ['modules', 'dists'],
+        dep_any => [flatten => ['level']],
+    },
 };
 sub rdeps {
     my %args = @_;
@@ -4730,7 +4792,10 @@ sub rdeps {
     my $state = _init(\%args, 'ro');
     my $dbh = $state->{dbh};
 
-    my $mods    = $args{modules};
+    my $mods    =
+        $args{modules} && !$args{dists} ? $args{modules} :
+        $args{dists} && !$args{modules} ? _dists2theirmods($dbh, $args{dists}) :
+        (return [400, "Please specify modules OR dists"]);
     my $level   = $args{level} // 1;
     my $authors =  $args{authors} ? [map {uc} @{$args{authors}}] : undef;
     my $authors_arent = $args{authors_arent} ? [map {uc} @{$args{authors_arent}}] : undef;
