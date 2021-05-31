@@ -1,3 +1,10 @@
+1.066   2021-05-31  Released-By: PERLANCAR; Urgency: medium
+
+	- [subcommand rdeps] Accept option --dist.
+
+	- [subcommand deps] Accept option --module.
+
+
 1.065   2021-05-25  Released-By: PERLANCAR; Urgency: medium
 
 	- [subcommand rdeps] Allow finding revdeps for unindexed modules
