@@ -1,3 +1,8 @@
+1.067   2021-06-03  Released-By: PERLANCAR; Urgency: medium
+
+	- [subcommand related-mods] Add option --(no-)submodules.
+
+
 1.066   2021-05-31  Released-By: PERLANCAR; Urgency: medium
 
 	- [subcommand rdeps] Accept option --dist.
