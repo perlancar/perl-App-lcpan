@@ -5,7 +5,7 @@ package App::lcpan::Cmd::related_mods;
 # DIST
 # VERSION
 
-use 5.010;
+use 5.010001;
 use strict;
 use warnings;
 use Log::ger;
@@ -52,6 +52,24 @@ _
             schema => 'bool*',
             tags => ['category:filtering'],
         },
+        submodules => {
+            summary => 'Whether to include submodules',
+            schema => 'bool*',
+            description => <<'_',
+
+If set to true, will only show related submodules, e.g. `lcpan related-modules
+Foo::Bar` will only show `Foo::Bar::Baz`, `Foo::Bar::Quz`, and so on.
+
+If set to false, will only show related modules that are not submodules, e.g.
+`lcpan related-modules Foo::Bar` will show `Baz`, `Foo::Baz`, but not
+`Foo::Bar::Baz`.
+
+_
+            cmdline_aliases => {
+                exclude_submodules => {is_flag=>1, summary=>"Equivalent to --no-submodules", code=>sub {$_[0]{submodules}=0}},
+                include_submodules => {is_flag=>1, summary=>"Equivalent to --submodules", code=>sub {$_[0]{submodules}=1}},
+            },
+        },
     },
 };
 sub handle_cmd {
@@ -96,6 +114,15 @@ sub handle_cmd {
             push @dist_names, $dist_name;
         }
         push @where, "f.dist_name NOT IN (".join(", ", map { $dbh->quote($_) } @dist_names).")";
+    }
+    if ($args{submodules}) {
+        for my $module (@$modules) {
+            push @where, "m2.name LIKE " . $dbh->quote("$module\::%");
+        }
+    } elsif (defined $args{submodules} && !$args{submodules}) {
+        for my $module (@$modules) {
+            push @where, "m2.name NOT LIKE " . $dbh->quote("$module\::%");
+        }
     }
 
     my @order = map {/(-?)(.+)/; $2 . ($1 ? " DESC" : "")} @{$args{sort}};
