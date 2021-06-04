@@ -1,6 +1,8 @@
 package App::lcpan::Cmd::mentions_for_all_mods;
 
+# AUTHORITY
 # DATE
+# DIST
 # VERSION
 
 use 5.010;
@@ -18,6 +20,13 @@ my $mentions_for_mod_args = $App::lcpan::Cmd::mentions_for_mod::SPEC{handle_cmd}
 $SPEC{'handle_cmd'} = {
     v => 1.1,
     summary => 'List PODs which mention all specified module(s)',
+    description => <<'_',
+
+This subcommand searches PODs that mention all of the specified modules. To
+search for PODs that mention *any* of the specified modules, see the
+`mentions-for-mods` subcommand.
+
+_
     args => $mentions_for_mod_args,
 };
 sub handle_cmd {

@@ -1,6 +1,8 @@
 package App::lcpan::Cmd::mentions_for_mod;
 
+# AUTHORITY
 # DATE
+# DIST
 # VERSION
 
 use 5.010;
@@ -22,7 +24,11 @@ $SPEC{'handle_cmd'} = {
 
 This subcommand is a shortcut for:
 
-    % lcpan mentions --type known-module --mentioned-module MOD
+    % lcpan mentions --type known-module --mentioned-module <module1> [module2] ...
+
+This searches PODs that mention either `module1`, `module2`, and so on. To
+search for PODs that mention *all* of the modules, see the
+`mentions-for-all-mods` subcommand.
 
 _
     args => {
