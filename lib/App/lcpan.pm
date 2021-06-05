@@ -264,6 +264,24 @@ our %fctime_args = (
     },
 );
 
+our %argspecopt_since = (
+    since => {
+        summary => 'Include only records that are added since a certain date',
+        schema => ['date*', 'x.perl.coerce_rules' => ['From_str::natural']],
+        tags => ['category:filtering'],
+    },
+    since_last_index_update => {
+        summary => 'Include only records that are added since the last index update',
+        schema => 'true*',
+        tags => ['category:filtering'],
+    },
+    since_last_n_index_updates => {
+        summary => 'Include only records that are added since the last N index updates',
+        schema => 'posint*',
+        tags => ['category:filtering'],
+    },
+);
+
 our %fmtime_args = (
     updated_since => {
         summary => 'Include only records that are updated since certain date',
@@ -627,25 +645,36 @@ sub _set_args_default {
     }
 }
 
-# set {added_,updated_,added_or_udpated_}since from
-# {added_,updated_,added_or_updated_}since_last_{index_update,n_index_updates},
+# set {,added_,updated_,added_or_udpated_}since from
+# {,added_,updated_,added_or_updated_}since_last_{index_update,n_index_updates},
 # set, since SQL query will usually use the former
 sub _set_since {
     my ($args, $dbh) = @_;
 
     my $num_sinces = 0;
+    if (defined $args->{since}) { $num_sinces++ }
     if (defined $args->{added_since}) { $num_sinces++ }
     if (defined $args->{updated_since}) { $num_sinces++ }
     if (defined $args->{added_or_updated_since}) { $num_sinces++ }
-    if (defined $args->{added_since_last_index_update} || defined $args->{updated_since_last_index_update} || defined $args->{added_or_updated_since_last_index_update}) {
+    if (defined $args->{since_last_index_update} ||
+            defined $args->{added_since_last_index_update} ||
+            defined $args->{updated_since_last_index_update} ||
+            defined $args->{added_or_updated_since_last_index_update}) {
         my ($time) = $dbh->selectrow_array("SELECT date FROM log WHERE category='update_index' AND summary LIKE 'Begin%' ORDER BY date DESC");
-        die "Index has not been updated at all, cannot use {added_,updated_,added_or_updated_}since_last_index_update option" unless $time;
+        die "Index has not been updated at all, cannot use {,added_,updated_,added_or_updated_}since_last_index_update option" unless $time;
+        if (delete $args->{since_last_index_update})                  { $args->{since}                  //= $time; log_trace "Setting since=%s", $time; $num_sinces++ }
         if (delete $args->{added_since_last_index_update})            { $args->{added_since}            //= $time; log_trace "Setting added_since=%s", $time; $num_sinces++ }
         if (delete $args->{updated_since_last_index_update})          { $args->{updated_since}          //= $time; log_trace "Setting updated_since=%s", $time; $num_sinces++ }
         if (delete $args->{added_or_updated_since_last_index_update}) { $args->{added_or_updated_since} //= $time; log_trace "Setting added_or_updated_since=%s", $time; $num_sinces++ }
     }
-    if (defined $args->{added_since_last_n_index_updates} || defined $args->{updated_since_last_n_index_updates} || defined $args->{added_or_updated_since_last_n_index_updates}) {
-        my $n = int($args->{added_since_last_n_index_updates} // $args->{updated_since_last_n_index_updates} // $args->{added_or_updated_since_last_n_index_updates});
+    if (defined $args->{since_last_n_index_updates} ||
+            defined $args->{added_since_last_n_index_updates} ||
+            defined $args->{updated_since_last_n_index_updates} ||
+            defined $args->{added_or_updated_since_last_n_index_updates}) {
+        my $n = int($args->{since_last_n_index_updates} //
+                        $args->{added_since_last_n_index_updates} //
+                        $args->{updated_since_last_n_index_updates} //
+                        $args->{added_or_updated_since_last_n_index_updates});
         $n = 1 if $n < 1;
         my $sth = $dbh->prepare("SELECT date FROM log WHERE category='update_index' AND summary LIKE 'Begin%' ORDER BY date DESC");
         $sth->execute;
@@ -662,10 +691,12 @@ sub _set_since {
 }
 
 sub _add_since_where_clause {
-    my ($args, $where, $table) = @_;
-    if (defined $args->{added_since}  )          { push @$where, "$table.rec_ctime >= ". (0+$args->{added_since}) }
-    if (defined $args->{updated_since})          { push @$where, "($table.rec_mtime >= ". (0+$args->{updated_since}). " AND $table.rec_ctime < ".(0+$args->{updated_since}). ")" }
-    if (defined $args->{added_or_updated_since}) { push @$where, "($table.rec_ctime >= ". (0+$args->{added_or_updated_since}). " OR $table.rec_mtime >= ". (0+$args->{added_or_updated_since}). ")" }
+    my ($args, $where, $table, $which) = @_;
+    if (defined $args->{since} && $which eq 'ctime') { push @$where, "$table.rec_ctime >= ". (0+$args->{since}) }
+    if (defined $args->{since} && $which eq 'mtime') { push @$where, "$table.rec_mtime >= ". (0+$args->{since}) }
+    if (defined $args->{added_since}  )              { push @$where, "$table.rec_ctime >= ". (0+$args->{added_since}) }
+    if (defined $args->{updated_since})              { push @$where, "($table.rec_mtime >= ". (0+$args->{updated_since}). " AND $table.rec_ctime < ".(0+$args->{updated_since}). ")" }
+    if (defined $args->{added_or_updated_since})     { push @$where, "($table.rec_ctime >= ". (0+$args->{added_or_updated_since}). " OR $table.rec_mtime >= ". (0+$args->{added_or_updated_since}). ")" }
 }
 
 sub _fmt_time {
