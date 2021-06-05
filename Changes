@@ -1,3 +1,12 @@
+1.068   2021-06-05  Released-By: PERLANCAR; Urgency: medium
+
+	- [ux] [doc] Add description and cross-mention between mentions-for-mods
+	  and mentions-for-all-mods.
+
+        - [build] Rebuild to bump dependency version to attempt to fix
+          RT#136715.
+
+
 1.067   2021-06-03  Released-By: PERLANCAR; Urgency: medium
 
 	- [subcommand related-mods] Add option --(no-)submodules.
