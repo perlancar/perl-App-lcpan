@@ -1,8 +1,5 @@
 package App::lcpan::Cmd::authors_by_rdep_count;
 
-# DATE
-# VERSION
-
 use 5.010;
 use strict;
 use warnings;
@@ -10,6 +7,11 @@ use warnings;
 use Function::Fallback::CoreOrPP qw(clone_list);
 
 require App::lcpan;
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 our %SPEC;
 
@@ -66,7 +68,14 @@ ORDER BY rdep_count DESC
     while (my $row = $sth->fetchrow_hashref) {
         push @res, $row;
     }
-    my $resmeta = {};
+
+    require Data::TableData::Rank;
+    Data::TableData::Rank::add_rank_column_to_table(
+        table => \@res,
+        data_columns => [qw/rdep_count/],
+    );
+
+my $resmeta = {};
     $resmeta->{'table.fields'} = [qw/id name rdep_count/];
     [200, "OK", \@res, $resmeta];
 }
