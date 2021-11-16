@@ -1,13 +1,15 @@
 package App::lcpan::Cmd::authors_by_script_count;
 
-# DATE
-# VERSION
-
 use 5.010;
 use strict;
 use warnings;
 
 require App::lcpan;
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 our %SPEC;
 
@@ -42,9 +44,16 @@ ORDER BY script_count DESC
     while (my $row = $sth->fetchrow_hashref) {
         push @res, $row;
     }
+
+    require Data::TableData::Rank;
+    Data::TableData::Rank::add_rank_column_to_table(
+        table => \@res,
+        data_columns => [qw/script_count/],
+    );
+
     my $resmeta = {};
     #$resmeta->{'table.fields'} = [qw/id name script_count script_count_pct/];
-    $resmeta->{'table.fields'} = [qw/id script_count script_count_pct/];
+    $resmeta->{'table.fields'} = [qw/rank id script_count script_count_pct/];
     [200, "OK", \@res, $resmeta];
 }
 
