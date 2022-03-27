@@ -1,3 +1,8 @@
+1.070   2022-03-27  Released-By: PERLANCAR; Urgency: medium
+
+        - Add subcommand: dists-by-mod-count.
+
+
 1.069   2022-03-27  Released-By: PERLANCAR; Urgency: medium
 
         - Add proper rank column to ranking subcommands (*-by-*count).
