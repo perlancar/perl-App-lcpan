@@ -1,8 +1,5 @@
 package App::lcpan::Cmd::copy_script;
 
-# DATE
-# VERSION
-
 use 5.010;
 use strict;
 use warnings;
@@ -10,6 +7,11 @@ use warnings;
 require App::lcpan;
 
 use Perinci::Object;
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 our %SPEC;
 

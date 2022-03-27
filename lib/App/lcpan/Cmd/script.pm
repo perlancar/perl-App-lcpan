@@ -1,8 +1,5 @@
 package App::lcpan::Cmd::script;
 
-# DATE
-# VERSION
-
 use 5.010;
 use strict;
 use warnings;
@@ -10,6 +7,11 @@ use warnings;
 use Hash::Subset 'hash_subset_without';
 require App::lcpan;
 require App::lcpan::Cmd::scripts;
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 our %SPEC;
 

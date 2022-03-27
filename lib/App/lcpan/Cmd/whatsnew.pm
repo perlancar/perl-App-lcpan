@@ -2,11 +2,6 @@
 
 package App::lcpan::Cmd::whatsnew;
 
-# AUTHORITY
-# DATE
-# DIST
-# VERSION
-
 use 5.010001;
 use strict;
 use warnings;
@@ -14,6 +9,11 @@ use Log::ger;
 
 require App::lcpan;
 use Hash::Subset 'hash_subset';
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 our %SPEC;
 

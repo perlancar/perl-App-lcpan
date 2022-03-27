@@ -1,14 +1,16 @@
 package App::lcpan::Cmd::author_deps_by_dependent_count;
 
-# DATE
-# VERSION
-
 use 5.010;
 use strict;
 use warnings;
 
 require App::lcpan;
 require App::lcpan::Cmd::deps_by_dependent_count;
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 our %SPEC;
 

@@ -1,10 +1,5 @@
 package App::lcpan::Cmd::dists_by_dep_count;
 
-# AUTHORITY
-# DATE
-# DIST
-# VERSION
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,6 +7,11 @@ use warnings;
 use Function::Fallback::CoreOrPP qw(clone_list);
 
 require App::lcpan;
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 our %SPEC;
 
@@ -71,8 +71,12 @@ ORDER BY dep_count DESC
     while (my $row = $sth->fetchrow_hashref) {
         push @res, $row;
     }
+
+    require Data::TableData::Rank;
+    Data::TableData::Rank::add_rank_column_to_table(table => \@res, data_columns => ['dep_count']);
+
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/dist author dep_count/];
+    $resmeta->{'table.fields'} = [qw/rank dist author dep_count/];
     [200, "OK", \@res, $resmeta];
 }
 

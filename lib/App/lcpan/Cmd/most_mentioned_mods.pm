@@ -1,10 +1,5 @@
 package App::lcpan::Cmd::most_mentioned_mods;
 
-# AUTHORITY
-# DATE
-# DIST
-# VERSION
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,6 +7,11 @@ use warnings;
 use Function::Fallback::CoreOrPP qw(clone);
 
 require App::lcpan::Cmd::mods_by_mention_count;
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 our %SPEC;
 

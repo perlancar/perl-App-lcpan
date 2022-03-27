@@ -1,13 +1,15 @@
 package End::PrintBytesIn;
 
-# DATE
-# VERSION
-
 use 5.010001;
 use strict;
 use warnings;
 
 use Number::Format::Metric;
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 END {
     printf "Total downloaded data: %sb\n",

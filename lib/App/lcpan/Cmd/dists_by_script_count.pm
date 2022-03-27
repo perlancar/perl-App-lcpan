@@ -1,15 +1,15 @@
 package App::lcpan::Cmd::dists_by_script_count;
 
-# AUTHORITY
-# DATE
-# DIST
-# VERSION
-
 use 5.010;
 use strict;
 use warnings;
 
 require App::lcpan;
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 our %SPEC;
 
@@ -57,8 +57,12 @@ ORDER BY script_count DESC
     while (my $row = $sth->fetchrow_hashref) {
         push @res, $row;
     }
+
+    require Data::TableData::Rank;
+    Data::TableData::Rank::add_rank_column_to_table(table => \@res, data_columns => ['script_count']);
+
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/dist author script_count/];
+    $resmeta->{'table.fields'} = [qw/rank dist author script_count/];
     [200, "OK", \@res, $resmeta];
 }
 

@@ -1,9 +1,5 @@
+## no critic: Subroutines::ProhibitExplicitReturnUndef
 package App::lcpan;
-
-# AUTHORITY
-# DATE
-# DIST
-# VERSION
 
 use 5.010001;
 use strict;
@@ -11,9 +7,14 @@ use warnings;
 use Log::ger;
 
 use Clone::Util qw(clone modclone);
+use Exporter;
 use List::Util qw(first);
 
-use Exporter;
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
+
 our @ISA = qw(Exporter);
 our @EXPORT_OK = qw(
                        update
@@ -752,7 +753,7 @@ sub _relpath {
 }
 
 sub _dblog {
-    no strict 'refs';
+    no strict 'refs'; ## no critic: TestingAndDebugging::ProhibitNoStrict
 
     my ($dbh, $level, $category, $summary) = @_;
     $dbh->do("INSERT INTO log (date,lcpan_version,pid, level,category,summary) VALUES (?,?,?, ?,?,?)", {},
@@ -1893,7 +1894,7 @@ sub _update_index {
     # check whether we need to reindex if a sufficiently old (and possibly
     # incorrect) version of us did the reindexing
     {
-        no strict 'refs';
+        no strict 'refs'; ## no critic: TestingAndDebugging::ProhibitNoStrict
         my $our_version = ${__PACKAGE__.'::VERSION'};
 
         my ($indexer_version) = $dbh->selectrow_array("SELECT value FROM meta WHERE name='indexer_version'");
@@ -2573,7 +2574,7 @@ sub _update_index {
 
         # record the module version that does the indexing
         {
-            no strict 'refs';
+            no strict 'refs'; ## no critic: TestingAndDebugging::ProhibitNoStrict
             $dbh->do("INSERT OR REPLACE INTO meta (name,value) VALUES (?,?)",
                      {}, 'indexer_version', ${__PACKAGE__.'::VERSION'});
         }

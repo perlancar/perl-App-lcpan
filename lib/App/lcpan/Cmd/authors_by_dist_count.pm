@@ -1,15 +1,15 @@
 package App::lcpan::Cmd::authors_by_dist_count;
 
-# AUTHORITY
-# DATE
-# DIST
-# VERSION
-
 use 5.010001;
 use strict;
 use warnings;
 
 require App::lcpan;
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 our %SPEC;
 

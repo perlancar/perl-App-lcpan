@@ -1,14 +1,16 @@
 package App::lcpan::Cmd::mod_contents;
 
-# DATE
-# VERSION
-
 use 5.010;
 use strict;
 use warnings;
 
 require App::lcpan;
 require App::lcpan::Cmd::contents;
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 our %SPEC;
 

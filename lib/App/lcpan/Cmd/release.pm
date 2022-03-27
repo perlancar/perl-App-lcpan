@@ -1,8 +1,5 @@
 package App::lcpan::Cmd::release;
 
-# DATE
-# VERSION
-
 use 5.010;
 use strict;
 use warnings;
@@ -11,6 +8,11 @@ use Hash::Subset 'hash_subset_without';
 require App::lcpan;
 
 our %SPEC;
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 $SPEC{handle_cmd} = {
     v => 1.1,

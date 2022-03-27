@@ -1,13 +1,15 @@
 package App::lcpan::Cmd::author_rels;
 
-# DATE
-# VERSION
-
 use 5.010;
 use strict;
 use warnings;
 
 require App::lcpan;
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 our %SPEC;
 

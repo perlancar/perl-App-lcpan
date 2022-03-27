@@ -1,8 +1,5 @@
 package App::lcpan::Cmd::src;
 
-# DATE
-# VERSION
-
 use 5.010;
 use strict;
 use warnings;
@@ -11,6 +8,11 @@ use Encode qw(decode);
 
 require App::lcpan;
 require App::lcpan::Cmd::doc;
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 our %SPEC;
 

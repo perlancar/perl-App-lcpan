@@ -1,8 +1,5 @@
 package App::lcpan::Cmd::dist_rdeps;
 
-# DATE
-# VERSION
-
 use 5.010;
 use strict;
 use warnings;
@@ -11,6 +8,11 @@ use Log::ger;
 use App::lcpan ();
 use App::lcpan::Cmd::dist_mods;
 use Hash::Subset qw(hash_subset hash_subset_without);
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 our %SPEC;
 

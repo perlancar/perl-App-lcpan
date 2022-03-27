@@ -3,14 +3,16 @@
 # NO_PERINCI_CMDLINE_SCRIPT
 # FRAGMENT id=shcompgen-hint command=_cpanm
 
-# DATE
-# VERSION
-
 use strict;
 use warnings;
 
 use App::lcpan;
 use Perinci::CmdLine::Util::Config;
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 my $res = Perinci::CmdLine::Util::Config::read_config(
     program_name => "lcpan",

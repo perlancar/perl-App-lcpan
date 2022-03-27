@@ -1,10 +1,5 @@
 package App::lcpan::Cmd::heaviest_dists;
 
-# AUTHORITY
-# DATE
-# DIST
-# VERSION
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,6 +7,11 @@ use warnings;
 use Function::Fallback::CoreOrPP qw(clone);
 
 require App::lcpan::Cmd::dists_by_dep_count;
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 our %SPEC;
 

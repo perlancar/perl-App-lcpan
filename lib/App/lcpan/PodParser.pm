@@ -1,8 +1,5 @@
 package App::lcpan::PodParser;
 
-# DATE
-# VERSION
-
 use 5.010;
 use strict;
 use warnings;
@@ -11,6 +8,11 @@ use Log::ger;
 use parent qw(Pod::Simple::Methody);
 
 use List::Util qw(first);
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 sub handle_text {
     my $self = shift;

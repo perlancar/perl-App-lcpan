@@ -1,14 +1,16 @@
 package App::lcpan::Cmd::subs;
 
-# DATE
-# VERSION
-
 use 5.010;
 use strict;
 use warnings;
 use Log::ger;
 
 require App::lcpan;
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 our %SPEC;
 

@@ -1,14 +1,16 @@
 package App::lcpan::Cmd::mod;
 
-# DATE
-# VERSION
-
 use 5.010;
 use strict;
 use warnings;
 
 use Function::Fallback::CoreOrPP qw(clone);
 require App::lcpan::Cmd::module;
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 our %SPEC;
 

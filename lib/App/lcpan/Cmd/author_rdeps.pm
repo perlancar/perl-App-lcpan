@@ -1,14 +1,16 @@
 package App::lcpan::Cmd::author_rdeps;
 
-# DATE
-# VERSION
-
 use 5.010;
 use strict;
 use warnings;
 
 require App::lcpan;
 use Hash::Subset 'hash_subset';
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 our %SPEC;
 

@@ -1,10 +1,5 @@
 package LWP::UserAgent::Plugin::FilterLcpan;
 
-# AUTHORITY
-# DATE
-# DIST
-# VERSION
-
 use 5.010001;
 use strict;
 use warnings;
@@ -12,6 +7,11 @@ use experimental 'smartmatch';
 use Log::ger;
 
 use HTTP::Response;
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 sub before_mirror {
     my ($self, $r) = @_;

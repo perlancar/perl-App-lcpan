@@ -1,8 +1,5 @@
 package App::lcpan::Cmd::mentions_for_script;
 
-# DATE
-# VERSION
-
 use 5.010;
 use strict;
 use warnings;
@@ -10,6 +7,11 @@ use Log::ger;
 
 require App::lcpan;
 require App::lcpan::Cmd::mentions;
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 our %SPEC;
 

@@ -1,14 +1,16 @@
 package App::lcpan::Cmd::inject;
 
-# DATE
-# VERSION
-
 use 5.010;
 use strict;
 use warnings;
 
 require App::lcpan;
 use Proc::ChildError qw(explain_child_error);
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 our %SPEC;
 
