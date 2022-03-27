@@ -46,10 +46,7 @@ ORDER BY script_count DESC
     }
 
     require Data::TableData::Rank;
-    Data::TableData::Rank::add_rank_column_to_table(
-        table => \@res,
-        data_columns => [qw/script_count/],
-    );
+    Data::TableData::Rank::add_rank_column_to_table(table => \@res, data_columns => [qw/script_count/]);
 
     my $resmeta = {};
     #$resmeta->{'table.fields'} = [qw/id name script_count script_count_pct/];

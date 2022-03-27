@@ -50,8 +50,7 @@ sub handle_cmd {
     @where = (1) if !@where;
 
     my $sql = "SELECT
-  m.cpanid id,
-  a.fullname name,
+  m.cpanid author,
   COUNT(DISTINCT f.id) AS rdep_count
 FROM module m
 JOIN dep dp ON dp.module_id=m.id
@@ -70,13 +69,10 @@ ORDER BY rdep_count DESC
     }
 
     require Data::TableData::Rank;
-    Data::TableData::Rank::add_rank_column_to_table(
-        table => \@res,
-        data_columns => [qw/rdep_count/],
-    );
+    Data::TableData::Rank::add_rank_column_to_table(table => \@res, data_columns => ['rdep_count']);
 
-my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/id name rdep_count/];
+    my $resmeta = {};
+    $resmeta->{'table.fields'} = [qw/rank author rdep_count/];
     [200, "OK", \@res, $resmeta];
 }
 

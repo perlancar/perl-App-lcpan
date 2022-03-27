@@ -132,7 +132,10 @@ ORDER BY COUNT(*) DESC, m.name
         push @rows, $row;
     }
 
-    [200, "OK", \@rows, {'table.fields'=>[map {$_->[0]} @cols]}];
+    require Data::TableData::Rank;
+    Data::TableData::Rank::add_rank_column_to_table(table => \@rows, data_columns => ['dependent_count']);
+
+    [200, "OK", \@rows, {'table.fields'=>['rank', map {$_->[0]} @cols]}];
 }
 
 1;

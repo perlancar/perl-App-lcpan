@@ -17,7 +17,7 @@ our %SPEC;
 
 $SPEC{'handle_cmd'} = {
     v => 1.1,
-    summary => 'List modules ranked by number of reverse dependencies',
+    summary => 'List "most depended modules" (modules ranked by number of reverse dependencies)',
     args => {
         %App::lcpan::common_args,
         %App::lcpan::fauthor_args,
@@ -70,8 +70,12 @@ ORDER BY rdep_count DESC
     while (my $row = $sth->fetchrow_hashref) {
         push @res, $row;
     }
+
+    require Data::TableData::Rank;
+    Data::TableData::Rank::add_rank_column_to_table(table => \@res, data_columns => ['rdep_count']);
+
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/name author rdep_count/];
+    $resmeta->{'table.fields'} = [qw/rank module author rdep_count/];
     [200, "OK", \@res, $resmeta];
 }
 

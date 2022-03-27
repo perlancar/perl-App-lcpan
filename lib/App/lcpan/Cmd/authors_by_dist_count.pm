@@ -42,8 +42,12 @@ ORDER BY dist_count DESC
     while (my $row = $sth->fetchrow_hashref) {
         push @res, $row;
     }
+
+    require Data::TableData::Rank;
+    Data::TableData::Rank::add_rank_column_to_table(table => \@res, data_columns => ['dist_count']);
+
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/author dist_count dist_count_pct/];
+    $resmeta->{'table.fields'} = [qw/rank author dist_count dist_count_pct/];
     [200, "OK", \@res, $resmeta];
 }
 

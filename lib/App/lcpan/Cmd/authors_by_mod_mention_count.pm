@@ -81,8 +81,12 @@ ORDER BY mod_mention_count DESC
     while (my $row = $sth->fetchrow_hashref) {
         push @res, $row;
     }
+
+    require Data::TableData::Rank;
+    Data::TableData::Rank::add_rank_column_to_table(table => \@res, data_columns => ['mod_mention_count']);
+
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/author mod_mention_count/];
+    $resmeta->{'table.fields'} = [qw/rank author mod_mention_count/];
     [200, "OK", \@res, $resmeta];
 }
 

@@ -91,8 +91,12 @@ ORDER BY mention_count DESC
     while (my $row = $sth->fetchrow_hashref) {
         push @res, $row;
     }
+
+    require Data::TableData::Rank;
+    Data::TableData::Rank::add_rank_column_to_table(table => \@res, data_columns => ['mention_count']);
+
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/module mention_count author abstract/];
+    $resmeta->{'table.fields'} = [qw/rank module author mention_count abstract/];
     [200, "OK", \@res, $resmeta];
 }
 

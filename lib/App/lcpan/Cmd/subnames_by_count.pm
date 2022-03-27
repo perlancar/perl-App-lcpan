@@ -59,8 +59,12 @@ ORDER BY COUNT(name) DESC";
     while (my $row = $sth->fetchrow_hashref) {
         push @res, $row;
     }
+
+    require Data::TableData::Rank;
+    Data::TableData::Rank::add_rank_column_to_table(table => \@res, data_columns => ['count']);
+
     my $resmeta = {};
-    $resmeta->{'table.fields'} = [qw/sub count/];
+    $resmeta->{'table.fields'} = [qw/rank sub count/];
 
     [200, "OK", \@res, $resmeta];
 }
