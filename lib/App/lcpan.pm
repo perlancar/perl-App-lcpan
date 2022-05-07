@@ -817,7 +817,7 @@ sub _set_namespace {
 }
 
 our $db_schema_spec = {
-    latest_v => 15,
+    latest_v => 16,
 
     install => [
         'CREATE TABLE author (
@@ -830,7 +830,7 @@ our $db_schema_spec = {
         'CREATE INDEX ix_author__rec_ctime ON author(rec_ctime)',
         'CREATE INDEX ix_author__rec_mtime ON author(rec_mtime)',
 
-        'CREATE TABLE file (
+        'CREATE TABLE file ( -- remember to keep schema in-sync with old_file
              id INTEGER NOT NULL PRIMARY KEY,
              name TEXT NOT NULL,
              cpanid VARCHAR(20) NOT NULL REFERENCES author(cpanid),
@@ -883,6 +883,43 @@ our $db_schema_spec = {
         'CREATE INDEX ix_file__rec_mtime ON file(rec_mtime)',
         'CREATE INDEX ix_file__dist_name ON file(dist_name)',
 
+        'CREATE TABLE old_file ( -- remember to keep schema in-sync with file
+             id INTEGER NOT NULL PRIMARY KEY,
+             cpanid VARCHAR(20) NOT NULL, -- REFERENCES author(cpanid),
+
+             mtime INT,
+             size INT,
+
+             file_status TEXT,
+             file_error TEXT,
+
+             meta_status TEXT,
+             meta_error TEXT,
+
+             dist_name TEXT,
+             dist_abstract TEXT,
+             dist_version VARCHAR(20),
+             dist_version_numified VARCHAR(20),
+             is_latest_dist BOOLEAN,
+
+             pod_status TEXT,
+
+             sub_status TEXT,
+
+             has_metajson INTEGER,
+             has_metayml INTEGER,
+             has_makefilepl INTEGER,
+             has_buildpl INTEGER,
+
+             rec_ctime INT,
+             rec_mtime INT
+        )',
+        'CREATE UNIQUE INDEX ix_old_file__id ON old_file(id)',
+        'CREATE UNIQUE INDEX ix_old_file__cpanid__name ON old_file(cpanid,name)',
+        'CREATE INDEX ix_old_file__rec_ctime ON old_file(rec_ctime)',
+        'CREATE INDEX ix_old_file__rec_mtime ON old_file(rec_mtime)',
+        'CREATE INDEX ix_old_file__dist_name ON old_file(dist_name)',
+
         # files inside the release archive file
         'CREATE TABLE content (
              id INTEGER NOT NULL PRIMARY KEY,
@@ -900,7 +937,7 @@ our $db_schema_spec = {
         'CREATE INDEX ix_content__rec_ctime ON content(rec_ctime)',
         'CREATE INDEX ix_content__rec_mtime ON content(rec_mtime)',
 
-        'CREATE TABLE module (
+        'CREATE TABLE module ( -- remember to keep schema in-sync with old_module
              id INTEGER NOT NULL PRIMARY KEY,
              name VARCHAR(255) NOT NULL,
              cpanid VARCHAR(20) NOT NULL REFERENCES author(cpanid), -- [cache]
@@ -919,7 +956,26 @@ our $db_schema_spec = {
         'CREATE INDEX ix_module__rec_ctime ON module(rec_ctime)',
         'CREATE INDEX ix_module__rec_mtime ON module(rec_mtime)',
 
-        'CREATE TABLE script (
+        'CREATE TABLE old_module ( -- remember to keep schema in-sync with module
+             id INTEGER NOT NULL PRIMARY KEY,
+             name VARCHAR(255) NOT NULL,
+             cpanid VARCHAR(20) NOT NULL, -- REFERENCES author(cpanid), -- [cache]
+             file_id INTEGER NOT NULL,
+             version VARCHAR(20),
+             version_numified DECIMAL,
+             content_id INTEGER, -- REFERENCES content(id),
+             abstract TEXT,
+             rec_ctime INT,
+             rec_mtime INT
+         )',
+        'CREATE INDEX ix_old_module__id ON old_module(id)',
+        'CREATE INDEX ix_old_module__name ON old_module(name)',
+        'CREATE INDEX ix_old_module__file_id ON old_module(file_id)',
+        'CREATE INDEX ix_old_module__cpanid ON old_module(cpanid)',
+        'CREATE INDEX ix_old_module__rec_ctime ON old_module(rec_ctime)',
+        'CREATE INDEX ix_old_module__rec_mtime ON old_module(rec_mtime)',
+
+        'CREATE TABLE script ( -- remember to keep schema in-sync with old_script
              id INTEGER NOT NULL PRIMARY KEY,
              file_id INTEGER NOT NULL REFERENCES file(id), -- [cache]
              cpanid VARCHAR(20) NOT NULL REFERENCES author(cpanid), -- [cache]
@@ -934,6 +990,22 @@ our $db_schema_spec = {
         'CREATE INDEX ix_script__name ON script(name)',
         'CREATE INDEX ix_script__rec_ctime ON script(rec_ctime)',
         'CREATE INDEX ix_script__rec_mtime ON script(rec_mtime)',
+
+        'CREATE TABLE old_script ( -- remember to keep schema in-sync with script
+             id INTEGER NOT NULL PRIMARY KEY,
+             file_id INTEGER NOT NULL, -- REFERENCES file(id), -- [cache]
+             cpanid VARCHAR(20) NOT NULL, -- REFERENCES author(cpanid), -- [cache]
+             name TEXT NOT NULL,
+             content_id INT, -- REFERENCES content(id),
+             abstract TEXT,
+             rec_ctime INT,
+             rec_mtime INT
+        )',
+        'CREATE UNIQUE INDEX ix_old_script__id ON old_script(id)',
+        'CREATE UNIQUE INDEX ix_old_script__file_id__name ON old_script(file_id, name)',
+        'CREATE INDEX ix_old_script__name ON old_script(name)',
+        'CREATE INDEX ix_old_script__rec_ctime ON old_script(rec_ctime)',
+        'CREATE INDEX ix_old_script__rec_mtime ON old_script(rec_mtime)',
 
         'CREATE TABLE mention (
              id INTEGER NOT NULL PRIMARY KEY,
@@ -1344,6 +1416,83 @@ our $db_schema_spec = {
         },
     ],
 
+    upgrade_to_v16 => [
+        # add table old_file
+        'CREATE TABLE old_file ( -- remember to keep schema in-sync with file
+             id INTEGER NOT NULL PRIMARY KEY,
+             cpanid VARCHAR(20) NOT NULL, -- REFERENCES author(cpanid),
+
+             mtime INT,
+             size INT,
+
+             file_status TEXT,
+             file_error TEXT,
+
+             meta_status TEXT,
+             meta_error TEXT,
+
+             dist_name TEXT,
+             dist_abstract TEXT,
+             dist_version VARCHAR(20),
+             dist_version_numified VARCHAR(20),
+             is_latest_dist BOOLEAN,
+
+             pod_status TEXT,
+
+             sub_status TEXT,
+
+             has_metajson INTEGER,
+             has_metayml INTEGER,
+             has_makefilepl INTEGER,
+             has_buildpl INTEGER,
+
+             rec_ctime INT,
+             rec_mtime INT
+        )',
+        'CREATE UNIQUE INDEX ix_old_file__id ON old_file(id)',
+        'CREATE UNIQUE INDEX ix_old_file__cpanid__name ON old_file(cpanid,name)',
+        'CREATE INDEX ix_old_file__rec_ctime ON old_file(rec_ctime)',
+        'CREATE INDEX ix_old_file__rec_mtime ON old_file(rec_mtime)',
+        'CREATE INDEX ix_old_file__dist_name ON old_file(dist_name)',
+
+        # add table old_module
+        'CREATE TABLE old_module ( -- remember to keep schema in-sync with module
+             id INTEGER NOT NULL PRIMARY KEY,
+             name VARCHAR(255) NOT NULL,
+             cpanid VARCHAR(20) NOT NULL, -- REFERENCES author(cpanid), -- [cache]
+             file_id INTEGER NOT NULL,
+             version VARCHAR(20),
+             version_numified DECIMAL,
+             content_id INTEGER, -- REFERENCES content(id),
+             abstract TEXT,
+             rec_ctime INT,
+             rec_mtime INT
+         )',
+        'CREATE INDEX ix_old_module__id ON old_module(id)',
+        'CREATE INDEX ix_old_module__name ON old_module(name)',
+        'CREATE INDEX ix_old_module__file_id ON old_module(file_id)',
+        'CREATE INDEX ix_old_module__cpanid ON old_module(cpanid)',
+        'CREATE INDEX ix_old_module__rec_ctime ON old_module(rec_ctime)',
+        'CREATE INDEX ix_old_module__rec_mtime ON old_module(rec_mtime)',
+
+        # add table old_script
+        'CREATE TABLE old_script ( -- remember to keep schema in-sync with script
+             id INTEGER NOT NULL PRIMARY KEY,
+             file_id INTEGER NOT NULL, -- REFERENCES file(id), -- [cache]
+             cpanid VARCHAR(20) NOT NULL, -- REFERENCES author(cpanid), -- [cache]
+             name TEXT NOT NULL,
+             content_id INT, -- REFERENCES content(id),
+             abstract TEXT,
+             rec_ctime INT,
+             rec_mtime INT
+        )',
+        'CREATE UNIQUE INDEX ix_old_script__id ON old_script(id)',
+        'CREATE UNIQUE INDEX ix_old_script__file_id__name ON old_script(file_id, name)',
+        'CREATE INDEX ix_old_script__name ON old_script(name)',
+        'CREATE INDEX ix_old_script__rec_ctime ON old_script(rec_ctime)',
+        'CREATE INDEX ix_old_script__rec_mtime ON old_script(rec_mtime)',
+    ],
+
     # for testing
     install_v1 => [
         'CREATE TABLE author (
@@ -1745,6 +1894,8 @@ sub _delete_releases_records {
         }
         $dbh->do("DELETE FROM namespace WHERE num_modules <= 0");
 
+        log_trace("  Copying module records to old_module");
+        $dbh->do("INSERT INTO old_module SELECT * FROM module WHERE file_id IN (".join(",",@file_ids).")");
         log_trace("  Deleting module records");
         $dbh->do("DELETE FROM module WHERE file_id IN (".join(",",@file_ids).")");
     }
@@ -1752,6 +1903,8 @@ sub _delete_releases_records {
     log_trace("  Deleting mention records");
     $dbh->do("DELETE FROM mention WHERE source_file_id IN (".join(",",@file_ids).")");
 
+    log_trace("  Copying script records to old_script");
+    $dbh->do("INSERT INTO old_script SELECT * FROM script WHERE file_id IN (".join(",",@file_ids).")");
     log_trace("  Deleting script records");
     $dbh->do("DELETE FROM script WHERE file_id IN (".join(",",@file_ids).")");
 
@@ -1761,6 +1914,8 @@ sub _delete_releases_records {
     log_trace("  Deleting content records");
     $dbh->do("DELETE FROM content WHERE file_id IN (".join(",",@file_ids).")");
 
+    log_trace("  Copying file records to old_file");
+    $dbh->do("INSERT INTO old_file SELECT * FROM file WHERE file_id IN (".join(",",@file_ids).")");
     $dbh->do("DELETE FROM file WHERE id IN (".join(",",@file_ids).")");
 }
 
@@ -2752,11 +2907,14 @@ sub _reset {
     $dbh->do("DELETE FROM namespace");
     $dbh->do("DELETE FROM mention")   if _table_exists($dbh, "main", "mention");
     $dbh->do("DELETE FROM module");
+    $dbh->do("DELETE FROM old_module")if _table_exists($dbh, "main", "old_module");
     $dbh->do("DELETE FROM script")    if _table_exists($dbh, "main", "script");
+    $dbh->do("DELETE FROM old_script")if _table_exists($dbh, "main", "old_script");
     $dbh->do("DELETE FROM sub")       if _table_exists($dbh, "main", "sub");
     $dbh->do("DELETE FROM dist")      if _table_exists($dbh, "main", "dist");
     $dbh->do("DELETE FROM content")   if _table_exists($dbh, "main", "content");
     $dbh->do("DELETE FROM file");
+    $dbh->do("DELETE FROM old_file")  if _table_exists($dbh, "main", "old_file");
     $dbh->do("DELETE FROM author");
     $dbh->do("DELETE FROM log")       if _table_exists($dbh, "main", "log") && !$soft;
 
