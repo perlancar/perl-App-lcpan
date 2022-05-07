@@ -912,6 +912,7 @@ our $db_schema_spec = {
 
         'CREATE TABLE old_file ( -- remember to keep schema in-sync with file
              id INTEGER NOT NULL PRIMARY KEY,
+             name TEXT NOT NULL,
              cpanid VARCHAR(20) NOT NULL, -- REFERENCES author(cpanid),
 
              mtime INT,
@@ -1447,6 +1448,7 @@ our $db_schema_spec = {
         # add table old_file
         'CREATE TABLE old_file ( -- remember to keep schema in-sync with file
              id INTEGER NOT NULL PRIMARY KEY,
+             name TEXT NOT NULL,
              cpanid VARCHAR(20) NOT NULL, -- REFERENCES author(cpanid),
 
              mtime INT,
@@ -1942,7 +1944,7 @@ sub _delete_releases_records {
     $dbh->do("DELETE FROM content WHERE file_id IN (".join(",",@file_ids).")");
 
     log_trace("  Copying file records to old_file");
-    $dbh->do("INSERT INTO old_file SELECT * FROM file WHERE file_id IN (".join(",",@file_ids).")");
+    $dbh->do("INSERT INTO old_file SELECT * FROM file WHERE id IN (".join(",",@file_ids).")");
     $dbh->do("DELETE FROM file WHERE id IN (".join(",",@file_ids).")");
 }
 
