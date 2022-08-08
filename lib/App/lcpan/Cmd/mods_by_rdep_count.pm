@@ -20,13 +20,14 @@ $SPEC{'handle_cmd'} = {
     summary => 'List "most depended modules" (modules ranked by number of reverse dependencies)',
     args => {
         %App::lcpan::common_args,
-        %App::lcpan::fauthor_args,
         clone_list(%App::lcpan::deps_phase_args),
         clone_list(%App::lcpan::deps_rel_args),
         n => {
             summary => 'Return at most this number of results',
             schema => 'posint*',
         },
+        %App::lcpan::argspecsopt_module_authors,
+        %App::lcpan::argspecsopt_dist_authors,
     },
 };
 delete $SPEC{'handle_cmd'}{args}{phase}{default};
@@ -39,9 +40,17 @@ sub handle_cmd {
 
     my @where;
     my @binds;
-    if ($args{author}) {
-        push @where, "(author=?)";
-        push @binds, uc($args{author});
+    if ($args{module_authors} && @{ $args{module_authors} }) {
+        push @where, "(author IN (".join(", ", map {$dbh->quote($_)} @{ $args{module_authors} })."))";
+    }
+    if ($args{module_authors_arent} && @{ $args{module_authors_arent} }) {
+        push @where, "(author NOT IN (".join(", ", map {$dbh->quote($_)} @{ $args{module_authors_arent} })."))";
+    }
+    if ($args{dist_authors} && @{ $args{dist_authors} }) {
+        push @where, "(f.cpanid IN (".join(", ", map {$dbh->quote($_)} @{ $args{dist_authors} })."))";
+    }
+    if ($args{dist_authors_arent} && @{ $args{dist_authors_arent} }) {
+        push @where, "(f.cpanid NOT IN (".join(", ", map {$dbh->quote($_)} @{ $args{dist_authors_arent} })."))";
     }
     if ($args{phase} && $args{phase} ne 'ALL') {
         push @where, "(phase=?)";
@@ -58,7 +67,8 @@ sub handle_cmd {
   m.cpanid author,
   COUNT(*) AS rdep_count
 FROM module m
-JOIN dep dp ON dp.module_id=m.id
+JOIN dep dp ON m.id=dp.module_id
+LEFT JOIN file f ON dp.file_id=f.id
 WHERE ".join(" AND ", @where)."
 GROUP BY m.name
 ORDER BY rdep_count DESC

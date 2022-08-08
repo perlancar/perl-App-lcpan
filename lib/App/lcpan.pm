@@ -545,6 +545,42 @@ our %authors_args = (
     },
 );
 
+our %argspecsopt_module_authors = (
+    module_authors => {
+        summary => 'Only list depended modules published by specified author(s)',
+        'x.name.is_plural' => 1,
+        schema => ['array*', of=>'str*'],
+        element_completion => \&App::lcpan::_complete_cpanid,
+        tags => ['category:filtering'],
+    },
+    module_authors_arent => {
+        summary => 'Do not list depended modules published by specified author(s)',
+        'x.name.is_plural' => 1,
+        'x.name.singular' => 'module_author_isnt',
+        schema => ['array*', of=>'str*'],
+        element_completion => \&App::lcpan::_complete_cpanid,
+        tags => ['category:filtering'],
+    },
+);
+
+our %argspecsopt_dist_authors = (
+    dist_authors => {
+        summary => 'Only select dependent distributions published by specified author(s)',
+        'x.name.is_plural' => 1,
+        schema => ['array*', of=>'str*'],
+        element_completion => \&App::lcpan::_complete_cpanid,
+        tags => ['category:filtering'],
+    },
+    dist_authors_arent => {
+        summary => 'Do not select dependent distributions published by specified author(s)',
+        'x.name.is_plural' => 1,
+        'x.name.singular' => 'dist_author_isnt',
+        schema => ['array*', of=>'str*'],
+        element_completion => \&App::lcpan::_complete_cpanid,
+        tags => ['category:filtering'],
+    },
+);
+
 our %dist_args = (
     dist => {
         schema => 'perl::distname*',

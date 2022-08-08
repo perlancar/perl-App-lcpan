@@ -44,19 +44,7 @@ _
         %App::lcpan::common_args,
         %App::lcpan::author_args,
         %App::lcpan::deps_args,
-        module_authors => {
-            summary => 'Only list depended modules published by specified author(s)',
-            'x.name.is_plural' => 1,
-            schema => ['array*', of=>'str*'],
-            element_completion => \&App::lcpan::_complete_cpanid,
-        },
-        module_authors_arent => {
-            summary => 'Do not list depended modules published by specified author(s)',
-            'x.name.is_plural' => 1,
-            'x.name.singular' => 'module_author_isnt',
-            schema => ['array*', of=>'str*'],
-            element_completion => \&App::lcpan::_complete_cpanid,
-        },
+        %App::lcpan::argspecsopt_module_authors,
     },
 };
 sub handle_cmd {
