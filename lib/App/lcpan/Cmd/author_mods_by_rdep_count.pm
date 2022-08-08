@@ -27,6 +27,7 @@ $SPEC{'handle_cmd'} = {
 sub handle_cmd {
     my %args = @_;
 
+    $args{module_authors} = [delete $args{author}];
     App::lcpan::Cmd::mods_by_rdep_count::handle_cmd(%args);
 }
 
