@@ -23,6 +23,13 @@ This subcommand lists other modules that might be related to the module(s) you
 specify. This is done by listing modules that tend be mentioned together in POD
 documentation.
 
+The downside of this approach is that the module(s) and the related modules must
+all already be mentioned together in POD documentations. You will not find a
+fresh new module that tries to be an improvement/alternative to an existing
+module, even if that new module mentions the old module a lot, simply because
+the new module has not been mentioned in other modules' PODs. Someone will need
+to create that POD(s) first.
+
 The scoring/ranking still needs to be tuned.
 
 _

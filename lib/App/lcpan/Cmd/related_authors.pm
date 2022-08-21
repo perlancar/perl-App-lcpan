@@ -72,7 +72,7 @@ sub handle_cmd {
     while (my @row = $sth_authors_modules->fetchrow_array) {
         push @modules, $row[0];
     }
-    log_trace("modules released by %s: %s", $authors, \@modules);
+    log_trace("num_modules released by %s: %d", $authors, scalar(@modules));
     return [400, "No modules released by author(s)"] unless @modules;
     my $modules_s = join(",", map {$dbh->quote($_)} @modules);
 
