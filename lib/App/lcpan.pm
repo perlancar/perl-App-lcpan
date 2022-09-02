@@ -3140,24 +3140,24 @@ sub _complete_mod {
     }
 
     my $sth = $dbh->prepare(
-        "SELECT name FROM module WHERE name LIKE ? ORDER BY name");
+        "SELECT DISTINCT name,abstract FROM module WHERE name LIKE ? ORDER BY name");
     $sth->execute($word . '%');
 
     # XXX follow Complete::Common::OPT_CI
 
     my @res;
-    while (my ($mod) = $sth->fetchrow_array) {
+    while (my ($mod,$abstract) = $sth->fetchrow_array) {
         # only complete one level deeper at a time
         if ($mod =~ /:\z/) {
             next unless $mod =~ /\A\Q$word\E:*\w+\z/i;
         } else {
             next unless $mod =~ /\A\Q$word\E\w*(::\w+)?\z/i;
         }
-        push @res, $mod;
+        push @res, {word=>$mod, summary=>$abstract};
     }
 
     # convert back to slash if user originally typed with slash
-    if ($uses_slash) { for (@res) { s!::!/!g } }
+    if ($uses_slash) { for (@res) { $_->{word} =~ s!::!/!g } }
 
     \@res;
 };
@@ -3199,17 +3199,17 @@ sub _complete_mod_or_dist {
     if ($word =~ /-/) {
         $is_dist++;
         $sth = $dbh->prepare(
-            "SELECT DISTINCT dist_name FROM file WHERE dist_name LIKE ? ORDER BY dist_name");
+            "SELECT DISTINCT dist_name,dist_abstract FROM file WHERE dist_name LIKE ? ORDER BY dist_name");
     } else {
         $sth = $dbh->prepare(
-            "SELECT name FROM module WHERE name LIKE ? ORDER BY name");
+            "SELECT name,abstract FROM module WHERE name LIKE ? ORDER BY name");
     }
     $sth->execute($word . '%');
 
     # XXX follow Complete::Common::OPT_CI
 
     my @res;
-    while (my ($e) = $sth->fetchrow_array) {
+    while (my ($e,$summary) = $sth->fetchrow_array) {
         # only complete one level deeper at a time
         if ($is_dist) {
             if ($e =~ /-\z/) {
@@ -3224,11 +3224,11 @@ sub _complete_mod_or_dist {
                 next unless $e =~ /\A\Q$word\E\w*(::\w+)?\z/i;
             }
         }
-        push @res, $e;
+        push @res, {word=>$e, summary=>$summary};
     }
 
     # convert back to slash if user originally typed with slash
-    if ($uses_slash) { for (@res) { s!::!/!g } }
+    if ($uses_slash) { for (@res) { $_->{word} =~ s!::!/!g } }
 
     \@res;
 };
@@ -3270,17 +3270,17 @@ sub _complete_mod_or_dist_or_script {
     if ($word =~ /-/) {
         $is_dist++;
         $sth = $dbh->prepare(
-            "SELECT DISTINCT dist_name FROM file WHERE dist_name LIKE ? ORDER BY dist_name");
+            "SELECT DISTINCT dist_name,dist_abstract FROM file WHERE dist_name LIKE ? ORDER BY dist_name");
     } else {
         $sth = $dbh->prepare(
-            "SELECT name FROM module WHERE name LIKE ? ORDER BY name");
+            "SELECT name FROM module,abstract WHERE name LIKE ? ORDER BY name");
     }
     $sth->execute($word . '%');
 
     # XXX follow Complete::Common::OPT_CI
 
     my @res;
-    while (my ($e) = $sth->fetchrow_array) {
+    while (my ($e,$summary) = $sth->fetchrow_array) {
         # only complete one level deeper at a time
         if ($is_dist) {
             if ($e =~ /-\z/) {
@@ -3295,21 +3295,21 @@ sub _complete_mod_or_dist_or_script {
                 next unless $e =~ /\A\Q$word\E\w*(::\w+)?\z/i;
             }
         }
-        push @res, $e;
+        push @res, {word=>$e, summary=>$summary};
     }
 
     # also get candidates from script name
     unless ($word =~ /::/) {
         $sth = $dbh->prepare(
-            "SELECT DISTINCT name FROM script WHERE name LIKE ? ORDER BY name");
+            "SELECT DISTINCT name,abstract FROM script WHERE name LIKE ? ORDER BY name");
         $sth->execute($word . '%');
-        while (my ($e) = $sth->fetchrow_array) {
-            push @res, $e;
+        while (my ($e,$abstract) = $sth->fetchrow_array) {
+            push @res, {word=>$e, summary=>$abstract};
         }
     }
 
     # convert back to slash if user originally typed with slash
-    if ($uses_slash) { for (@res) { s!::!/!g } }
+    if ($uses_slash) { for (@res) { $_->{word} =~ s!::!/!g } }
 
     \@res;
 };
@@ -3391,14 +3391,14 @@ sub _complete_script {
     }
 
     my $sth = $dbh->prepare(
-        "SELECT DISTINCT name FROM script WHERE name LIKE ? ORDER BY name");
+        "SELECT DISTINCT name,abstract FROM script WHERE name LIKE ? ORDER BY name");
     $sth->execute($word . '%');
 
     # XXX follow Complete::Common::OPT_CI
 
     my @res;
-    while (my ($script) = $sth->fetchrow_array) {
-        push @res, $script;
+    while (my ($script, $abstract) = $sth->fetchrow_array) {
+        push @res, {word=>$script, summary=>$abstract};
     }
 
     \@res;
@@ -3433,20 +3433,20 @@ sub _complete_dist {
     }
 
     my $sth = $dbh->prepare(
-        "SELECT DISTINCT dist_name FROM file WHERE dist_name LIKE ? ORDER BY dist_name");
+        "SELECT DISTINCT dist_name,dist_abstract FROM file WHERE dist_name LIKE ? ORDER BY dist_name");
     $sth->execute($word . '%');
 
     # XXX follow Complete::Common::OPT_CI
 
     my @res;
-    while (my ($dist) = $sth->fetchrow_array) {
+    while (my ($dist,$abstract) = $sth->fetchrow_array) {
         # only complete one level deeper at a time
         if ($dist =~ /-\z/) {
             next unless $dist =~ /\A\Q$word\E-*\w+\z/i;
         } else {
             next unless $dist =~ /\A\Q$word\E\w*(-\w+)?\z/i;
         }
-        push @res, $dist;
+        push @res, {word=>$dist, summary=>$abstract};
     }
 
     \@res;
@@ -3523,14 +3523,14 @@ sub _complete_rel {
     }
 
     my $sth = $dbh->prepare(
-        "SELECT name FROM file WHERE name LIKE ? ORDER BY name");
+        "SELECT name,dist_abstract FROM file WHERE name LIKE ? ORDER BY name");
     $sth->execute($word . '%');
 
     # XXX follow Complete::Common::OPT_CI
 
     my @res;
-    while (my ($rel) = $sth->fetchrow_array) { #
-        push @res, $rel;
+    while (my ($rel,$abstract) = $sth->fetchrow_array) { #
+        push @res, {word=>$rel, summary=>$abstract};
     }
 
     \@res;
