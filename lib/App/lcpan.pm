@@ -1959,8 +1959,9 @@ sub _delete_releases_records {
         }
         $dbh->do("DELETE FROM namespace WHERE num_modules <= 0");
 
-        log_trace("  Copying module records to old_module");
-        $dbh->do("INSERT INTO old_module SELECT * FROM module WHERE file_id IN (".join(",",@file_ids).")");
+        #log_trace("  Copying module records to old_module");
+        #$dbh->do("INSERT INTO old_module SELECT * FROM module WHERE file_id IN (".join(",",@file_ids).")");
+
         log_trace("  Deleting module records");
         $dbh->do("DELETE FROM module WHERE file_id IN (".join(",",@file_ids).")");
     }
@@ -1968,8 +1969,9 @@ sub _delete_releases_records {
     log_trace("  Deleting mention records");
     $dbh->do("DELETE FROM mention WHERE source_file_id IN (".join(",",@file_ids).")");
 
-    log_trace("  Copying script records to old_script");
-    $dbh->do("INSERT INTO old_script SELECT * FROM script WHERE file_id IN (".join(",",@file_ids).")");
+    #log_trace("  Copying script records to old_script");
+    #$dbh->do("INSERT INTO old_script SELECT * FROM script WHERE file_id IN (".join(",",@file_ids).")");
+
     log_trace("  Deleting script records");
     $dbh->do("DELETE FROM script WHERE file_id IN (".join(",",@file_ids).")");
 
@@ -1979,8 +1981,10 @@ sub _delete_releases_records {
     log_trace("  Deleting content records");
     $dbh->do("DELETE FROM content WHERE file_id IN (".join(",",@file_ids).")");
 
-    log_trace("  Copying file records to old_file");
-    $dbh->do("INSERT INTO old_file SELECT * FROM file WHERE id IN (".join(",",@file_ids).")");
+    #log_trace("  Copying file records to old_file");
+    #$dbh->do("INSERT INTO old_file SELECT * FROM file WHERE id IN (".join(",",@file_ids).")");
+
+    log_trace("  Deleting file records");
     $dbh->do("DELETE FROM file WHERE id IN (".join(",",@file_ids).")");
 }
 
