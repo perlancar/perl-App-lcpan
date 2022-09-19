@@ -1,3 +1,24 @@
+1.071   2022-09-19  Released-By: PERLANCAR; Urgency: medium
+
+        - Disable saving old file/module/script records for now, because of
+          current lack of handling of duplicates.
+
+        - Add subcommands: author-mods-by-rdep-count (which is just a shortcut
+          for mods-by-rdep-count, author-mods-by-other-author-rdep-count,
+          delete-old-data, related-authors, .
+
+        - [ux] Provide summaries for most completion answers.
+
+        - [doc][subcommand related-mods] Add note about the downside of the
+          approach used.
+
+        - Add common option: --no-update-db-schema.
+
+        - [subcommand mods-by-rdep-count] Replace --author arg to
+          --module-author, --module-author-isnt, --dist-author,
+          --dist-author-isnt.
+
+
 1.070_001  2022-05-07  Released-By: PERLANCAR; Urgency: medium
 
            - [experimental] Retain historical records for tables file, module,
