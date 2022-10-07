@@ -3347,20 +3347,20 @@ sub _complete_ns {
     }
 
     my $sth = $dbh->prepare(
-        "SELECT name FROM namespace WHERE name LIKE ? ORDER BY name");
+        "SELECT ns.name name, m.abstract FROM namespace ns LEFT JOIN module m ON ns.name=m.name WHERE ns.name LIKE ? ORDER BY ns.name");
     $sth->execute($word . '%');
 
     # XXX follow Complete::Common::OPT_CI
 
     my @res;
-    while (my ($ns) = $sth->fetchrow_array) {
+    while (my ($ns, $abstract) = $sth->fetchrow_array) {
         # only complete one level deeper at a time
         if ($ns =~ /:\z/) {
             next unless $ns =~ /\A\Q$word\E:*\w+\z/i;
         } else {
             next unless $ns =~ /\A\Q$word\E\w*(::\w+)?\z/i;
         }
-        push @res, $ns;
+        push @res, {word=>$ns, (defined($abstract) ? (summary=>$abstract) : ())};
     }
 
     \@res;
