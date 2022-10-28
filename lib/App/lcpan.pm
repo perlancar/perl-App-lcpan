@@ -4390,7 +4390,7 @@ sub _get_prereqs {
     log_trace("Finding dependencies for file ID(s) %s (level=%i) ...", $file_ids, $level);
     return [200, "OK", []] unless @$file_ids;
 
-    my @where = ("dp.file_id IN (".join(",", @$file_ids).")");
+    my @where  = ("dp.file_id IN (".join(",", @$file_ids).")");
     my @bind  = ();
 
     if ($filters->{authors}) {
@@ -4455,6 +4455,10 @@ ORDER BY module".($level > 1 ? " DESC" : ""));
 
         next if !$filters->{include_indexed}   && ( defined $row->{author} || $row->{module} eq 'perl');
         next if !$filters->{include_unindexed} && (!defined $row->{author} && $row->{module} ne 'perl');
+
+        if ($filters->{exclude_deps} && grep { $row->{module} eq $_ } @{ $filters->{exclude_deps} }) {
+            next;
+        }
 
         $row->{is_core} = $row->{module} eq 'perl' ||
             Module::CoreList::More->is_still_core($row->{module}, undef, version->parse($plver)->numify);
@@ -4826,6 +4830,13 @@ _
         %argspec0opt_dists_with_optional_vers,
         %argspecopt_mods,
         %deps_args,
+        exclude_deps => {
+            summary => 'Exclude some dependencies from being shown',
+            'x.name.is_plural' => 1,
+            'x.name.singular' => 'exclude_dep',
+            schema => ['array*', of=>'perl::modname*', min_len=>1],
+            element_completion => \&_complete_mod,
+        },
     },
     args_rels => {
         req_one => ['modules', 'dists'],
@@ -4899,6 +4910,7 @@ sub deps {
         include_noncore => $include_noncore,
         include_indexed => $include_indexed,
         include_unindexed => $include_unindexed,
+        exclude_deps => $args{exclude_deps},
         authors => $args{authors},
         authors_arent => $args{authors_arent},
         added_since => $args{added_since},
