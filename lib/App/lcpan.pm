@@ -3331,6 +3331,9 @@ sub _complete_ns {
     my $cmdline = $args{cmdline} or return undef;
     my $r = $args{r};
 
+    # allow writing Mod::SubMod as Mod/SubMod
+    my $uses_slash = $word =~ s!/!::!g ? 1:0;
+
     # force read config file, because by default it is turned off when in
     # completion
     $r->{read_config} = 1;
@@ -3362,6 +3365,9 @@ sub _complete_ns {
         }
         push @res, {word=>$ns, (defined($abstract) ? (summary=>$abstract) : ())};
     }
+
+    # convert back to slash if user originally typed with slash
+    if ($uses_slash) { for (@res) { $_->{word} =~ s!::!/!g } }
 
     \@res;
 };
@@ -3553,6 +3559,9 @@ sub _complete_content_package_or_script {
     my $cmdline = $args{cmdline} or return undef;
     my $r = $args{r};
 
+    # allow writing Mod::SubMod as Mod/SubMod
+    my $uses_slash = $word =~ s!/!::!g ? 1:0;
+
     # force read config file, because by default it is turned off when in
     # completion
     $r->{read_config} = 1;
@@ -3603,6 +3612,9 @@ sub _complete_content_package_or_script {
             push @res, $script;
         }
     }
+
+    # convert back to slash if user originally typed with slash
+    if ($uses_slash) { for (@res) { s!::!/!g } }
 
     \@res;
 };

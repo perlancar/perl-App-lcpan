@@ -17,7 +17,7 @@ our %SPEC;
 
 $SPEC{'handle_cmd'} = {
     v => 1.1,
-    summary => 'Show POD documentation of module/.pod/script',
+    summary => 'Show POD documentation of module/POD/script',
     description => <<'_',
 
 This command extracts module (.pm)/.pod/script from release tarballs and render
@@ -206,7 +206,7 @@ LIMIT 1", {}, @bind);
         }
     }
 
-    return [404, "No such module/.pod/script"] unless $row;
+    return [404, "No such module/POD/script"] unless $row;
 
     my $path = App::lcpan::_fullpath(
         $row->{release}, $state->{cpan}, $row->{author});
