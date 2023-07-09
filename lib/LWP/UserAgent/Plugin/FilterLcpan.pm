@@ -3,7 +3,6 @@ package LWP::UserAgent::Plugin::FilterLcpan;
 use 5.010001;
 use strict;
 use warnings;
-use experimental 'smartmatch';
 use Log::ger;
 
 use HTTP::Response;
@@ -21,7 +20,7 @@ sub before_mirror {
     if ($r->{config}{include_author}) {
         my $ary = ref $r->{config}{include_author} eq 'ARRAY' ?
             $r->{config}{include_author} : [split /;/, $r->{config}{include_author}];
-        if ($url =~ m!authors/id/./../(.+)/! && !($1 ~~ @$ary)) {
+        if ($url =~ m!authors/id/./../(.+)/! && !(grep { $_ eq $1 } @$ary)) {
             say "mirror($url, $filename): author not included, skipping"
                 if $r->{config}{verbose};
             return HTTP::Response->new(304);
@@ -30,7 +29,7 @@ sub before_mirror {
     if ($r->{config}{exclude_author}) {
         my $ary = ref $r->{config}{exclude_author} eq 'ARRAY' ?
             $r->{config}{exclude_author} : [split /;/, $r->{config}{exclude_author}];
-        if ($url =~ m!authors/id/./../(.+)/! && ($1 ~~ @$ary)) {
+        if ($url =~ m!authors/id/./../(.+)/! && (grep { $_ eq $1 } @$ary)) {
             say "mirror($url, $filename): author included, skipping"
                 if $r->{config}{verbose};
             return HTTP::Response->new(304);
