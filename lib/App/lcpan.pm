@@ -5200,7 +5200,7 @@ ORDER BY $order";
 }
 
 1;
-# ABSTRACT: Manage your local CPAN mirror
+# ABSTRACT: Manage your (l)ocal CPAN mirror
 
 =head1 SYNOPSIS
 
