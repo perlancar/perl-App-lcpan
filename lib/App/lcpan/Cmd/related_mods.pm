@@ -59,6 +59,14 @@ _
             schema => 'bool*',
             tags => ['category:filtering'],
         },
+        include_module_pattern => {
+            summary => 'A SQL wildcard pattern to only select modules matching some pattern',
+            schema => 'str*',
+        },
+        exclude_module_patterh => {
+            summary => 'A SQL wildcard pattern to exclude modules',
+            schema => 'str*',
+        },
         submodules => {
             summary => 'Whether to include submodules',
             schema => 'bool*',
@@ -130,6 +138,12 @@ sub handle_cmd {
         for my $module (@$modules) {
             push @where, "m2.name NOT LIKE " . $dbh->quote("$module\::%");
         }
+    }
+    if (defined $args{include_module_pattern}) {
+        push @where, "m2.name LIKE " . $dbh->quote($args{include_module_pattern});
+    }
+    if (defined $args{exclude_module_pattern}) {
+        push @where, "m2.name NOT LIKE " . $dbh->quote($args{exclude_module_pattern});
     }
 
     my @order = map {/(-?)(.+)/; $2 . ($1 ? " DESC" : "")} @{$args{sort}};
