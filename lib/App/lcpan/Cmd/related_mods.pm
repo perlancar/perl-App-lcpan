@@ -74,7 +74,7 @@ If set to false, will only show related modules that are not submodules, e.g.
 _
             cmdline_aliases => {
                 exclude_submodules => {is_flag=>1, summary=>"Equivalent to --no-submodules", code=>sub {$_[0]{submodules}=0}},
-                include_submodules => {is_flag=>1, summary=>"Equivalent to --submodules", code=>sub {$_[0]{submodules}=1}},
+                only_submodules    => {is_flag=>1, summary=>"Equivalent to --submodules", code=>sub {$_[0]{submodules}=1}},
             },
         },
     },
