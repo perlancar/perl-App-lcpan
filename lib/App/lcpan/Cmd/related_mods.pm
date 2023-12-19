@@ -63,7 +63,7 @@ _
             summary => 'A SQL wildcard pattern to only select modules matching some pattern',
             schema => 'str*',
         },
-        exclude_module_patterh => {
+        exclude_module_pattern => {
             summary => 'A SQL wildcard pattern to exclude modules',
             schema => 'str*',
         },
